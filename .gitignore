@@ -1,0 +1,35 @@
+# .gitignore
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.egg-info/
+.env
+.env.*
+
+# VSCode
+.vscode/
+
+# Alembic
+backend/alembic/versions/__pycache__/
+
+# Node/Frontend
+node_modules/
+dist/
+build/
+
+# System
+.DS_Store
+Thumbs.db
+
+# Others
+*.log
+*.bak
+*.swp
+*.tmp
+
+# Ignore data folders
+backend/data/

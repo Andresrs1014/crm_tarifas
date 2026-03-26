@@ -13,7 +13,11 @@ from app.database import engine  # noqa: F401 — registra el engine
 from sqlmodel import SQLModel
 
 # Importar todos los modelos para que Alembic los detecte en autogenerate
-import app.models.user  # noqa: F401
+import app.models.user       # noqa: F401
+import app.models.comercial  # noqa: F401
+import app.models.record     # noqa: F401
+import app.models.contacto   # noqa: F401
+import app.models.actividad  # noqa: F401
 
 config = context.config
 

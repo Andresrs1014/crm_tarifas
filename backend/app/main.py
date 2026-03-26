@@ -6,9 +6,17 @@ from sqlmodel import Session
 
 from app.auth.service import get_user_by_username, hash_password
 from app.auth.router import router as auth_router
+from app.routers.comerciales import router as comerciales_router
+from app.routers.records import router as records_router
+from app.routers.contactos import router as contactos_router
+from app.routers.actividades import router as actividades_router
 from app.config import settings
 from app.database import engine, create_db_and_tables
-from app.models.user import User  # noqa: F401 — necesario para que SQLModel registre la tabla
+from app.models.user import User        # noqa: F401
+from app.models.comercial import Comercial  # noqa: F401
+from app.models.record import Record    # noqa: F401
+from app.models.contacto import Contacto  # noqa: F401
+from app.models.actividad import Actividad  # noqa: F401
 
 
 def _seed_superadmin() -> None:
@@ -53,6 +61,10 @@ app.add_middleware(
 
 # Routers
 app.include_router(auth_router, prefix="/api")
+app.include_router(comerciales_router, prefix="/api")
+app.include_router(records_router, prefix="/api")
+app.include_router(contactos_router, prefix="/api")
+app.include_router(actividades_router, prefix="/api")
 
 
 @app.get("/", tags=["health"])

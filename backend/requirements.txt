@@ -4,6 +4,8 @@ sqlmodel
 alembic
 python-jose[cryptography]
 passlib[bcrypt]
+bcrypt==4.0.1
 python-dotenv
 pydantic-settings
 email-validator
+python-multipart
