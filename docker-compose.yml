@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: crm_tarifas_backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app          # hot-reload en desarrollo
+      - sqlite_data:/app/data   # persistencia de la base de datos
+    env_file:
+      - .env
+    restart: unless-stopped
+
+volumes:
+  sqlite_data:
