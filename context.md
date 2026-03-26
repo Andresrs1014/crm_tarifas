@@ -37,8 +37,8 @@ crm-tarifas/
 - [x] Fase 3 — Biblioteca: líneas, grupos, ítems, observaciones, seed data
 - [x] Fase 4 — Cotizaciones: wizard, numeración atómica, duplicar, actualizar tarifas, link público
 - [x] Fase 5 — Dashboard: agregaciones SQL para KPIs y gráficos
-- [ ] Fase 6 — Frontend Base: login, routing protegido, layout
-- [ ] Fase 7 — Páginas Core: dashboard, prospectos, clientes, equipo, registro, detalle
+- [x] Fase 6 — Frontend Base: login, routing protegido, layout
+- [x] Fase 7 — Páginas Core: dashboard, prospectos, clientes, equipo, registro, detalle
 - [ ] Fase 8 — Cotizaciones FE: wizard 5 pasos, biblioteca UI, export PDF
 - [ ] Fase 9 — Polish: carga masiva, EmailJS, responsive, toasts
 
