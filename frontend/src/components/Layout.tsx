@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Building2, UserCog,
@@ -7,17 +8,41 @@ import { useAuthStore } from '../store/authStore'
 import Toast from './Toast'
 
 const NAV = [
-  { to: '/dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
-  { to: '/registro',  icon: <PlusCircle size={18} />,      label: 'Nuevo Registro' },
-  { to: '/prospectos', icon: <Users size={18} />,           label: 'Prospectos' },
-  { to: '/clientes',  icon: <Building2 size={18} />,        label: 'Clientes' },
-  { to: '/equipo',    icon: <UserCog size={18} />,           label: 'Equipo' },
-  { to: '/cotizaciones', icon: <FileText size={18} />,      label: 'Cotizaciones' },
-  { to: '/biblioteca', icon: <BookOpen size={18} />,        label: 'Biblioteca' },
+  { to: '/dashboard',    icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
+  { to: '/registro',     icon: <PlusCircle size={18} />,      label: 'Nuevo Registro' },
+  { to: '/prospectos',   icon: <Users size={18} />,           label: 'Prospectos' },
+  { to: '/clientes',     icon: <Building2 size={18} />,       label: 'Clientes' },
+  { to: '/equipo',       icon: <UserCog size={18} />,          label: 'Equipo' },
+  { to: '/cotizaciones', icon: <FileText size={18} />,        label: 'Cotizaciones' },
+  { to: '/biblioteca',   icon: <BookOpen size={18} />,        label: 'Servicios' },
 ]
+
+function useClock() {
+  const [now, setNow] = useState(new Date())
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(id)
+  }, [])
+  return now
+}
 
 export default function Layout() {
   const { user, logout } = useAuthStore()
+  const now = useClock()
+
+  const fecha = now.toLocaleDateString('es-CO', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+
+  const hora = now.toLocaleTimeString('es-CO', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  })
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: '#0a0e1a' }}>
@@ -25,9 +50,7 @@ export default function Layout() {
       <aside className="w-56 shrink-0 flex flex-col border-r border-border" style={{ background: '#111827' }}>
         {/* Logo */}
         <div className="px-5 py-5 border-b border-border">
-          <span className="font-condensed font-bold text-xl tracking-wider text-accent">
-            ZYMO
-          </span>
+          <span className="font-condensed font-bold text-xl tracking-wider text-accent">ZYMO</span>
           <span className="font-condensed text-muted text-sm ml-1">CRM</span>
         </div>
 
@@ -64,9 +87,23 @@ export default function Layout() {
       </aside>
 
       {/* Main */}
-      <main className="flex-1 overflow-y-auto">
-        <Outlet />
-      </main>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header con fecha/hora */}
+        <header
+          className="shrink-0 flex items-center justify-end px-8 py-3 border-b border-border"
+          style={{ background: '#111827' }}
+        >
+          <div className="text-right">
+            <p className="text-xs font-medium capitalize" style={{ color: '#00c2ff' }}>{fecha}</p>
+            <p className="text-xs" style={{ color: '#8899b4' }}>{hora}</p>
+          </div>
+        </header>
+
+        {/* Contenido */}
+        <main className="flex-1 overflow-y-auto">
+          <Outlet />
+        </main>
+      </div>
 
       <Toast />
     </div>

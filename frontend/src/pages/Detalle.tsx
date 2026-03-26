@@ -12,6 +12,7 @@ import BillingLines from '../components/BillingLines'
 import ConfirmModal from '../components/ConfirmModal'
 import { useToastStore } from '../store/toastStore'
 import { fmtCOP, fmtDate } from '../utils/format'
+import { getBibliotecaApi } from '../api/biblioteca'
 import { SERVICIOS } from '../types'
 import type { ContactoCreate } from '../types'
 
@@ -39,6 +40,15 @@ export default function Detalle() {
     queryKey: ['comerciales'],
     queryFn: getComercialesApi,
   })
+
+  const { data: biblioteca = [] } = useQuery({
+    queryKey: ['biblioteca'],
+    queryFn: getBibliotecaApi,
+    staleTime: 1000 * 60 * 5,
+  })
+  const lineasDisponibles = biblioteca.length > 0
+    ? biblioteca.map((l) => l.nombre)
+    : [...SERVICIOS]
 
   const updateMutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) => updateRecord(id!, payload),
@@ -334,7 +344,7 @@ export default function Detalle() {
             ) : (
               <>
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {SERVICIOS.map((s) => (
+                  {lineasDisponibles.map((s) => (
                     <ServiceChip
                       key={s}
                       label={s}

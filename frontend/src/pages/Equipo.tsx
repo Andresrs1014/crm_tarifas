@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import PageContainer from '../components/PageContainer'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -98,7 +99,7 @@ export default function Equipo() {
   }
 
   return (
-    <div className="p-6 max-w-3xl">
+    <PageContainer>
       <div className="flex items-center justify-between mb-6">
         <h1 className="font-condensed font-bold text-2xl" style={{ color: '#e8edf5' }}>
           Equipo Comercial
@@ -237,6 +238,6 @@ export default function Equipo() {
         onCancel={() => setDeleteId(null)}
         loading={deleteMutation.isPending}
       />
-    </div>
+    </PageContainer>
   )
 }

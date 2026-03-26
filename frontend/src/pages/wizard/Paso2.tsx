@@ -1,9 +1,16 @@
 import { useCotWizardStore } from '../../store/cotWizardStore'
-import { SERVICIOS, SERVICIO_COLORS } from '../../types'
+import { SERVICIO_COLORS } from '../../types'
+import type { BibliotecaLinea } from '../../types'
 
-export default function Paso2() {
+interface Props {
+  biblioteca: BibliotecaLinea[]
+}
+
+export default function Paso2({ biblioteca }: Props) {
   const lineas = useCotWizardStore((s) => s.lineas)
   const toggleLinea = useCotWizardStore((s) => s.toggleLinea)
+
+  const serviciosDisponibles = biblioteca.map((l) => l.nombre)
 
   return (
     <div className="bg-surface border border-border rounded-xl p-5">
@@ -16,7 +23,7 @@ export default function Paso2() {
       </p>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {SERVICIOS.map((svc) => {
+        {serviciosDisponibles.map((svc) => {
           const active = lineas.includes(svc)
           const color = SERVICIO_COLORS[svc] ?? '#8899b4'
           return (

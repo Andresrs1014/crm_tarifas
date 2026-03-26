@@ -1,31 +1,27 @@
 import { SERVICIO_COLORS } from '../types'
 
 interface ServiceChipProps {
-  service: string
+  label: string
   selected: boolean
-  onClick: () => void
+  onToggle: () => void
   disabled?: boolean
 }
 
-export default function ServiceChip({ service, selected, onClick, disabled }: ServiceChipProps) {
-  const color = SERVICIO_COLORS[service] ?? '#8899b4'
+export default function ServiceChip({ label, selected, onToggle, disabled }: ServiceChipProps) {
+  const color = SERVICIO_COLORS[label] ?? '#8899b4'
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={onToggle}
       disabled={disabled}
-      className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
-        selected
-          ? 'text-bg'
-          : 'bg-transparent text-muted border-border hover:border-muted'
-      } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+      className="px-3 py-1.5 rounded-lg text-sm font-medium border transition-all"
       style={
         selected
-          ? { backgroundColor: color, borderColor: color }
-          : { borderColor: color + '55', color }
+          ? { background: color + '20', borderColor: color, color }
+          : { background: 'transparent', borderColor: '#1e3050', color: '#8899b4' }
       }
     >
-      {service}
+      {label}
     </button>
   )
 }

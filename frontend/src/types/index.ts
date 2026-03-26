@@ -9,11 +9,11 @@ export const SERVICIOS = [
 
 export const SERVICIO_COLORS: Record<string, string> = {
   'Zona Franca':       '#00c2ff',
-  'Depósito Aduanero': '#a855f7',
-  'CEDI':              '#00e676',
-  'Transporte':        '#f5a623',
-  'Paqueteo':          '#ff6b6b',
-  'Aduana':            '#00ffcc',
+  'Depósito Aduanero': '#f5a623',
+  'CEDI':              '#f5a623',
+  'Transporte':        '#00e676',
+  'Paqueteo':          '#a855f7',
+  'Aduana':            '#ff4444',
 }
 
 // ---------- Biblioteca ----------
