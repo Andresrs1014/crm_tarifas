@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { box-sizing: border-box; }
+
+body {
+  background-color: #0a0e1a;
+  color: #e8edf5;
+  font-family: 'Barlow', sans-serif;
+  margin: 0;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #111827; }
+::-webkit-scrollbar-thumb { background: #1e3050; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #2a4070; }
+
+/* Inputs base */
+input, select, textarea {
+  background-color: #1a2235;
+  color: #e8edf5;
+  border: 1px solid #1e3050;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.15s;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: #00c2ff;
+}
+input::placeholder, textarea::placeholder {
+  color: #8899b4;
+}
+select option {
+  background: #1a2235;
+}

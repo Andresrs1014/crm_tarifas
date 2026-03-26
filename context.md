@@ -33,10 +33,10 @@ crm-tarifas/
 ## Fases
 - [x] Fase 0 — Setup: estructura, docker-compose, FastAPI base, SQLite
 - [x] Fase 1 — Auth: modelo users, JWT, endpoints /token /register /me, superadmin automático
-- [ ] Fase 2 — Core Backend: modelos y CRUD de comerciales, records, contactos, actividades
-- [ ] Fase 3 — Biblioteca: líneas, grupos, ítems, observaciones, seed data
-- [ ] Fase 4 — Cotizaciones: wizard, numeración atómica, duplicar, actualizar tarifas, link público
-- [ ] Fase 5 — Dashboard: agregaciones SQL para KPIs y gráficos
+- [x] Fase 2 — Core Backend: modelos y CRUD de comerciales, records, contactos, actividades
+- [x] Fase 3 — Biblioteca: líneas, grupos, ítems, observaciones, seed data
+- [x] Fase 4 — Cotizaciones: wizard, numeración atómica, duplicar, actualizar tarifas, link público
+- [x] Fase 5 — Dashboard: agregaciones SQL para KPIs y gráficos
 - [ ] Fase 6 — Frontend Base: login, routing protegido, layout
 - [ ] Fase 7 — Páginas Core: dashboard, prospectos, clientes, equipo, registro, detalle
 - [ ] Fase 8 — Cotizaciones FE: wizard 5 pasos, biblioteca UI, export PDF
