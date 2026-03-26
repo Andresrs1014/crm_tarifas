@@ -1,0 +1,266 @@
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
+import { Plus, Eye, Pencil, Copy, Link, Printer, Trash2 } from 'lucide-react'
+import {
+  getCotizacionesApi,
+  deleteCotizacionApi,
+  duplicarCotizacionApi,
+} from '../api/cotizaciones'
+import { getComercialesApi } from '../api/comerciales'
+import Badge from '../components/Badge'
+import ConfirmModal from '../components/ConfirmModal'
+import { useToastStore } from '../store/toastStore'
+import { useCotWizardStore } from '../store/cotWizardStore'
+import { fmtDate } from '../utils/format'
+import { SERVICIO_COLORS } from '../types'
+import type { CotizacionRead } from '../types'
+
+const ESTADO_COLORS: Record<string, string> = {
+  borrador:    '#8899b4',
+  enviada:     '#00c2ff',
+  negociacion: '#f5a623',
+  aprobada:    '#00e676',
+  rechazada:   '#ff6b6b',
+}
+
+export default function Cotizaciones() {
+  const [search, setSearch] = useState('')
+  const [estado, setEstado] = useState('')
+  const [comercialId, setComercialId] = useState('')
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const navigate = useNavigate()
+  const toast = useToastStore()
+  const qc = useQueryClient()
+  const resetWizard = useCotWizardStore((s) => s.resetWizard)
+
+  const { data: cotizaciones = [], isLoading } = useQuery({
+    queryKey: ['cotizaciones', search, estado, comercialId],
+    queryFn: () =>
+      getCotizacionesApi({
+        ...(search ? { search } : {}),
+        ...(estado ? { estado } : {}),
+        ...(comercialId ? { comercial_id: comercialId } : {}),
+      }),
+  })
+
+  const { data: comerciales = [] } = useQuery({
+    queryKey: ['comerciales'],
+    queryFn: getComercialesApi,
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteCotizacionApi,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['cotizaciones'] })
+      toast.add('Cotización eliminada')
+      setDeleteId(null)
+    },
+    onError: () => toast.add('Error al eliminar', 'error'),
+  })
+
+  const duplicarMutation = useMutation({
+    mutationFn: duplicarCotizacionApi,
+    onSuccess: (cot) => {
+      qc.invalidateQueries({ queryKey: ['cotizaciones'] })
+      toast.add(`Duplicada como ${cot.numero}`)
+    },
+    onError: () => toast.add('Error al duplicar', 'error'),
+  })
+
+  const comercialNombre = (id: string | null) =>
+    comerciales.find((c) => c.id === id)?.nombre ?? '—'
+
+  const copyLink = (cot: CotizacionRead) => {
+    const slug = cot.numero.replace('COT-', 'COT')
+    const url = `${window.location.origin}/cot/${slug}`
+    navigator.clipboard.writeText(url)
+    toast.add('Link copiado al portapapeles')
+  }
+
+  const openPrint = (cot: CotizacionRead) => {
+    const slug = cot.numero.replace('COT-', 'COT')
+    window.open(`/cot/${slug}`, '_blank')
+  }
+
+  const handleNew = () => {
+    resetWizard()
+    navigate('/cotizaciones/nueva')
+  }
+
+  return (
+    <div className="p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="font-condensed font-bold text-2xl" style={{ color: '#e8edf5' }}>
+          Cotizaciones
+        </h1>
+        <button
+          onClick={handleNew}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition"
+          style={{ background: '#00c2ff', color: '#0a0e1a' }}
+        >
+          <Plus size={16} /> Nueva cotización
+        </button>
+      </div>
+
+      {/* Filtros */}
+      <div className="flex gap-3 mb-5">
+        <input
+          className="flex-1"
+          placeholder="Buscar por empresa, NIT o número..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <select className="w-44" value={estado} onChange={(e) => setEstado(e.target.value)}>
+          <option value="">Todos los estados</option>
+          <option value="borrador">Borrador</option>
+          <option value="enviada">Enviada</option>
+          <option value="negociacion">Negociación</option>
+          <option value="aprobada">Aprobada</option>
+          <option value="rechazada">Rechazada</option>
+        </select>
+        <select className="w-44" value={comercialId} onChange={(e) => setComercialId(e.target.value)}>
+          <option value="">Todos los comerciales</option>
+          {comerciales.map((c) => (
+            <option key={c.id} value={c.id}>{c.nombre}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Tabla */}
+      <div className="bg-surface border border-border rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                {['Número', 'Empresa', 'Líneas', 'Estado', 'Comercial', 'Fecha', 'Vigencia', ''].map((h) => (
+                  <th
+                    key={h}
+                    className="text-left px-4 py-3 text-xs font-condensed uppercase text-muted tracking-wider whitespace-nowrap"
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading && (
+                <tr>
+                  <td colSpan={8} className="text-center py-10 text-muted">Cargando...</td>
+                </tr>
+              )}
+              {!isLoading && cotizaciones.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="text-center py-10 text-muted">Sin cotizaciones</td>
+                </tr>
+              )}
+              {cotizaciones.map((cot) => (
+                <tr
+                  key={cot.id}
+                  className="border-b border-border hover:bg-surface2 transition"
+                >
+                  <td className="px-4 py-3">
+                    <span className="font-condensed font-bold text-sm" style={{ color: '#00c2ff' }}>
+                      {cot.numero}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="font-medium" style={{ color: '#e8edf5' }}>{cot.empresa}</p>
+                    {cot.nit && <p className="text-xs text-muted">NIT {cot.nit}</p>}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-1">
+                      {cot.lineas.slice(0, 3).map((l) => (
+                        <span
+                          key={l}
+                          className="text-xs px-1.5 py-0.5 rounded"
+                          style={{
+                            background: SERVICIO_COLORS[l] + '22',
+                            color: SERVICIO_COLORS[l],
+                          }}
+                        >
+                          {l}
+                        </span>
+                      ))}
+                      {cot.lineas.length > 3 && (
+                        <span className="text-xs text-muted">+{cot.lineas.length - 3}</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className="text-xs px-2 py-0.5 rounded-full font-medium capitalize"
+                      style={{
+                        background: (ESTADO_COLORS[cot.estado] ?? '#8899b4') + '22',
+                        color: ESTADO_COLORS[cot.estado] ?? '#8899b4',
+                      }}
+                    >
+                      {cot.estado}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-muted">{comercialNombre(cot.comercial_id)}</td>
+                  <td className="px-4 py-3 text-muted whitespace-nowrap">{fmtDate(cot.fecha)}</td>
+                  <td className="px-4 py-3 text-muted whitespace-nowrap">{fmtDate(cot.vigencia)}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-1.5">
+                      <ActionBtn title="Ver" onClick={() => navigate(`/cotizaciones/${cot.id}`)}>
+                        <Eye size={14} />
+                      </ActionBtn>
+                      <ActionBtn title="Editar" onClick={() => navigate(`/cotizaciones/${cot.id}/editar`)}>
+                        <Pencil size={14} />
+                      </ActionBtn>
+                      <ActionBtn title="Duplicar" onClick={() => duplicarMutation.mutate(cot.id)}>
+                        <Copy size={14} />
+                      </ActionBtn>
+                      <ActionBtn title="Copiar link público" onClick={() => copyLink(cot)}>
+                        <Link size={14} />
+                      </ActionBtn>
+                      <ActionBtn title="PDF / Imprimir" onClick={() => openPrint(cot)}>
+                        <Printer size={14} />
+                      </ActionBtn>
+                      <ActionBtn title="Eliminar" danger onClick={() => setDeleteId(cot.id)}>
+                        <Trash2 size={14} />
+                      </ActionBtn>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <ConfirmModal
+        open={!!deleteId}
+        message="¿Eliminar esta cotización? Esta acción no se puede deshacer."
+        onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
+        onCancel={() => setDeleteId(null)}
+        loading={deleteMutation.isPending}
+      />
+    </div>
+  )
+}
+
+function ActionBtn({
+  children,
+  onClick,
+  title,
+  danger,
+}: {
+  children: React.ReactNode
+  onClick: () => void
+  title?: string
+  danger?: boolean
+}) {
+  return (
+    <button
+      title={title}
+      onClick={onClick}
+      className={`p-1.5 rounded transition ${
+        danger ? 'text-muted hover:text-danger' : 'text-muted hover:text-accent'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}

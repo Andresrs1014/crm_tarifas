@@ -16,6 +16,102 @@ export const SERVICIO_COLORS: Record<string, string> = {
   'Aduana':            '#00ffcc',
 }
 
+// ---------- Biblioteca ----------
+
+export interface BibliotecaColumna {
+  id: string     // slug único, ej: 'kg', 'm3'
+  nombre: string // label visible, ej: 'Kilogramos'
+}
+
+export interface BibliotecaItem {
+  id: string
+  grupo_id: string
+  nombre: string
+  tarifa: string                      // '559.900' | '0,36%'
+  tipo_tarifa: 'moneda' | 'porcentaje'
+  obs: string | null
+  extra_cols: Record<string, string>  // { col_id: valor }
+  orden: number
+}
+
+export interface BibliotecaObservacion {
+  id: string
+  linea_id: string
+  nombre: string
+  html: string
+  orden: number
+}
+
+export interface BibliotecaGrupo {
+  id: string
+  linea_id: string
+  nombre: string
+  orden: number
+  items: BibliotecaItem[]
+}
+
+export interface BibliotecaLinea {
+  id: string
+  nombre: string
+  columnas: BibliotecaColumna[]       // columnas extra de esta línea
+  orden: number
+  grupos: BibliotecaGrupo[]
+  observaciones: BibliotecaObservacion[]
+}
+
+// ---------- Cotizaciones ----------
+
+export type EstadoCotizacion =
+  | 'borrador'
+  | 'enviada'
+  | 'negociacion'
+  | 'aprobada'
+  | 'rechazada'
+
+// WizardItem: copia editable en memoria de un BibliotecaItem
+export interface WizardItem {
+  sel: boolean
+  nombre: string
+  tarifa: string
+  tipo_tarifa: 'moneda' | 'porcentaje'
+  obs: string
+  extra_cols: Record<string, string>
+}
+
+// WizardGrupo: grupo con nombre + lista de WizardItems
+export interface WizardGrupo {
+  sel: boolean    // true = todos sus items seleccionados
+  nombre: string  // guardamos nombre para display sin re-consultar biblioteca
+  items: WizardItem[]
+}
+
+// ItemsMap = { [servicio]: { [grupo_id]: WizardGrupo } }
+// Esto es exactamente la forma del items_snapshot en el backend
+export type ItemsMap = Record<string, Record<string, WizardGrupo>>
+
+export interface CotizacionRead {
+  id: string
+  numero: string
+  empresa: string
+  nit: string | null
+  record_id: string | null
+  contacto: string | null
+  cargo: string | null
+  email: string | null
+  telefono: string | null
+  comercial_id: string | null
+  fecha: string
+  vigencia: string
+  estado: EstadoCotizacion
+  asunto: string | null
+  lineas: string[]
+  items_snapshot: ItemsMap
+  obs_plantillas: Record<string, string[]>
+  obs_libre: string | null
+  created_at: string
+  updated_at: string
+}
+
 // ---------- Auth ----------
 
 export interface UserRead {
