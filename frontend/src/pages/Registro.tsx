@@ -6,9 +6,11 @@ import { z } from 'zod'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { createRecord } from '../api/records'
 import { getComercialesApi } from '../api/comerciales'
+import { getBibliotecaApi } from '../api/biblioteca'
 import ServiceChip from '../components/ServiceChip'
 import ContactosList from '../components/ContactosList'
 import BillingLines from '../components/BillingLines'
+import PageContainer from '../components/PageContainer'
 import { useToastStore } from '../store/toastStore'
 import { SERVICIOS } from '../types'
 import type { ContactoCreate } from '../types'
@@ -50,6 +52,17 @@ export default function Registro() {
     queryFn: getComercialesApi,
   })
 
+  const { data: biblioteca = [] } = useQuery({
+    queryKey: ['biblioteca'],
+    queryFn: getBibliotecaApi,
+    staleTime: 1000 * 60 * 5,
+  })
+
+  // Líneas desde backend; mientras carga usa el array estático para no mostrar vacío
+  const lineasDisponibles = biblioteca.length > 0
+    ? biblioteca.map((l) => l.nombre)
+    : [...SERVICIOS]
+
   const { register, handleSubmit, watch, control, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -87,223 +100,229 @@ export default function Registro() {
   }
 
   return (
-    <div className="p-6 max-w-3xl">
-      <div className="mb-6">
-        <h1 className="font-condensed font-bold text-2xl" style={{ color: '#e8edf5' }}>
-          Nuevo Registro
-        </h1>
-        <p className="text-muted text-sm mt-1">Prospecto o cliente nuevo</p>
+    <PageContainer>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="font-condensed font-bold text-2xl" style={{ color: '#e8edf5' }}>
+            Nuevo Registro
+          </h1>
+          <p className="text-muted text-sm mt-1">Prospecto o cliente nuevo</p>
+        </div>
+
+        {/* Tipo de registro en el header */}
+        <Controller
+          control={control}
+          name="tipo"
+          render={({ field }) => (
+            <div className="flex gap-2">
+              {(['prospecto', 'cliente'] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => field.onChange(t)}
+                  className="px-5 py-2 rounded-lg text-sm font-medium capitalize transition"
+                  style={{
+                    background: field.value === t ? '#00c2ff' : 'transparent',
+                    color: field.value === t ? '#0a0e1a' : '#8899b4',
+                    border: `1px solid ${field.value === t ? '#00c2ff' : '#1e3050'}`,
+                  }}
+                >
+                  {t.charAt(0).toUpperCase() + t.slice(1)}
+                </button>
+              ))}
+            </div>
+          )}
+        />
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
 
-        {/* Tipo */}
-        <div className="bg-surface border border-border rounded-xl p-5">
-          <h2 className="font-condensed text-xs uppercase text-muted tracking-wider mb-3">Tipo de registro</h2>
-          <Controller
-            control={control}
-            name="tipo"
-            render={({ field }) => (
-              <div className="flex gap-3">
-                {(['prospecto', 'cliente'] as const).map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => field.onChange(t)}
-                    className="px-5 py-2 rounded-lg text-sm font-medium capitalize transition"
-                    style={{
-                      background: field.value === t ? '#00c2ff' : 'transparent',
-                      color: field.value === t ? '#0a0e1a' : '#8899b4',
-                      border: `1px solid ${field.value === t ? '#00c2ff' : '#1e3050'}`,
-                    }}
-                  >
-                    {t.charAt(0).toUpperCase() + t.slice(1)}
-                  </button>
-                ))}
+        {/* Fila 1: Datos generales + Estado */}
+        <div className="grid grid-cols-3 gap-5">
+
+          {/* Datos generales — 2 cols */}
+          <div className="col-span-2 bg-surface border border-border rounded-xl p-5">
+            <h2 className="font-condensed text-xs uppercase text-muted tracking-wider mb-4">Datos generales</h2>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-3">
+                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Empresa *</label>
+                <input {...register('empresa')} placeholder="Nombre de la empresa" />
+                {errors.empresa && <p className="text-danger text-xs mt-1">{errors.empresa.message}</p>}
               </div>
-            )}
-          />
-        </div>
-
-        {/* Datos generales */}
-        <div className="bg-surface border border-border rounded-xl p-5">
-          <h2 className="font-condensed text-xs uppercase text-muted tracking-wider mb-4">Datos generales</h2>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Empresa *</label>
-              <input {...register('empresa')} placeholder="Nombre de la empresa" />
-              {errors.empresa && <p className="text-danger text-xs mt-1">{errors.empresa.message}</p>}
-            </div>
-            <div>
-              <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">NIT</label>
-              <input {...register('nit')} placeholder="900.123.456-7" />
-            </div>
-            <div>
-              <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Ciudad</label>
-              <input {...register('ciudad')} placeholder="Ciudad" />
-            </div>
-            <div>
-              <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Comercial</label>
-              <select {...register('comercial_id')}>
-                <option value="">Sin asignar</option>
-                {comerciales.map((c) => (
-                  <option key={c.id} value={c.id}>{c.nombre}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Fecha</label>
-              <input type="date" {...register('fecha')} />
-            </div>
-            <div>
-              <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Tipo cliente</label>
-              <select {...register('tipo_cliente')}>
-                <option value="directo">Directo</option>
-                <option value="indirecto">Indirecto</option>
-                <option value="referido">Referido</option>
-              </select>
-            </div>
-            {tipoCliente !== 'directo' && (
               <div>
-                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Comisión</label>
-                <input {...register('comision')} placeholder="%" />
+                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">NIT</label>
+                <input {...register('nit')} placeholder="900.123.456-7" />
               </div>
-            )}
-            <div className="col-span-2">
-              <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Observaciones</label>
-              <textarea
-                {...register('observaciones')}
-                placeholder="Notas adicionales..."
-                className="h-20 resize-none"
-              />
+              <div>
+                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Ciudad</label>
+                <input {...register('ciudad')} placeholder="Ciudad" />
+              </div>
+              <div>
+                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Fecha</label>
+                <input type="date" {...register('fecha')} />
+              </div>
+              <div>
+                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Comercial</label>
+                <select {...register('comercial_id')}>
+                  <option value="">Sin asignar</option>
+                  {comerciales.map((c) => (
+                    <option key={c.id} value={c.id}>{c.nombre}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Tipo cliente</label>
+                <select {...register('tipo_cliente')}>
+                  <option value="directo">Directo</option>
+                  <option value="indirecto">Indirecto</option>
+                  <option value="referido">Referido</option>
+                </select>
+              </div>
+              {tipoCliente !== 'directo' && (
+                <div>
+                  <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Comisión</label>
+                  <input {...register('comision')} placeholder="%" />
+                </div>
+              )}
+              <div className="col-span-3">
+                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Observaciones</label>
+                <textarea
+                  {...register('observaciones')}
+                  placeholder="Notas adicionales..."
+                  className="h-20 resize-none"
+                />
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Servicios */}
-        <div className="bg-surface border border-border rounded-xl p-5">
-          <h2 className="font-condensed text-xs uppercase text-muted tracking-wider mb-4">Servicios de interés</h2>
-          <div className="flex flex-wrap gap-2 mb-4">
-            {SERVICIOS.map((s) => (
-              <ServiceChip
-                key={s}
-                label={s}
-                selected={servicios.includes(s)}
-                onToggle={() =>
-                  setServicios((prev) =>
-                    prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
-                  )
-                }
-              />
-            ))}
-          </div>
-          {servicios.length > 0 && (
-            <>
-              <p className="text-xs text-muted mb-3 uppercase tracking-wider font-condensed">Facturación por línea</p>
-              <BillingLines
-                servicios={servicios}
-                value={facturacionLineas}
-                onChange={setFacturacionLineas}
-              />
-            </>
-          )}
-        </div>
-
-        {/* Campos prospecto */}
-        {tipo === 'prospecto' && (
+          {/* Estado prospecto/cliente — 1 col */}
           <div className="bg-surface border border-border rounded-xl p-5">
-            <h2 className="font-condensed text-xs uppercase text-muted tracking-wider mb-4">Estado prospecto</h2>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Estado</label>
-                <select {...register('estado_prospecto')}>
-                  <option value="">—</option>
-                  <option value="seguimiento">Seguimiento</option>
-                  <option value="cerrado">Cerrado</option>
-                  <option value="perdido">Perdido</option>
-                  <option value="frio">Frío</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Visita</label>
-                <select {...register('visita')}>
-                  <option value="">—</option>
-                  <option value="no">No</option>
-                  <option value="si">Sí</option>
-                  <option value="virtual">Virtual</option>
-                  <option value="llamada">Llamada</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Facturado</label>
-                <select {...register('facturado_p')}>
-                  <option value="">—</option>
-                  <option value="no">No</option>
-                  <option value="si">Sí</option>
-                  <option value="parcial">Parcial</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Próx. seguimiento</label>
-                <input type="date" {...register('proximo_seguimiento')} />
-              </div>
-            </div>
+            {tipo === 'prospecto' ? (
+              <>
+                <h2 className="font-condensed text-xs uppercase text-muted tracking-wider mb-4">Estado prospecto</h2>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Estado</label>
+                    <select {...register('estado_prospecto')}>
+                      <option value="">—</option>
+                      <option value="seguimiento">Seguimiento</option>
+                      <option value="cerrado">Cerrado</option>
+                      <option value="perdido">Perdido</option>
+                      <option value="frio">Frío</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Visita</label>
+                    <select {...register('visita')}>
+                      <option value="">—</option>
+                      <option value="no">No</option>
+                      <option value="si">Sí</option>
+                      <option value="virtual">Virtual</option>
+                      <option value="llamada">Llamada</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Facturado</label>
+                    <select {...register('facturado_p')}>
+                      <option value="">—</option>
+                      <option value="no">No</option>
+                      <option value="si">Sí</option>
+                      <option value="parcial">Parcial</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Próx. seguimiento</label>
+                    <input type="date" {...register('proximo_seguimiento')} />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="font-condensed text-xs uppercase text-muted tracking-wider mb-4">Estado cliente</h2>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Estado</label>
+                    <select {...register('estado_cliente')}>
+                      <option value="">—</option>
+                      <option value="activo">Activo</option>
+                      <option value="en-riesgo">En riesgo</option>
+                      <option value="inactivo">Inactivo</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Visita</label>
+                    <select {...register('visita_cliente')}>
+                      <option value="">—</option>
+                      <option value="no">No</option>
+                      <option value="si">Sí</option>
+                      <option value="virtual">Virtual</option>
+                      <option value="llamada">Llamada</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">¿Nuevo servicio?</label>
+                    <select {...register('nuevo_servicio')}>
+                      <option value="">—</option>
+                      <option value="si">Sí</option>
+                      <option value="no">No</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Servicio nuevo</label>
+                    <input {...register('servicio_nuevo')} placeholder="Nombre del servicio" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Facturado</label>
+                    <select {...register('facturado')}>
+                      <option value="">—</option>
+                      <option value="no">No</option>
+                      <option value="si">Sí</option>
+                      <option value="parcial">Parcial</option>
+                    </select>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
-        )}
+        </div>
 
-        {/* Campos cliente */}
-        {tipo === 'cliente' && (
+        {/* Fila 2: Servicios + Contactos */}
+        <div className="grid grid-cols-2 gap-5">
+
+          {/* Servicios de interés */}
           <div className="bg-surface border border-border rounded-xl p-5">
-            <h2 className="font-condensed text-xs uppercase text-muted tracking-wider mb-4">Estado cliente</h2>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Estado</label>
-                <select {...register('estado_cliente')}>
-                  <option value="">—</option>
-                  <option value="activo">Activo</option>
-                  <option value="en-riesgo">En riesgo</option>
-                  <option value="inactivo">Inactivo</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Visita</label>
-                <select {...register('visita_cliente')}>
-                  <option value="">—</option>
-                  <option value="no">No</option>
-                  <option value="si">Sí</option>
-                  <option value="virtual">Virtual</option>
-                  <option value="llamada">Llamada</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">¿Nuevo servicio?</label>
-                <select {...register('nuevo_servicio')}>
-                  <option value="">—</option>
-                  <option value="si">Sí</option>
-                  <option value="no">No</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Servicio nuevo</label>
-                <input {...register('servicio_nuevo')} placeholder="Nombre del servicio" />
-              </div>
-              <div>
-                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Facturado</label>
-                <select {...register('facturado')}>
-                  <option value="">—</option>
-                  <option value="no">No</option>
-                  <option value="si">Sí</option>
-                  <option value="parcial">Parcial</option>
-                </select>
-              </div>
+            <h2 className="font-condensed text-xs uppercase text-muted tracking-wider mb-4">Servicios de interés</h2>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {lineasDisponibles.map((s) => (
+                <ServiceChip
+                  key={s}
+                  label={s}
+                  selected={servicios.includes(s)}
+                  onToggle={() =>
+                    setServicios((prev) =>
+                      prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
+                    )
+                  }
+                />
+              ))}
             </div>
+            {servicios.length > 0 && (
+              <>
+                <p className="text-xs text-muted mb-3 uppercase tracking-wider font-condensed">Facturación por línea</p>
+                <BillingLines
+                  servicios={servicios}
+                  value={facturacionLineas}
+                  onChange={setFacturacionLineas}
+                />
+              </>
+            )}
           </div>
-        )}
 
-        {/* Contactos */}
-        <div className="bg-surface border border-border rounded-xl p-5">
-          <h2 className="font-condensed text-xs uppercase text-muted tracking-wider mb-4">Contactos</h2>
-          <ContactosList value={contactos} onChange={setContactos} />
+          {/* Contactos */}
+          <div className="bg-surface border border-border rounded-xl p-5">
+            <h2 className="font-condensed text-xs uppercase text-muted tracking-wider mb-4">Contactos</h2>
+            <ContactosList value={contactos} onChange={setContactos} />
+          </div>
         </div>
 
         {/* Submit */}
@@ -325,6 +344,6 @@ export default function Registro() {
           </button>
         </div>
       </form>
-    </div>
+    </PageContainer>
   )
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import PageContainer from '../components/PageContainer'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Eye, Pencil, Copy, Link, Printer, Trash2 } from 'lucide-react'
 import {
@@ -89,7 +90,7 @@ export default function Cotizaciones() {
   }
 
   return (
-    <div className="p-6">
+    <PageContainer>
       <div className="flex items-center justify-between mb-6">
         <h1 className="font-condensed font-bold text-2xl" style={{ color: '#e8edf5' }}>
           Cotizaciones
@@ -237,7 +238,7 @@ export default function Cotizaciones() {
         onCancel={() => setDeleteId(null)}
         loading={deleteMutation.isPending}
       />
-    </div>
+    </PageContainer>
   )
 }
 

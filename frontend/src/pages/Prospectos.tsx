@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import PageContainer from '../components/PageContainer'
 import { useNavigate } from 'react-router-dom'
 import { Eye, Trash2 } from 'lucide-react'
 import { getRecords, deleteRecord } from '../api/records'
@@ -48,7 +49,7 @@ export default function Prospectos() {
     comerciales.find((c) => c.id === id)?.nombre ?? '—'
 
   return (
-    <div className="p-6">
+    <PageContainer>
       <div className="flex items-center justify-between mb-6">
         <h1 className="font-condensed font-bold text-2xl" style={{ color: '#e8edf5' }}>
           Prospectos
@@ -166,6 +167,6 @@ export default function Prospectos() {
         onCancel={() => setDeleteId(null)}
         loading={deleteMutation.isPending}
       />
-    </div>
+    </PageContainer>
   )
 }

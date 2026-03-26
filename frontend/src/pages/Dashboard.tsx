@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import PageContainer from '../components/PageContainer'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { getDashboardStats, getDashboardCharts } from '../api/dashboard'
 import { getComercialesApi } from '../api/comerciales'
@@ -33,7 +34,7 @@ export default function Dashboard() {
   })
 
   return (
-    <div className="p-6">
+    <PageContainer>
       <div className="flex items-center justify-between mb-6">
         <h1 className="font-condensed font-bold text-2xl" style={{ color: '#e8edf5' }}>
           Dashboard
@@ -160,6 +161,6 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
       </div>
-    </div>
+    </PageContainer>
   )
 }

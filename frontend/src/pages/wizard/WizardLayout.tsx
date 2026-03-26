@@ -144,7 +144,7 @@ export default function WizardLayout() {
       {/* Contenido del paso */}
       <div className="mb-8">
         {paso === 1 && <Paso1 />}
-        {paso === 2 && <Paso2 />}
+        {paso === 2 && <Paso2 biblioteca={biblioteca} />}
         {paso === 3 && <Paso3 biblioteca={biblioteca} />}
         {paso === 4 && <Paso4 biblioteca={biblioteca} />}
         {paso === 5 && <Paso5 biblioteca={biblioteca} onSave={handleSave} />}
