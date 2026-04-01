@@ -2,14 +2,13 @@ import { useState, useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Building2, UserCog,
-  PlusCircle, FileText, BookOpen, LogOut,
+  PlusCircle, FileText, BookOpen, LogOut, ShieldCheck,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import Toast from './Toast'
 
-const NAV = [
+const NAV_MAIN = [
   { to: '/dashboard',    icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
-  { to: '/registro',     icon: <PlusCircle size={18} />,      label: 'Nuevo Registro' },
   { to: '/prospectos',   icon: <Users size={18} />,           label: 'Prospectos' },
   { to: '/clientes',     icon: <Building2 size={18} />,       label: 'Clientes' },
   { to: '/equipo',       icon: <UserCog size={18} />,          label: 'Equipo' },
@@ -56,7 +55,24 @@ export default function Layout() {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-3 px-2">
-          {NAV.map(({ to, icon, label }) => (
+          {/* Nuevo Registro destacado */}
+          <NavLink
+            to="/registro"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm mb-3 transition-all ${
+                isActive
+                  ? 'bg-accent/20 text-accent'
+                  : 'text-accent/80 hover:bg-accent/10 hover:text-accent'
+              }`
+            }
+          >
+            <PlusCircle size={18} />
+            <span className="font-medium">Nuevo Registro</span>
+          </NavLink>
+
+          <div className="border-t border-border mb-3" />
+
+          {NAV_MAIN.map(({ to, icon, label }) => (
             <NavLink
               key={to}
               to={to}
@@ -72,6 +88,26 @@ export default function Layout() {
               <span className="font-medium">{label}</span>
             </NavLink>
           ))}
+
+          {/* Admin — solo superadmin */}
+          {user?.is_superadmin && (
+            <>
+              <div className="border-t border-border my-3" />
+              <NavLink
+                to="/admin/usuarios"
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm mb-0.5 transition-all ${
+                    isActive
+                      ? 'bg-gold/10 text-gold'
+                      : 'text-muted hover:bg-surface2 hover:text-white'
+                  }`
+                }
+              >
+                <ShieldCheck size={18} />
+                <span className="font-medium">Usuarios</span>
+              </NavLink>
+            </>
+          )}
         </nav>
 
         {/* User */}

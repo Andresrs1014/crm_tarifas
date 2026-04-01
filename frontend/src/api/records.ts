@@ -39,3 +39,10 @@ export async function addActividad(recordId: string, payload: ActividadCreate): 
   const { data } = await api.post<Actividad>(`/api/records/${recordId}/actividades`, payload)
   return data
 }
+
+export async function importRecords(
+  rows: Record<string, unknown>[]
+): Promise<{ created: number; errors: Array<{ empresa: string; error: string }> }> {
+  const { data } = await api.post('/api/records/import', rows)
+  return data
+}

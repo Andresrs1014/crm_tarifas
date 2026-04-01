@@ -1,6 +1,8 @@
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.auth.dependencies import get_current_active_user, require_superadmin
 from app.auth.service import (
@@ -11,7 +13,7 @@ from app.auth.service import (
 )
 from app.database import get_session
 from app.models.user import User
-from app.schemas.user import Token, UserCreate, UserRead
+from app.schemas.user import Token, UserCreate, UserRead, UserUpdate
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -68,3 +70,50 @@ def register(
 @router.get("/me", response_model=UserRead, summary="Datos del usuario actual")
 def me(current_user: User = Depends(get_current_active_user)):
     return current_user
+
+
+@router.get("/users", response_model=list[UserRead], summary="Listar usuarios (superadmin)")
+def list_users(
+    session: Session = Depends(get_session),
+    _: User = Depends(require_superadmin),
+):
+    users = session.exec(select(User).order_by(User.created_at)).all()
+    return [UserRead.model_validate(u) for u in users]
+
+
+@router.put("/users/{user_id}", response_model=UserRead, summary="Actualizar usuario (superadmin)")
+def update_user(
+    user_id: uuid.UUID,
+    data: UserUpdate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_superadmin),
+):
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="No puedes modificar tu propio estado")
+    update_data = data.model_dump(exclude_unset=True)
+    if "password" in update_data:
+        update_data["hashed_password"] = hash_password(update_data.pop("password"))
+    for k, v in update_data.items():
+        setattr(user, k, v)
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return UserRead.model_validate(user)
+
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Eliminar usuario (superadmin)")
+def delete_user(
+    user_id: uuid.UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_superadmin),
+):
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="No puedes eliminar tu propia cuenta")
+    session.delete(user)
+    session.commit()
