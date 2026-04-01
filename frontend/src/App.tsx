@@ -12,6 +12,8 @@ import Cotizaciones from './pages/Cotizaciones'
 import WizardLayout from './pages/wizard/WizardLayout'
 import CotPublica from './pages/CotPublica'
 import Biblioteca from './pages/Biblioteca'
+import Usuarios from './pages/Usuarios'
+import ImportWizard from './pages/ImportWizard'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -48,6 +50,8 @@ export default function App() {
           <Route path="cotizaciones/nueva" element={<WizardLayout />} />
           <Route path="cotizaciones/:id/editar" element={<WizardLayout />} />
           <Route path="biblioteca" element={<Biblioteca />} />
+          <Route path="registro/importar" element={<ImportWizard />} />
+          <Route path="admin/usuarios" element={<Usuarios />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import PageContainer from '../components/PageContainer'
 import { useNavigate } from 'react-router-dom'
-import { Eye, Trash2 } from 'lucide-react'
+import { Eye, Trash2, Upload, Building2 as Building2Icon } from 'lucide-react'
 import { getRecords, deleteRecord } from '../api/records'
 import { getComercialesApi } from '../api/comerciales'
 import Badge from '../components/Badge'
@@ -54,7 +54,22 @@ export default function Clientes() {
         <h1 className="font-condensed font-bold text-2xl" style={{ color: '#e8edf5' }}>
           Clientes
         </h1>
-        <span className="text-muted text-sm">{records.length} registros</span>
+        <div className="flex items-center gap-3">
+          <span className="text-muted text-sm">{records.length} registros</span>
+          <button
+            onClick={() => navigate('/registro/importar?tipo=cliente')}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted hover:text-white border border-border transition"
+          >
+            <Upload size={14} /> Importar
+          </button>
+          <button
+            onClick={() => navigate('/registro')}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition"
+            style={{ background: '#00c2ff', color: '#0a0e1a' }}
+          >
+            + Nuevo
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}
@@ -93,14 +108,23 @@ export default function Clientes() {
               </tr>
             </thead>
             <tbody>
-              {isLoading && (
-                <tr>
-                  <td colSpan={10} className="text-center py-10 text-muted">Cargando...</td>
+              {isLoading && Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i} className="border-b border-border">
+                  {['70%', '45%', '55%', '80%', '40%', '50%', '45%', '55%', '60%', '20%'].map((w, j) => (
+                    <td key={j} className="px-4 py-3">
+                      <div className="h-4 bg-surface2 rounded animate-pulse" style={{ width: w }} />
+                    </td>
+                  ))}
                 </tr>
-              )}
+              ))}
               {!isLoading && records.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="text-center py-10 text-muted">Sin clientes</td>
+                  <td colSpan={10} className="py-16 text-center">
+                    <div className="flex flex-col items-center gap-3 text-muted">
+                      <Building2Icon size={36} className="opacity-30" />
+                      <p className="text-sm">No hay clientes que mostrar</p>
+                    </div>
+                  </td>
                 </tr>
               )}
               {records.map((r) => (

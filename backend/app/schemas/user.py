@@ -27,5 +27,11 @@ class Token(BaseModel):
     token_type: str
 
 
+class UserUpdate(BaseModel):
+    is_active: Optional[bool] = None
+    password: Optional[str] = None
+    email: Optional[EmailStr] = None
+
+
 class TokenData(BaseModel):
     username: Optional[str] = None

@@ -145,14 +145,23 @@ export default function Cotizaciones() {
               </tr>
             </thead>
             <tbody>
-              {isLoading && (
-                <tr>
-                  <td colSpan={8} className="text-center py-10 text-muted">Cargando...</td>
+              {isLoading && Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i} className="border-b border-border">
+                  {['30%', '65%', '70%', '40%', '50%', '45%', '45%', '20%'].map((w, j) => (
+                    <td key={j} className="px-4 py-3">
+                      <div className="h-4 bg-surface2 rounded animate-pulse" style={{ width: w }} />
+                    </td>
+                  ))}
                 </tr>
-              )}
+              ))}
               {!isLoading && cotizaciones.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="text-center py-10 text-muted">Sin cotizaciones</td>
+                  <td colSpan={8} className="py-16 text-center">
+                    <div className="flex flex-col items-center gap-3 text-muted">
+                      <FileText size={36} className="opacity-30" />
+                      <p className="text-sm">No hay cotizaciones que mostrar</p>
+                    </div>
+                  </td>
                 </tr>
               )}
               {cotizaciones.map((cot) => (

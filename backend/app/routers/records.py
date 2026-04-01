@@ -4,11 +4,13 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from app.auth.dependencies import get_current_active_user
 from app.database import get_session
 from app.models.actividad import Actividad
+from app.models.comercial import Comercial
 from app.models.contacto import Contacto
 from app.models.record import Record
 from app.models.user import User
@@ -17,6 +19,18 @@ from app.schemas.contacto import ContactoRead
 from app.schemas.record import RecordCreate, RecordRead, RecordReadDetalle, RecordUpdate
 
 router = APIRouter(prefix="/records", tags=["records"])
+
+
+class ImportRow(BaseModel):
+    tipo: str = "prospecto"
+    empresa: str
+    nit: Optional[str] = None
+    ciudad: Optional[str] = None
+    comercial_nombre: Optional[str] = None
+    servicios: list[str] = []
+    estado_prospecto: Optional[str] = None
+    estado_cliente: Optional[str] = None
+    observaciones: Optional[str] = None
 
 
 def _to_db(data: dict) -> dict:
@@ -130,6 +144,52 @@ def update_record(
     session.commit()
     session.refresh(record)
     return _build_detalle(record, session)
+
+
+@router.post("/import", summary="Importación masiva desde Excel (frontend parseado)")
+def import_records(
+    rows: list[ImportRow],
+    session: Session = Depends(get_session),
+    _: User = Depends(get_current_active_user),
+):
+    comerciales = session.exec(select(Comercial)).all()
+    comercial_map = {c.nombre.strip().lower(): c.id for c in comerciales}
+
+    created = 0
+    errors = []
+
+    for row in rows:
+        if not row.empresa or not row.empresa.strip():
+            errors.append({"empresa": "(vacío)", "error": "Empresa requerida"})
+            continue
+
+        comercial_id = None
+        if row.comercial_nombre and row.comercial_nombre.strip():
+            comercial_id = comercial_map.get(row.comercial_nombre.strip().lower())
+            if not comercial_id:
+                errors.append({
+                    "empresa": row.empresa,
+                    "error": f"Comercial '{row.comercial_nombre}' no encontrado en el sistema",
+                })
+                continue
+
+        tipo = row.tipo if row.tipo in ("prospecto", "cliente") else "prospecto"
+        record = Record(
+            tipo=tipo,
+            empresa=row.empresa.strip(),
+            nit=row.nit.strip() if row.nit else None,
+            ciudad=row.ciudad.strip() if row.ciudad else None,
+            comercial_id=comercial_id,
+            servicios=json.dumps(row.servicios),
+            estado_prospecto=row.estado_prospecto,
+            estado_cliente=row.estado_cliente,
+            observaciones=row.observaciones,
+        )
+        session.add(record)
+        created += 1
+
+    session.commit()
+    return {"created": created, "errors": errors}
 
 
 @router.delete("/{record_id}", status_code=status.HTTP_204_NO_CONTENT)
