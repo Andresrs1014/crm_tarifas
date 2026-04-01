@@ -9,8 +9,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./backend:/app          # hot-reload en desarrollo
-      - sqlite_data:/app/data   # persistencia de la base de datos
+      - sqlite_data:/app/data
     env_file:
       - .env
     restart: unless-stopped
@@ -21,12 +20,7 @@ services:
       dockerfile: Dockerfile
     container_name: crm_tarifas_frontend
     ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    environment:
-      - VITE_API_URL=http://localhost:8000
+      - "80:80"
     depends_on:
       - backend
     restart: unless-stopped
