@@ -33,6 +33,9 @@ class Record(SQLModel, table=True):
     fecha: date = Field(default_factory=date.today, nullable=False)
     proximo_seguimiento: Optional[date] = Field(default=None)
 
+    direccion: Optional[str] = Field(default=None)
+    categoria: Optional[str] = Field(default=None)          # A|B|C
+
     # Prospecto-specific
     estado_prospecto: Optional[str] = Field(default=None)  # seguimiento|cerrado|perdido|frio
     visita: Optional[str] = Field(default=None)             # no|si|virtual|llamada

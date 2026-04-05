@@ -26,7 +26,7 @@ router = APIRouter(prefix="/cotizaciones", tags=["cotizaciones"])
 
 def _to_db(data: dict) -> dict:
     """Serializa campos Python a JSON string para columnas TEXT."""
-    for field in ("lineas", "items_snapshot", "obs_plantillas"):
+    for field in ("lineas", "items_snapshot", "obs_plantillas", "tarifa_tipo", "tarifa_especial_id"):
         if field in data:
             data[field] = json.dumps(data[field], ensure_ascii=False)
     return data

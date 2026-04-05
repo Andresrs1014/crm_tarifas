@@ -26,6 +26,9 @@ class Cotizacion(SQLModel, table=True):
     items_snapshot: str = Field(nullable=False)      # JSON deep clone — NUNCA referencias a biblioteca
     obs_plantillas: Optional[str] = Field(default="{}")  # JSON dict[str, list[str]]
     obs_libre: Optional[str] = Field(default=None)
+    paqueteadora: Optional[str] = Field(default=None)         # empresa paqueteadora (servicio Paqueteo)
+    tarifa_tipo: Optional[str] = Field(default=None)          # JSON dict[linea, "biblioteca"|"especial"]
+    tarifa_especial_id: Optional[str] = Field(default=None)   # JSON dict[linea, uuid_str]
     created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
     updated_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
 

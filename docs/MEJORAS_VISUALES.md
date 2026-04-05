@@ -5,7 +5,7 @@ Diagnóstico y cambios acordados — pendientes para después de completar Fase 
 ## Problemas identificados
 
 1. **Jerarquía visual plana** — título, filtros y tabla compiten sin orden claro
-2. **Rainbow de colores en Dashboard** — 6 StatCards con 6 colores distintos, se ve disperso
+2. **Rainbow de colores en Dashboard** — 6 StatCards con 6 colores distintos, se ve disperso - Pero mantengamoslo, para que tengan dinamismo las cards, lo que si toca hacer es que se vea mejor.
 3. **Header superior es ruido vacío** — solo muestra fecha/hora, espacio izquierdo completamente vacío
 4. **Loading y empty states sin diseño** — solo texto gris flotando, se siente inacabado
 5. **Botón de acción principal ausente en listas** — no hay "Nuevo" en /prospectos ni /clientes

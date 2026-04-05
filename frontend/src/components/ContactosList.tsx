@@ -6,7 +6,7 @@ interface ContactosListProps {
   onChange: (v: ContactoCreate[]) => void
 }
 
-const empty = (): ContactoCreate => ({ nombre: '', cargo: '', telefono: '', email: '', orden: 0 })
+const empty = (): ContactoCreate => ({ nombre: '', cargo: '', telefono: '', email: '', orden: 0, cumpleanos: null, recibe_regalos: null, direccion: null })
 
 export default function ContactosList({ value, onChange }: ContactosListProps) {
   const add = () => onChange([...value, { ...empty(), orden: value.length }])
@@ -55,6 +55,32 @@ export default function ContactosList({ value, onChange }: ContactosListProps) {
               placeholder="Email"
               value={c.email || ''}
               onChange={(e) => update(i, 'email', e.target.value)}
+            />
+            <div>
+              <label className="block text-xs text-muted mb-1">Cumpleaños</label>
+              <input
+                type="date"
+                value={c.cumpleanos || ''}
+                onChange={(e) => update(i, 'cumpleanos', e.target.value || null as unknown as string)}
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-muted mb-1">¿Recibe regalos?</label>
+              <select
+                value={c.recibe_regalos || ''}
+                onChange={(e) => update(i, 'recibe_regalos', e.target.value || null as unknown as string)}
+              >
+                <option value="">— Sin definir —</option>
+                <option value="si">Sí</option>
+                <option value="no">No</option>
+                <option value="tal_vez">Tal vez</option>
+              </select>
+            </div>
+            <input
+              className="col-span-2"
+              placeholder="Dirección"
+              value={c.direccion || ''}
+              onChange={(e) => update(i, 'direccion', e.target.value)}
             />
           </div>
         </div>

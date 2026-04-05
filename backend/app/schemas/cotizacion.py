@@ -22,6 +22,9 @@ class CotizacionCreate(BaseModel):
     items_snapshot: dict[str, Any]       # deep clone del wizard
     obs_plantillas: dict[str, list[str]] = {}
     obs_libre: Optional[str] = None
+    paqueteadora: Optional[str] = None
+    tarifa_tipo: Optional[dict[str, str]] = None     # {linea: "biblioteca"|"especial"}
+    tarifa_especial_id: Optional[dict[str, str]] = None  # {linea: uuid_str}
 
 
 class CotizacionUpdate(BaseModel):
@@ -41,6 +44,9 @@ class CotizacionUpdate(BaseModel):
     items_snapshot: Optional[dict[str, Any]] = None
     obs_plantillas: Optional[dict[str, list[str]]] = None
     obs_libre: Optional[str] = None
+    paqueteadora: Optional[str] = None
+    tarifa_tipo: Optional[dict[str, str]] = None
+    tarifa_especial_id: Optional[dict[str, str]] = None
 
 
 class CotizacionRead(BaseModel):
@@ -62,6 +68,9 @@ class CotizacionRead(BaseModel):
     items_snapshot: dict[str, Any]
     obs_plantillas: dict[str, list[str]]
     obs_libre: Optional[str]
+    paqueteadora: Optional[str]
+    tarifa_tipo: Optional[dict[str, str]]
+    tarifa_especial_id: Optional[dict[str, str]]
     created_at: datetime
     updated_at: datetime
 
@@ -90,7 +99,51 @@ class CotizacionRead(BaseModel):
             return {}
         return v
 
+    @field_validator("tarifa_tipo", mode="before")
+    @classmethod
+    def parse_tarifa_tipo(cls, v):
+        if isinstance(v, str):
+            return json.loads(v) if v else None
+        return v
+
+    @field_validator("tarifa_especial_id", mode="before")
+    @classmethod
+    def parse_tarifa_especial_id(cls, v):
+        if isinstance(v, str):
+            return json.loads(v) if v else None
+        return v
+
 
 class ActualizarTarifasBody(BaseModel):
     porcentaje: float
     items_keys: list[str]  # nombres de items a incrementar (solo tipo_tarifa='moneda')
+
+
+class TarifaEspecialCreate(BaseModel):
+    nombre: str
+    servicio: str
+    grupos: list[Any]  # misma estructura que items_snapshot por línea
+
+
+class TarifaEspecialUpdate(BaseModel):
+    nombre: Optional[str] = None
+    servicio: Optional[str] = None
+    grupos: Optional[list[Any]] = None
+
+
+class TarifaEspecialRead(BaseModel):
+    id: uuid.UUID
+    nombre: str
+    servicio: str
+    grupos: list[Any]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+    @field_validator("grupos", mode="before")
+    @classmethod
+    def parse_grupos(cls, v):
+        if isinstance(v, str):
+            return json.loads(v) if v else []
+        return v or []

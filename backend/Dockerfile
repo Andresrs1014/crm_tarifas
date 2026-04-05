@@ -12,8 +12,8 @@ COPY . .
 # Create data directory for SQLite
 RUN mkdir -p /app/data
 
-# Make entrypoint executable
-RUN chmod +x /app/entrypoint.sh
+# Strip Windows CRLF and make entrypoint executable
+RUN sed -i 's/\r//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 EXPOSE 8000
 

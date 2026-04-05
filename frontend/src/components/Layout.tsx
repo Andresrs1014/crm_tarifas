@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Building2, UserCog,
-  PlusCircle, FileText, BookOpen, LogOut, ShieldCheck,
+  PlusCircle, FileText, BookOpen, LogOut, ShieldCheck, HeartHandshake,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import Toast from './Toast'
@@ -14,6 +14,7 @@ const NAV_MAIN = [
   { to: '/equipo',       icon: <UserCog size={18} />,          label: 'Equipo' },
   { to: '/cotizaciones', icon: <FileText size={18} />,        label: 'Cotizaciones' },
   { to: '/biblioteca',   icon: <BookOpen size={18} />,        label: 'Servicios' },
+  { to: '/sac',          icon: <HeartHandshake size={18} />, label: 'SAC' },
 ]
 
 function useClock() {
@@ -48,9 +49,11 @@ export default function Layout() {
       {/* Sidebar */}
       <aside className="w-56 shrink-0 flex flex-col border-r border-border" style={{ background: '#111827' }}>
         {/* Logo */}
-        <div className="px-5 py-5 border-b border-border">
-          <span className="font-condensed font-bold text-xl tracking-wider text-accent">ZYMO</span>
-          <span className="font-condensed text-muted text-sm ml-1">CRM</span>
+        <div className="px-4 py-4 border-b border-border flex items-center gap-2.5">
+          <div className="bg-white rounded-md px-2.5 py-1.5 shrink-0">
+            <img src="/logo.png" alt="Zymo" className="h-6 w-auto" />
+          </div>
+          <span className="font-condensed text-muted text-xs tracking-widest uppercase">CRM</span>
         </div>
 
         {/* Nav */}

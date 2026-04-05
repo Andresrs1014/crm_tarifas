@@ -1,3 +1,4 @@
+import json
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -11,6 +12,14 @@ from app.models.user import User
 from app.schemas.contacto import ContactoCreate, ContactoRead, ContactoUpdate
 
 router = APIRouter(tags=["contactos"])
+
+
+def _contacto_to_db(data: dict) -> dict:
+    """Serializa list → JSON string para columnas TEXT en contactos."""
+    for field in ("fotos_entrega", "fotos_fda"):
+        if field in data and isinstance(data[field], list):
+            data[field] = json.dumps(data[field])
+    return data
 
 
 @router.get("/records/{record_id}/contactos", response_model=list[ContactoRead])
@@ -41,7 +50,7 @@ def add_contacto(
 ):
     if not session.get(Record, record_id):
         raise HTTPException(status_code=404, detail="Record no encontrado")
-    contacto = Contacto(record_id=record_id, **data.model_dump())
+    contacto = Contacto(record_id=record_id, **_contacto_to_db(data.model_dump()))
     session.add(contacto)
     session.commit()
     session.refresh(contacto)
@@ -62,7 +71,7 @@ def update_contacto(
     contacto = session.get(Contacto, contacto_id)
     if not contacto or contacto.record_id != record_id:
         raise HTTPException(status_code=404, detail="Contacto no encontrado")
-    for key, value in data.model_dump(exclude_unset=True).items():
+    for key, value in _contacto_to_db(data.model_dump(exclude_unset=True)).items():
         setattr(contacto, key, value)
     session.add(contacto)
     session.commit()

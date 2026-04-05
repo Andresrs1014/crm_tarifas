@@ -11,6 +11,7 @@ import {
 import ConfirmModal from '../components/ConfirmModal'
 import PageContainer from '../components/PageContainer'
 import { useToastStore } from '../store/toastStore'
+import type { ToastState } from '../store/toastStore'
 import { useAuthStore } from '../store/authStore'
 import { SERVICIO_COLORS } from '../types'
 import type { BibliotecaGrupo, BibliotecaItem, BibliotecaObservacion, BibliotecaColumna, BibliotecaLinea } from '../types'
@@ -172,7 +173,7 @@ function GruposTab({
 }: {
   linea: BibliotecaLinea
   onMutate: () => void
-  toast: ReturnType<typeof useToastStore>
+  toast: ToastState
 }) {
   const [expandedGrupos, setExpandedGrupos] = useState<Record<string, boolean>>({})
   const [newGrupoName, setNewGrupoName] = useState('')
@@ -332,9 +333,9 @@ function ItemsTable({
   color: string
   onMutate: () => void
   onDeleteItem: (id: string) => void
-  toast: ReturnType<typeof useToastStore>
+  toast: ToastState
 }) {
-  const EMPTY = { nombre: '', tarifa: '', tipo_tarifa: 'moneda' as const, obs: '', extra_cols: {} as Record<string, string> }
+  const EMPTY = { nombre: '', tarifa: '', tipo_tarifa: 'moneda' as 'moneda' | 'porcentaje', obs: '', extra_cols: {} as Record<string, string> }
   const [showAdd, setShowAdd] = useState(false)
   const [addForm, setAddForm] = useState(EMPTY)
   const [editId, setEditId] = useState<string | null>(null)
@@ -477,7 +478,7 @@ function ObsTab({
 }: {
   linea: BibliotecaLinea
   onMutate: () => void
-  toast: ReturnType<typeof useToastStore>
+  toast: ToastState
 }) {
   const EMPTY = { nombre: '', html: '' }
   const [showAdd, setShowAdd] = useState(false)
@@ -599,7 +600,7 @@ function ObsForm({ form, onChange, onSave, onCancel, loading, title }: {
 function ColumnasTab({ linea, onMutate, toast }: {
   linea: BibliotecaLinea
   onMutate: () => void
-  toast: ReturnType<typeof useToastStore>
+  toast: ToastState
 }) {
   const [columnas, setColumnas] = useState<BibliotecaColumna[]>(linea.columnas)
   const [newId, setNewId] = useState('')

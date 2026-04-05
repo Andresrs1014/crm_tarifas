@@ -56,6 +56,9 @@ const INITIAL_STATE = {
   items: {} as ItemsMap,
   obs_plantillas: {} as Record<string, string[]>,
   obs_libre: '',
+  paqueteadora: null as string | null,
+  tarifa_tipo: {} as Record<string, string>,        // {linea: 'biblioteca'|'especial'}
+  tarifa_especial_id: {} as Record<string, string>, // {linea: uuid_str}
 }
 
 // ─────────────────────────────────────────────────────────
@@ -89,7 +92,7 @@ function cloneItems(items: ItemsMap): ItemsMap {
 // Interfaz del store
 // ─────────────────────────────────────────────────────────
 
-interface CotWizardStore extends typeof INITIAL_STATE {
+type CotWizardStore = typeof INITIAL_STATE & {
   // ── Navegación ──
   setPaso: (n: 1 | 2 | 3 | 4 | 5) => void
 
@@ -129,6 +132,13 @@ interface CotWizardStore extends typeof INITIAL_STATE {
     colId: string,
     val: string
   ) => void
+
+  // ── Paso 3: paqueteadora ──
+  setPaqueteadora: (val: string | null) => void
+
+  // ── Paso 2: tarifa tipo / especial ──
+  setTarifaTipo: (svc: string, tipo: 'biblioteca' | 'especial') => void
+  setTarifaEspecialId: (svc: string, id: string) => void
 
   // ── Paso 4: observaciones ──
   // Toggle de una plantilla de observación (add/remove del array)
@@ -229,7 +239,7 @@ export const useCotWizardStore = create<CotWizardStore>((set, get) => ({
       const item = newItems[svc]?.[gid]?.items[idx]
       if (!item) return s
       // TypeScript sabe que field no es 'extra_cols' ni 'sel', así que es string
-      ;(item as Record<string, unknown>)[field] = val
+      ;(item as unknown as Record<string, unknown>)[field] = val
       return { items: newItems }
     }),
 
@@ -241,6 +251,18 @@ export const useCotWizardStore = create<CotWizardStore>((set, get) => ({
       item.extra_cols = { ...item.extra_cols, [colId]: val }
       return { items: newItems }
     }),
+
+  // ── Paso 3: paqueteadora ──
+
+  setPaqueteadora: (val) => set({ paqueteadora: val }),
+
+  // ── Paso 2: tarifa tipo / especial ──
+
+  setTarifaTipo: (svc, tipo) =>
+    set((s) => ({ tarifa_tipo: { ...s.tarifa_tipo, [svc]: tipo } })),
+
+  setTarifaEspecialId: (svc, id) =>
+    set((s) => ({ tarifa_especial_id: { ...s.tarifa_especial_id, [svc]: id } })),
 
   // ── Paso 4 ──
 
@@ -310,6 +332,9 @@ export const useCotWizardStore = create<CotWizardStore>((set, get) => ({
       items,
       obs_plantillas: structuredClone(cot.obs_plantillas),
       obs_libre: cot.obs_libre ?? '',
+      paqueteadora: cot.paqueteadora ?? null,
+      tarifa_tipo: cot.tarifa_tipo ?? {},
+      tarifa_especial_id: cot.tarifa_especial_id ?? {},
     })
   },
 }))
@@ -337,5 +362,8 @@ export function buildCotPayload(s: CotWizardStore) {
     items_snapshot: s.items,
     obs_plantillas: s.obs_plantillas,
     obs_libre: s.obs_libre || null,
+    paqueteadora: s.paqueteadora || null,
+    tarifa_tipo: s.tarifa_tipo,
+    tarifa_especial_id: s.tarifa_especial_id,
   }
 }

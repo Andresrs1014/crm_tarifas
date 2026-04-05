@@ -13,6 +13,7 @@ from app.schemas.dashboard import (
     ComercialActivity,
     DashboardCharts,
     DashboardStats,
+    RankingEntry,
 )
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -243,3 +244,40 @@ def get_charts(
         pipeline_cotizaciones=pipeline_cotizaciones,
         lineas_cotizadas=lineas_cotizadas,
     )
+
+
+# ---------- /ranking ----------
+
+@router.get("/ranking", response_model=list[RankingEntry])
+def get_ranking(
+    session: Session = Depends(get_session),
+    _: User = Depends(get_current_active_user),
+):
+    """Ranking de gestión por comercial: prospectos, clientes, visitas, valor facturado."""
+    rows = session.execute(text("""
+        SELECT
+            co.id               AS comercial_id,
+            co.nombre           AS nombre,
+            COUNT(DISTINCT CASE WHEN r.tipo = 'prospecto' THEN r.id END) AS prospectos,
+            COUNT(DISTINCT CASE WHEN r.tipo = 'cliente'   THEN r.id END) AS clientes,
+            COUNT(DISTINCT a.id)                                          AS visitas,
+            COALESCE(SUM(COALESCE(r.valor, 0) + COALESCE(r.valor_p, 0)), 0) AS valor_facturado
+        FROM comerciales co
+        LEFT JOIN records r    ON r.comercial_id = co.id
+        LEFT JOIN actividades a ON a.record_id   = r.id
+        WHERE co.activo = 1
+        GROUP BY co.id, co.nombre
+        ORDER BY clientes DESC, prospectos DESC
+    """)).all()
+
+    return [
+        RankingEntry(
+            comercial_id=str(r[0]),
+            nombre=r[1],
+            prospectos=r[2] or 0,
+            clientes=r[3] or 0,
+            visitas=r[4] or 0,
+            valor_facturado=r[5] or 0,
+        )
+        for r in rows
+    ]
