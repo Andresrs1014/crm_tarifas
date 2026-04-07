@@ -19,7 +19,8 @@ import app.models.record     # noqa: F401
 import app.models.contacto   # noqa: F401
 import app.models.actividad   # noqa: F401
 import app.models.biblioteca  # noqa: F401
-import app.models.cotizacion  # noqa: F401
+import app.models.cotizacion     # noqa: F401
+import app.models.tarifa_especial  # noqa: F401
 
 config = context.config
 

@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import PageContainer from '../components/PageContainer'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Eye, Pencil, Copy, Link, Printer, Trash2, FileText } from 'lucide-react'
+import { Plus, Eye, Pencil, Copy, Link, Printer, Trash2, TrendingUp, FileText } from 'lucide-react'
 import {
   getCotizacionesApi,
   deleteCotizacionApi,
   duplicarCotizacionApi,
+  actualizarTarifasApi,
 } from '../api/cotizaciones'
 import { getComercialesApi } from '../api/comerciales'
 import Badge from '../components/Badge'
@@ -16,6 +17,22 @@ import { useCotWizardStore } from '../store/cotWizardStore'
 import { fmtDate } from '../utils/format'
 import { SERVICIO_COLORS } from '../types'
 import type { CotizacionRead } from '../types'
+
+/** Extrae nombres de ítems tipo_tarifa='moneda' del snapshot */
+function extractMonedaItems(snapshot: Record<string, unknown>): string[] {
+  const names: string[] = []
+  for (const linea of Object.values(snapshot)) {
+    for (const grupo of Object.values(linea as Record<string, unknown>)) {
+      const g = grupo as { items?: Array<{ nombre: string; tipo_tarifa: string }> }
+      for (const item of g.items ?? []) {
+        if (item.tipo_tarifa === 'moneda' && !names.includes(item.nombre)) {
+          names.push(item.nombre)
+        }
+      }
+    }
+  }
+  return names
+}
 
 const ESTADO_COLORS: Record<string, string> = {
   borrador:    '#8899b4',
@@ -30,6 +47,9 @@ export default function Cotizaciones() {
   const [estado, setEstado] = useState('')
   const [comercialId, setComercialId] = useState('')
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [actualizarCot, setActualizarCot] = useState<CotizacionRead | null>(null)
+  const [actualizarPct, setActualizarPct] = useState('5')
+  const [actualizarItems, setActualizarItems] = useState<string[]>([])
   const navigate = useNavigate()
   const toast = useToastStore()
   const qc = useQueryClient()
@@ -68,6 +88,30 @@ export default function Cotizaciones() {
     },
     onError: () => toast.add('Error al duplicar', 'error'),
   })
+
+  const actualizarMutation = useMutation({
+    mutationFn: ({ id, porcentaje, items_keys }: { id: string; porcentaje: number; items_keys: string[] }) =>
+      actualizarTarifasApi(id, { porcentaje, items_keys }),
+    onSuccess: (cot) => {
+      qc.invalidateQueries({ queryKey: ['cotizaciones'] })
+      toast.add(`Nueva versión creada: ${cot.numero}`)
+      setActualizarCot(null)
+    },
+    onError: () => toast.add('Error al actualizar tarifas', 'error'),
+  })
+
+  const openActualizar = (cot: CotizacionRead) => {
+    const allItems = extractMonedaItems(cot.items_snapshot as Record<string, unknown>)
+    setActualizarCot(cot)
+    setActualizarPct('5')
+    setActualizarItems(allItems) // todos seleccionados por defecto
+  }
+
+  const toggleActualizarItem = (name: string) => {
+    setActualizarItems((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
+    )
+  }
 
   const comercialNombre = (id: string | null) =>
     comerciales.find((c) => c.id === id)?.nombre ?? '—'
@@ -222,6 +266,9 @@ export default function Cotizaciones() {
                       <ActionBtn title="Duplicar" onClick={() => duplicarMutation.mutate(cot.id)}>
                         <Copy size={14} />
                       </ActionBtn>
+                      <ActionBtn title="Actualizar tarifas" onClick={() => openActualizar(cot)}>
+                        <TrendingUp size={14} />
+                      </ActionBtn>
                       <ActionBtn title="Copiar link público" onClick={() => copyLink(cot)}>
                         <Link size={14} />
                       </ActionBtn>
@@ -247,6 +294,97 @@ export default function Cotizaciones() {
         onCancel={() => setDeleteId(null)}
         loading={deleteMutation.isPending}
       />
+
+      {/* Modal Actualizar Tarifas */}
+      {actualizarCot && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.6)' }}
+          onClick={() => setActualizarCot(null)}
+        >
+          <div
+            className="bg-surface border border-border rounded-xl p-6 w-full max-w-md space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="font-condensed font-bold text-lg" style={{ color: '#e8edf5' }}>
+              Actualizar tarifas — {actualizarCot.numero}
+            </h2>
+            <p className="text-xs text-muted">
+              Crea una nueva cotización con las tarifas en moneda incrementadas. La original no se modifica.
+            </p>
+
+            <div className="flex items-center gap-3">
+              <label className="text-xs text-muted whitespace-nowrap">Incremento %</label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={0.5}
+                className="w-24"
+                value={actualizarPct}
+                onChange={(e) => setActualizarPct(e.target.value)}
+              />
+            </div>
+
+            {(() => {
+              const allMonedaItems = extractMonedaItems(actualizarCot.items_snapshot as Record<string, unknown>)
+              return allMonedaItems.length > 0 ? (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs text-muted">Ítems en moneda a actualizar:</p>
+                    <button
+                      className="text-xs text-accent hover:underline"
+                      onClick={() => setActualizarItems(
+                        actualizarItems.length === allMonedaItems.length ? [] : [...allMonedaItems]
+                      )}
+                    >
+                      {actualizarItems.length === allMonedaItems.length ? 'Deseleccionar todos' : 'Seleccionar todos'}
+                    </button>
+                  </div>
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {allMonedaItems.map((name) => (
+                      <label key={name} className="flex items-center gap-2 text-xs cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={actualizarItems.includes(name)}
+                          onChange={() => toggleActualizarItem(name)}
+                          className="w-3.5 h-3.5 accent-purple-500"
+                        />
+                        <span style={{ color: '#e8edf5' }}>{name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-muted">Esta cotización no tiene ítems de tipo moneda.</p>
+              )
+            })()}
+
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                className="px-4 py-2 text-sm rounded-lg border border-border text-muted hover:text-white transition"
+                onClick={() => setActualizarCot(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                className="px-4 py-2 text-sm rounded-lg font-medium transition"
+                style={{ background: '#00c2ff', color: '#0a0e1a' }}
+                disabled={actualizarMutation.isPending || actualizarItems.length === 0}
+                onClick={() =>
+                  actualizarMutation.mutate({
+                    id: actualizarCot.id,
+                    porcentaje: parseFloat(actualizarPct) || 0,
+                    items_keys: actualizarItems,
+                  })
+                }
+              >
+                {actualizarMutation.isPending ? 'Creando...' : 'Crear nueva versión'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </PageContainer>
   )
 }

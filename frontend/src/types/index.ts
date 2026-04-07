@@ -108,8 +108,29 @@ export interface CotizacionRead {
   items_snapshot: ItemsMap
   obs_plantillas: Record<string, string[]>
   obs_libre: string | null
+  paqueteadora: string | null
+  tarifa_tipo: Record<string, string> | null   // {linea: "biblioteca"|"especial"}
+  tarifa_especial_id: Record<string, string> | null  // {linea: uuid_str}
   created_at: string
   updated_at: string
+}
+
+// ---------- Tarifas Especiales ----------
+
+export interface TarifaEspecial {
+  id: string
+  nombre: string
+  servicio: string
+  grupos: unknown[]     // misma estructura que grupos en BibliotecaLinea
+  created_at: string
+  updated_at: string
+}
+
+// ---------- SAC ----------
+
+export interface SACContacto extends Contacto {
+  empresa: string
+  record_id: string
 }
 
 // ---------- Auth ----------
@@ -157,6 +178,12 @@ export interface Contacto {
   telefono: string | null
   email: string | null
   orden: number
+  cumpleanos: string | null       // YYYY-MM-DD
+  recibe_regalos: string | null   // si|no|tal_vez
+  fotos_entrega: string[]
+  fotos_fda: string[]
+  fda_entregado: boolean | null
+  direccion: string | null
 }
 
 export interface ContactoCreate {
@@ -165,6 +192,9 @@ export interface ContactoCreate {
   telefono?: string
   email?: string
   orden: number
+  cumpleanos?: string | null
+  recibe_regalos?: string | null
+  direccion?: string | null
 }
 
 // ---------- Actividades ----------
@@ -198,6 +228,8 @@ export interface RecordRead {
   empresa: string
   nit: string | null
   ciudad: string | null
+  direccion: string | null
+  categoria: string | null         // A|B|C
   comercial_id: string | null
   tipo_cliente: 'directo' | 'indirecto' | 'referido'
   cliente_indirecto_id: string | null
@@ -253,4 +285,13 @@ export interface DashboardCharts {
   billing_por_linea: ChartPoint[]
   pipeline_cotizaciones: ChartPoint[]
   lineas_cotizadas: ChartPoint[]
+}
+
+export interface RankingEntry {
+  comercial_id: string
+  nombre: string
+  prospectos: number
+  clientes: number
+  visitas: number
+  valor_facturado: number
 }

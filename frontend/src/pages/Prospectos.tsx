@@ -135,7 +135,15 @@ export default function Prospectos() {
                   onClick={() => navigate(`/prospectos/${r.id}`)}
                 >
                   <td className="px-4 py-3">
-                    <p className="font-medium" style={{ color: '#e8edf5' }}>{r.empresa}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium" style={{ color: '#e8edf5' }}>{r.empresa}</p>
+                      {r.categoria && (
+                        <span className="text-xs px-1.5 py-0.5 rounded font-condensed font-bold"
+                          style={{ background: r.categoria === 'A' ? '#00c2ff22' : r.categoria === 'B' ? '#f59e0b22' : '#6b7280aa', color: r.categoria === 'A' ? '#00c2ff' : r.categoria === 'B' ? '#f59e0b' : '#d1d5db' }}>
+                          {r.categoria}
+                        </span>
+                      )}
+                    </div>
                     {r.nit && <p className="text-xs text-muted">NIT {r.nit}</p>}
                   </td>
                   <td className="px-4 py-3 text-muted">{r.ciudad ?? '—'}</td>

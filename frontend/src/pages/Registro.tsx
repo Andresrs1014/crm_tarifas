@@ -21,6 +21,8 @@ const schema = z.object({
   empresa: z.string().min(1, 'Requerido'),
   nit: z.string().optional(),
   ciudad: z.string().optional(),
+  direccion: z.string().optional(),
+  categoria: z.enum(['A', 'B', 'C', '']).optional(),
   comercial_id: z.string().optional(),
   tipo_cliente: z.enum(['directo', 'indirecto', 'referido']).default('directo'),
   comision: z.string().optional(),
@@ -158,6 +160,15 @@ export default function Registro() {
                 <input {...register('ciudad')} placeholder="Ciudad" />
               </div>
               <div>
+                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Categoría</label>
+                <select {...register('categoria')}>
+                  <option value="">—</option>
+                  <option value="A">A</option>
+                  <option value="B">B</option>
+                  <option value="C">C</option>
+                </select>
+              </div>
+              <div>
                 <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Fecha</label>
                 <input type="date" {...register('fecha')} />
               </div>
@@ -184,6 +195,10 @@ export default function Registro() {
                   <input {...register('comision')} placeholder="%" />
                 </div>
               )}
+              <div className="col-span-2">
+                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Dirección</label>
+                <input {...register('direccion')} placeholder="Dirección física" />
+              </div>
               <div className="col-span-3">
                 <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Observaciones</label>
                 <textarea

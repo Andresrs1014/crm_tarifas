@@ -13,8 +13,10 @@ from app.routers.actividades import router as actividades_router
 from app.routers.biblioteca import router as biblioteca_router
 from app.routers.cotizaciones import router as cotizaciones_router
 from app.routers.dashboard import router as dashboard_router
+from app.routers.tarifas_especiales import router as tarifas_especiales_router
+from app.routers.sac import router as sac_router
 from app.config import settings
-from app.database import engine, create_db_and_tables
+from app.database import engine, create_db_and_tables, apply_migrations
 from app.models.user import User        # noqa: F401
 from app.models.comercial import Comercial  # noqa: F401
 from app.models.record import Record    # noqa: F401
@@ -22,6 +24,7 @@ from app.models.contacto import Contacto  # noqa: F401
 from app.models.actividad import Actividad  # noqa: F401
 from app.models.biblioteca import BibliotecaLinea, BibliotecaGrupo, BibliotecaItem, BibliotecaObservacion  # noqa: F401
 from app.models.cotizacion import Cotizacion, CotNumeroCounter  # noqa: F401
+from app.models.tarifa_especial import TarifaEspecial  # noqa: F401
 from app.seed import seed_biblioteca, seed_cot_counter
 
 
@@ -45,6 +48,7 @@ def _seed_superadmin() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    apply_migrations()
     create_db_and_tables()
     _seed_superadmin()
     with Session(engine) as session:
@@ -77,6 +81,8 @@ app.include_router(actividades_router, prefix="/api")
 app.include_router(biblioteca_router, prefix="/api")
 app.include_router(cotizaciones_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
+app.include_router(tarifas_especiales_router, prefix="/api")
+app.include_router(sac_router, prefix="/api")
 
 
 @app.get("/", tags=["health"])

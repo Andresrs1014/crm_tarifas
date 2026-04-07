@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import List
 
 
 class ChartPoint(BaseModel):
@@ -21,6 +22,15 @@ class DashboardStats(BaseModel):
     facturacion_por_linea: dict[str, int]
     cotizaciones_por_estado: dict[str, int]
     total_cotizaciones: int
+
+
+class RankingEntry(BaseModel):
+    comercial_id: str
+    nombre: str
+    prospectos: int
+    clientes: int
+    visitas: int          # actividades registradas
+    valor_facturado: int  # suma de valor + valor_p en records
 
 
 class DashboardCharts(BaseModel):

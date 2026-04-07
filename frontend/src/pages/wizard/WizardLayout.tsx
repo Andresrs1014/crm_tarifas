@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useCotWizardStore, buildCotPayload } from '../../store/cotWizardStore'
@@ -58,12 +58,36 @@ export default function WizardLayout() {
     return () => { /* No resetear al desmontar — el usuario puede volver */ }
   }, [])
 
+  // Previene guardados concurrentes en autosave
+  const autosavingRef = useRef(false)
+
+  const handleAutosave = async () => {
+    if (autosavingRef.current) return
+    autosavingRef.current = true
+    const state = useCotWizardStore.getState()
+    const payload = buildCotPayload(state)
+    payload.estado = 'borrador'
+    try {
+      if (state.id) {
+        await updateCotizacionApi(state.id, payload as Record<string, unknown>)
+      } else {
+        const cot = await createCotizacionApi(payload as Record<string, unknown>)
+        useCotWizardStore.setState({ id: cot.id, numero: cot.numero })
+      }
+    } catch {
+      // Silencioso — no mostrar error al usuario en autosave
+    } finally {
+      autosavingRef.current = false
+    }
+  }
+
   const handleNext = () => {
     if (paso === 2) {
       // Al pasar a Paso 3: hidratar items desde biblioteca
       initItems(biblioteca)
     }
     if (paso < 5) setPaso((paso + 1) as 1 | 2 | 3 | 4 | 5)
+    void handleAutosave()
   }
 
   const handleBack = () => {

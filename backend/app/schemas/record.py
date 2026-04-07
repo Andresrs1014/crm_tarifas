@@ -14,6 +14,8 @@ class RecordCreate(BaseModel):
     empresa: str
     nit: Optional[str] = None
     ciudad: Optional[str] = None
+    direccion: Optional[str] = None
+    categoria: Optional[str] = None  # A|B|C
     comercial_id: Optional[uuid.UUID] = None
     tipo_cliente: str = "directo"  # directo|indirecto|referido
     cliente_indirecto_id: Optional[uuid.UUID] = None
@@ -46,6 +48,8 @@ class RecordUpdate(BaseModel):
     empresa: Optional[str] = None
     nit: Optional[str] = None
     ciudad: Optional[str] = None
+    direccion: Optional[str] = None
+    categoria: Optional[str] = None
     comercial_id: Optional[uuid.UUID] = None
     tipo_cliente: Optional[str] = None
     cliente_indirecto_id: Optional[uuid.UUID] = None
@@ -68,6 +72,9 @@ class RecordUpdate(BaseModel):
     valor: Optional[int] = None
     facturacion_lineas: Optional[dict[str, int]] = None
 
+    # Reemplaza todos los contactos del record cuando se provee
+    contactos: Optional[list[ContactoCreate]] = None
+
 
 class RecordRead(BaseModel):
     id: uuid.UUID
@@ -75,6 +82,8 @@ class RecordRead(BaseModel):
     empresa: str
     nit: Optional[str]
     ciudad: Optional[str]
+    direccion: Optional[str]
+    categoria: Optional[str]
     comercial_id: Optional[uuid.UUID]
     tipo_cliente: str
     cliente_indirecto_id: Optional[uuid.UUID]

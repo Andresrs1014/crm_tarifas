@@ -4,11 +4,72 @@ import PageContainer from '../components/PageContainer'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, X, Check } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Check, Trophy } from 'lucide-react'
 import { getComercialesApi, createComercialApi, updateComercialApi, deleteComercialApi } from '../api/comerciales'
+import { getRankingApi } from '../api/dashboard'
 import ConfirmModal from '../components/ConfirmModal'
 import { useToastStore } from '../store/toastStore'
-import type { Comercial } from '../types'
+import type { Comercial, RankingEntry } from '../types'
+
+const MEDAL_COLORS = ['#FFD700', '#C0C0C0', '#CD7F32'] as const
+
+function fmtCurrency(n: number): string {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`
+  return `$${n}`
+}
+
+function RankingCard({ entry, position }: { entry: RankingEntry; position: number }) {
+  const medal = MEDAL_COLORS[position] ?? null
+  const isTop3 = position < 3
+
+  return (
+    <div
+      className="bg-surface border border-border rounded-xl p-4 flex flex-col gap-3 transition hover:border-opacity-60"
+      style={isTop3 ? { borderColor: medal + '55' } : {}}
+    >
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div
+          className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+          style={{
+            background: isTop3 ? medal + '22' : '#1e3050',
+            color: isTop3 ? medal! : '#8899b4',
+          }}
+        >
+          {isTop3 ? <Trophy size={14} /> : position + 1}
+        </div>
+        <div className="min-w-0">
+          <p className="font-condensed font-bold text-sm truncate" style={{ color: '#e8edf5' }}>
+            {entry.nombre}
+          </p>
+          {isTop3 && (
+            <p className="text-xs font-medium" style={{ color: medal! }}>
+              {position === 0 ? '1° Lugar' : position === 1 ? '2° Lugar' : '3° Lugar'}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-2">
+        <Stat label="Prospectos" value={entry.prospectos} color="#00c2ff" />
+        <Stat label="Clientes" value={entry.clientes} color="#00e676" />
+        <Stat label="Visitas" value={entry.visitas} color="#a855f7" />
+        <Stat label="Facturado" value={fmtCurrency(entry.valor_facturado)} color="#f5a623" />
+      </div>
+    </div>
+  )
+}
+
+function Stat({ label, value, color }: { label: string; value: string | number; color: string }) {
+  return (
+    <div className="bg-surface2 rounded-lg px-3 py-2">
+      <p className="text-xs text-muted font-condensed uppercase tracking-wider">{label}</p>
+      <p className="text-sm font-bold" style={{ color }}>{value}</p>
+    </div>
+  )
+}
 
 const schema = z.object({
   nombre: z.string().min(1, 'Requerido'),
@@ -28,6 +89,11 @@ export default function Equipo() {
   const { data: comerciales = [], isLoading } = useQuery({
     queryKey: ['comerciales'],
     queryFn: getComercialesApi,
+  })
+
+  const { data: ranking = [] } = useQuery({
+    queryKey: ['ranking'],
+    queryFn: getRankingApi,
   })
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormValues>({
@@ -238,6 +304,23 @@ export default function Equipo() {
         onCancel={() => setDeleteId(null)}
         loading={deleteMutation.isPending}
       />
+
+      {/* Ranking de Gestión */}
+      {ranking.length > 0 && (
+        <div className="mt-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Trophy size={16} style={{ color: '#FFD700' }} />
+            <h2 className="font-condensed font-bold text-lg" style={{ color: '#e8edf5' }}>
+              Ranking de Gestión
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {ranking.map((entry, i) => (
+              <RankingCard key={entry.comercial_id} entry={entry} position={i} />
+            ))}
+          </div>
+        </div>
+      )}
     </PageContainer>
   )
 }
