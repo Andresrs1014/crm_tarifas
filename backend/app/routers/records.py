@@ -26,6 +26,8 @@ class ImportRow(BaseModel):
     empresa: str
     nit: Optional[str] = None
     ciudad: Optional[str] = None
+    direccion: Optional[str] = None
+    categoria: Optional[str] = None
     comercial_nombre: Optional[str] = None
     servicios: list[str] = []
     estado_prospecto: Optional[str] = None
@@ -136,11 +138,25 @@ def update_record(
     record = session.get(Record, record_id)
     if not record:
         raise HTTPException(status_code=404, detail="Record no encontrado")
-    update_data = _to_db(data.model_dump(exclude_unset=True))
+
+    contactos_nuevos = data.contactos
+    update_data = _to_db(data.model_dump(exclude_unset=True, exclude={"contactos"}))
     update_data["updated_at"] = datetime.utcnow()
     for key, value in update_data.items():
         setattr(record, key, value)
     session.add(record)
+
+    if contactos_nuevos is not None:
+        # Eliminar contactos existentes y reemplazar con los nuevos
+        existentes = session.exec(
+            select(Contacto).where(Contacto.record_id == record.id)
+        ).all()
+        for c in existentes:
+            session.delete(c)
+        session.flush()
+        for contacto_in in contactos_nuevos:
+            session.add(Contacto(record_id=record.id, **contacto_in.model_dump()))
+
     session.commit()
     session.refresh(record)
     return _build_detalle(record, session)
@@ -179,6 +195,8 @@ def import_records(
             empresa=row.empresa.strip(),
             nit=row.nit.strip() if row.nit else None,
             ciudad=row.ciudad.strip() if row.ciudad else None,
+            direccion=row.direccion.strip() if row.direccion else None,
+            categoria=row.categoria.strip() if row.categoria else None,
             comercial_id=comercial_id,
             servicios=json.dumps(row.servicios),
             estado_prospecto=row.estado_prospecto,

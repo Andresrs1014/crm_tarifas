@@ -2,6 +2,8 @@ import { useCotWizardStore } from '../../store/cotWizardStore'
 import { SERVICIO_COLORS } from '../../types'
 import type { BibliotecaLinea } from '../../types'
 
+const PAQUETEADORAS = ['COORDINADORA', 'TCC', 'SERVIENTREGA'] as const
+
 interface Props {
   biblioteca: BibliotecaLinea[]
 }
@@ -9,10 +11,14 @@ interface Props {
 export default function Paso3({ biblioteca }: Props) {
   const lineas = useCotWizardStore((s) => s.lineas)
   const items = useCotWizardStore((s) => s.items)
+  const paqueteadora = useCotWizardStore((s) => s.paqueteadora)
+  const setPaqueteadora = useCotWizardStore((s) => s.setPaqueteadora)
   const toggleGrupo = useCotWizardStore((s) => s.toggleGrupo)
   const toggleItem = useCotWizardStore((s) => s.toggleItem)
   const updateItemField = useCotWizardStore((s) => s.updateItemField)
   const updateItemExtraCol = useCotWizardStore((s) => s.updateItemExtraCol)
+
+  const tienePaqueteo = lineas.some((l) => l.toLowerCase() === 'paqueteo')
 
   const bibMap = new Map(biblioteca.map((l) => [l.nombre, l]))
 
@@ -30,6 +36,36 @@ export default function Paso3({ biblioteca }: Props) {
         Selecciona los ítems que incluirás y edita sus valores si es necesario.
         Editar aquí <strong className="text-white">no modifica la biblioteca</strong> — solo esta cotización.
       </p>
+
+      {tienePaqueteo && (
+        <div className="bg-surface border border-border rounded-xl p-4 flex items-center gap-4">
+          <label className="font-condensed text-xs uppercase text-muted tracking-wider whitespace-nowrap">
+            Paqueteadora
+          </label>
+          <div className="flex gap-2 flex-wrap">
+            {PAQUETEADORAS.map((op) => (
+              <button
+                key={op}
+                type="button"
+                onClick={() => setPaqueteadora(paqueteadora === op ? null : op)}
+                className="px-3 py-1 rounded-lg text-xs font-medium border transition-all"
+                style={{
+                  background: paqueteadora === op ? '#6d28d9' : 'transparent',
+                  borderColor: paqueteadora === op ? '#6d28d9' : '#1e3050',
+                  color: paqueteadora === op ? '#fff' : '#8899b4',
+                }}
+              >
+                {op}
+              </button>
+            ))}
+          </div>
+          {paqueteadora && (
+            <span className="text-xs text-muted ml-auto">
+              Seleccionada: <span className="text-white">{paqueteadora}</span>
+            </span>
+          )}
+        </div>
+      )}
 
       {lineas.map((svc) => {
         const color = SERVICIO_COLORS[svc] ?? '#8899b4'

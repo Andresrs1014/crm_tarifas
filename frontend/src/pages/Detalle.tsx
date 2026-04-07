@@ -76,6 +76,8 @@ export default function Detalle() {
       empresa: record.empresa,
       nit: record.nit ?? '',
       ciudad: record.ciudad ?? '',
+      direccion: record.direccion ?? '',
+      categoria: record.categoria ?? '',
       comercial_id: record.comercial_id ?? '',
       tipo_cliente: record.tipo_cliente,
       comision: record.comision ?? '',
@@ -100,13 +102,16 @@ export default function Detalle() {
       telefono: c.telefono ?? undefined,
       email: c.email ?? undefined,
       orden: c.orden,
+      cumpleanos: c.cumpleanos ?? null,
+      recibe_regalos: c.recibe_regalos ?? null,
+      direccion: c.direccion ?? null,
     })))
     setFacturacionLineas({ ...record.facturacion_lineas })
     setEditing(true)
   }
 
   const handleSave = () => {
-    const payload: Record<string, unknown> = { ...form, servicios, facturacion_lineas: facturacionLineas }
+    const payload: Record<string, unknown> = { ...form, servicios, facturacion_lineas: facturacionLineas, contactos }
     Object.keys(payload).forEach((k) => {
       if (payload[k] === '' || payload[k] === undefined) delete payload[k]
     })
@@ -201,9 +206,11 @@ export default function Detalle() {
                 <Info label="Ciudad" value={record.ciudad} />
                 <Info label="Comercial" value={comercialNombre(record.comercial_id)} />
                 <Info label="Tipo cliente" value={record.tipo_cliente} />
+                {record.categoria && <Info label="Categoría" value={record.categoria} />}
                 {record.comision && <Info label="Comisión" value={record.comision} />}
                 <Info label="Fecha" value={fmtDate(record.fecha)} />
                 <Info label="Actualizado" value={fmtDate(record.updated_at)} />
+                {record.direccion && <div className="col-span-2"><Info label="Dirección" value={record.direccion} /></div>}
                 {record.observaciones && (
                   <div className="col-span-2">
                     <p className="text-xs text-muted uppercase tracking-wider font-condensed mb-1">Observaciones</p>
@@ -226,6 +233,15 @@ export default function Detalle() {
                   <input value={String(form.ciudad ?? '')} onChange={(e) => setField('ciudad', e.target.value)} />
                 </div>
                 <div>
+                  <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Categoría</label>
+                  <select value={String(form.categoria ?? '')} onChange={(e) => setField('categoria', e.target.value)}>
+                    <option value="">—</option>
+                    <option value="A">A</option>
+                    <option value="B">B</option>
+                    <option value="C">C</option>
+                  </select>
+                </div>
+                <div>
                   <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Comercial</label>
                   <select value={String(form.comercial_id ?? '')} onChange={(e) => setField('comercial_id', e.target.value)}>
                     <option value="">Sin asignar</option>
@@ -245,6 +261,10 @@ export default function Detalle() {
                 <div>
                   <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Comisión</label>
                   <input value={String(form.comision ?? '')} onChange={(e) => setField('comision', e.target.value)} />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Dirección</label>
+                  <input value={String(form.direccion ?? '')} onChange={(e) => setField('direccion', e.target.value)} />
                 </div>
                 <div className="col-span-2">
                   <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Observaciones</label>
@@ -388,11 +408,17 @@ export default function Detalle() {
               ) : (
                 <div className="space-y-3">
                   {record.contactos.map((c) => (
-                    <div key={c.id} className="text-sm">
+                    <div key={c.id} className="text-sm border-b border-border last:border-0 pb-2 last:pb-0">
                       <p className="font-medium" style={{ color: '#e8edf5' }}>{c.nombre}</p>
                       {c.cargo && <p className="text-xs text-muted">{c.cargo}</p>}
                       {c.email && <p className="text-xs text-muted">{c.email}</p>}
                       {c.telefono && <p className="text-xs text-muted">{c.telefono}</p>}
+                      {c.cumpleanos && <p className="text-xs text-muted">🎂 {c.cumpleanos}</p>}
+                      {c.recibe_regalos && c.recibe_regalos !== 'no' && (
+                        <p className="text-xs" style={{ color: '#00c2ff' }}>
+                          {c.recibe_regalos === 'si' ? '🎁 Recibe regalos' : '🎁 Tal vez'}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>

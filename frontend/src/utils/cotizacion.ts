@@ -140,11 +140,7 @@ export function buildCotHTML(
     <div class="cot-preview" id="cot-doc">
       <div class="cot-preview-header">
         <div class="cot-preview-logo">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:900;
-            color:#002366;letter-spacing:3px;line-height:1">GRUPO ZYMO</div>
-          <div style="font-size:11px;color:#555;letter-spacing:2px;text-transform:uppercase;margin-top:4px">
-            Logística &amp; Comercio Exterior
-          </div>
+          <img src="/logo.png" alt="Zymo" style="height:48px;width:auto;display:block;" />
         </div>
         <div class="cot-preview-meta">
           <strong>${wiz.numero ?? 'BORRADOR'}</strong>
