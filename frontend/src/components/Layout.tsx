@@ -49,11 +49,9 @@ export default function Layout() {
       {/* Sidebar */}
       <aside className="w-56 shrink-0 flex flex-col border-r border-border" style={{ background: '#111827' }}>
         {/* Logo */}
-        <div className="px-4 py-4 border-b border-border flex items-center gap-2.5">
-          <div className="bg-white rounded-md px-2.5 py-1.5 shrink-0">
-            <img src="/logo.png" alt="Zymo" className="h-6 w-auto" />
-          </div>
-          <span className="font-condensed text-muted text-xs tracking-widest uppercase">CRM</span>
+        <div className="px-4 py-5 border-b border-border">
+          <img src="/logo_transparent.png" alt="Zymo" className="h-14 w-auto max-w-full" />
+          <span className="font-condensed text-sm tracking-widest uppercase mt-2 block" style={{ color: '#8899b4' }}>CRM Tarifas</span>
         </div>
 
         {/* Nav */}
