@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Building2, UserCog,
-  PlusCircle, FileText, BookOpen, LogOut, ShieldCheck, HeartHandshake,
+  FileText, BookOpen, LogOut, ShieldCheck, HeartHandshake,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import Toast from './Toast'
@@ -56,21 +56,6 @@ export default function Layout() {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-3 px-2">
-          {/* Nuevo Registro destacado */}
-          <NavLink
-            to="/registro"
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm mb-3 transition-all ${
-                isActive
-                  ? 'bg-accent/20 text-accent'
-                  : 'text-accent/80 hover:bg-accent/10 hover:text-accent'
-              }`
-            }
-          >
-            <PlusCircle size={18} />
-            <span className="font-medium">Nuevo Registro</span>
-          </NavLink>
-
           <div className="border-t border-border mb-3" />
 
           {NAV_MAIN.map(({ to, icon, label }) => (
