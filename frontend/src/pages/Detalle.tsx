@@ -402,7 +402,7 @@ export default function Detalle() {
 
           {/* Actividades */}
           <div className="bg-surface border border-border rounded-xl p-5">
-            <ActividadesTimeline recordId={record.id} actividades={record.actividades} />
+            <ActividadesTimeline recordId={record.id} actividades={record.actividades} queryKey={['record', id!]} />
           </div>
         </div>
       </div>

@@ -29,7 +29,7 @@ type Tab = 'items' | 'obs' | 'columnas'
 export default function Biblioteca() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [tabs, setTabs] = useState<Record<string, Tab>>({})
-  const toast = useToastStore()
+  const toast = useToastStore((s) => s)
   const qc = useQueryClient()
   const isSuperadmin = useAuthStore((s) => s.user?.is_superadmin ?? false)
 
@@ -172,7 +172,7 @@ function GruposTab({
 }: {
   linea: BibliotecaLinea
   onMutate: () => void
-  toast: ReturnType<typeof useToastStore>
+  toast: { add: (msg: string, type?: 'success' | 'error' | 'warning') => void }
 }) {
   const [expandedGrupos, setExpandedGrupos] = useState<Record<string, boolean>>({})
   const [newGrupoName, setNewGrupoName] = useState('')
@@ -332,9 +332,9 @@ function ItemsTable({
   color: string
   onMutate: () => void
   onDeleteItem: (id: string) => void
-  toast: ReturnType<typeof useToastStore>
+  toast: { add: (msg: string, type?: 'success' | 'error' | 'warning') => void }
 }) {
-  const EMPTY = { nombre: '', tarifa: '', tipo_tarifa: 'moneda' as const, obs: '', extra_cols: {} as Record<string, string> }
+  const EMPTY = { nombre: '', tarifa: '', tipo_tarifa: 'moneda' as 'moneda' | 'porcentaje', obs: '', extra_cols: {} as Record<string, string> }
   const [showAdd, setShowAdd] = useState(false)
   const [addForm, setAddForm] = useState(EMPTY)
   const [editId, setEditId] = useState<string | null>(null)
@@ -477,7 +477,7 @@ function ObsTab({
 }: {
   linea: BibliotecaLinea
   onMutate: () => void
-  toast: ReturnType<typeof useToastStore>
+  toast: { add: (msg: string, type?: 'success' | 'error' | 'warning') => void }
 }) {
   const EMPTY = { nombre: '', html: '' }
   const [showAdd, setShowAdd] = useState(false)
@@ -599,7 +599,7 @@ function ObsForm({ form, onChange, onSave, onCancel, loading, title }: {
 function ColumnasTab({ linea, onMutate, toast }: {
   linea: BibliotecaLinea
   onMutate: () => void
-  toast: ReturnType<typeof useToastStore>
+  toast: { add: (msg: string, type?: 'success' | 'error' | 'warning') => void }
 }) {
   const [columnas, setColumnas] = useState<BibliotecaColumna[]>(linea.columnas)
   const [newId, setNewId] = useState('')

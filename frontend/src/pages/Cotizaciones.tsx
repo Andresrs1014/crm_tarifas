@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import PageContainer from '../components/PageContainer'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Eye, Pencil, Copy, Link, Printer, Trash2 } from 'lucide-react'
+import { Plus, Eye, Pencil, Copy, Link, Printer, Trash2, FileText } from 'lucide-react'
 import {
   getCotizacionesApi,
   deleteCotizacionApi,

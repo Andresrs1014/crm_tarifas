@@ -86,10 +86,24 @@ function cloneItems(items: ItemsMap): ItemsMap {
 }
 
 // ─────────────────────────────────────────────────────────
+// Tipo base del estado (equivalente a typeof INITIAL_STATE)
+// ─────────────────────────────────────────────────────────
+
+type CotWizardState = DatosGenerales & {
+  id: string | null
+  numero: string | null
+  paso: 1 | 2 | 3 | 4 | 5
+  lineas: string[]
+  items: ItemsMap
+  obs_plantillas: Record<string, string[]>
+  obs_libre: string
+}
+
+// ─────────────────────────────────────────────────────────
 // Interfaz del store
 // ─────────────────────────────────────────────────────────
 
-interface CotWizardStore extends typeof INITIAL_STATE {
+interface CotWizardStore extends CotWizardState {
   // ── Navegación ──
   setPaso: (n: 1 | 2 | 3 | 4 | 5) => void
 
@@ -229,7 +243,7 @@ export const useCotWizardStore = create<CotWizardStore>((set, get) => ({
       const item = newItems[svc]?.[gid]?.items[idx]
       if (!item) return s
       // TypeScript sabe que field no es 'extra_cols' ni 'sel', así que es string
-      ;(item as Record<string, unknown>)[field] = val
+      ;(item as unknown as Record<string, unknown>)[field] = val
       return { items: newItems }
     }),
 
