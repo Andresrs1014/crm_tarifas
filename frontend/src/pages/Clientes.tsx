@@ -62,13 +62,6 @@ export default function Clientes() {
           >
             <Upload size={14} /> Importar
           </button>
-          <button
-            onClick={() => navigate('/registro')}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition"
-            style={{ background: '#00c2ff', color: '#0a0e1a' }}
-          >
-            + Nuevo
-          </button>
         </div>
       </div>
 
