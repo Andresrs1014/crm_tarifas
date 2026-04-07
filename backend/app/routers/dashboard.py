@@ -1,4 +1,6 @@
+import json
 import uuid
+from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -11,9 +13,13 @@ from app.models.user import User
 from app.schemas.dashboard import (
     ChartPoint,
     ComercialActivity,
+    CotizacionReciente,
     DashboardCharts,
+    DashboardRecientes,
     DashboardStats,
+    MonthPoint,
     RankingEntry,
+    RecordReciente,
 )
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -127,6 +133,23 @@ def get_stats(
     cotizaciones_por_estado = {r[0]: r[1] for r in rows}
     total_cotizaciones = sum(cotizaciones_por_estado.values())
 
+    # Cotizaciones en curso (borrador + enviada + negociacion)
+    en_curso = sum(
+        cotizaciones_por_estado.get(e, 0) for e in ("borrador", "enviada", "negociacion")
+    )
+
+    # Cotizaciones vencidas (vigencia < hoy, no aprobada ni rechazada)
+    hoy = date.today().isoformat()
+    vencidas_row = session.execute(
+        text(f"""
+            SELECT COUNT(*) FROM cotizaciones c
+            WHERE {cw}
+              AND c.vigencia < :hoy
+              AND c.estado NOT IN ('aprobada','rechazada')
+        """),
+        {**cp, "hoy": hoy},
+    ).scalar() or 0
+
     return DashboardStats(
         total_records=total_records,
         total_prospectos=total_prospectos,
@@ -137,6 +160,8 @@ def get_stats(
         facturacion_por_linea=facturacion_por_linea,
         cotizaciones_por_estado=cotizaciones_por_estado,
         total_cotizaciones=total_cotizaciones,
+        cotizaciones_en_curso=en_curso,
+        cotizaciones_vencidas=int(vencidas_row),
     )
 
 
@@ -235,6 +260,38 @@ def get_charts(
     ).all()
     lineas_cotizadas = [ChartPoint(name=r[0], value=r[1]) for r in rows]
 
+    # Registros por mes (últimos 12 meses)
+    rows = rq(f"""
+        SELECT strftime('%Y-%m', r.fecha) AS mes,
+               SUM(CASE WHEN r.tipo='prospecto' THEN 1 ELSE 0 END) AS prospectos,
+               SUM(CASE WHEN r.tipo='cliente'   THEN 1 ELSE 0 END) AS clientes
+        FROM records r WHERE {rw}
+          AND r.fecha >= date('now', '-11 months', 'start of month')
+        GROUP BY mes
+        ORDER BY mes
+    """)
+    registros_por_mes = [
+        MonthPoint(name=r[0], prospectos=r[1] or 0, clientes=r[2] or 0)
+        for r in rows
+    ]
+
+    # Gestión clientes antiguos
+    rw_c2 = rw + (" AND r.tipo='cliente'" if tipo != "cliente" else "")
+    gestion_data = [
+        ("Activos",     f"r.estado_cliente = 'activo'"),
+        ("En Riesgo",   f"r.estado_cliente = 'en-riesgo'"),
+        ("Inactivos",   f"r.estado_cliente = 'inactivo'"),
+        ("Con Visita",  f"r.visita_cliente IS NOT NULL AND r.visita_cliente != 'no'"),
+        ("Nuevo Svc",   f"r.nuevo_servicio = 'si'"),
+        ("Facturados",  f"r.facturado IS NOT NULL AND r.facturado != 'no'"),
+    ]
+    gestion_clientes = []
+    for label, cond in gestion_data:
+        val = rq(
+            f"SELECT COUNT(*) FROM records r WHERE {rw_c2} AND {cond}"
+        ).scalar() or 0
+        gestion_clientes.append(ChartPoint(name=label, value=int(val)))
+
     return DashboardCharts(
         prospectos_vs_clientes=prospectos_vs_clientes,
         pipeline_estados=pipeline_estados,
@@ -243,7 +300,71 @@ def get_charts(
         billing_por_linea=billing_por_linea,
         pipeline_cotizaciones=pipeline_cotizaciones,
         lineas_cotizadas=lineas_cotizadas,
+        registros_por_mes=registros_por_mes,
+        gestion_clientes=gestion_clientes,
     )
+
+
+# ---------- /recientes ----------
+
+@router.get("/recientes", response_model=DashboardRecientes)
+def get_recientes(
+    session: Session = Depends(get_session),
+    _: User = Depends(get_current_active_user),
+):
+    """Últimos 8 registros y últimas 6 cotizaciones."""
+    hoy = date.today().isoformat()
+
+    # Últimos 8 records con nombre de comercial
+    rec_rows = session.execute(text("""
+        SELECT r.id, r.empresa, r.tipo, co.nombre, r.servicios,
+               r.estado_prospecto, r.estado_cliente, r.fecha
+        FROM records r
+        LEFT JOIN comerciales co ON co.id = r.comercial_id
+        ORDER BY r.created_at DESC
+        LIMIT 8
+    """)).all()
+
+    registros = []
+    for r in rec_rows:
+        estado = r[5] if r[2] == "prospecto" else (r[6] or "")
+        servicios = json.loads(r[4]) if r[4] and r[4] not in ("null", "[]") else []
+        registros.append(RecordReciente(
+            id=str(r[0]),
+            empresa=r[1],
+            tipo=r[2],
+            comercial_nombre=r[3],
+            servicios=servicios,
+            estado=estado or "",
+            fecha=str(r[7]),
+        ))
+
+    # Últimas 6 cotizaciones
+    cot_rows = session.execute(text("""
+        SELECT id, numero, empresa, lineas, estado, fecha, vigencia
+        FROM cotizaciones
+        ORDER BY created_at DESC
+        LIMIT 6
+    """)).all()
+
+    cotizaciones = []
+    for c in cot_rows:
+        lineas = json.loads(c[3]) if c[3] and c[3] not in ("null", "[]") else []
+        vencida = (
+            str(c[6]) < hoy
+            and c[4] not in ("aprobada", "rechazada")
+        )
+        cotizaciones.append(CotizacionReciente(
+            id=str(c[0]),
+            numero=c[1],
+            empresa=c[2],
+            lineas=lineas,
+            estado=c[4],
+            fecha=str(c[5]),
+            vencida=vencida,
+        ))
+
+    return DashboardRecientes(registros=registros, cotizaciones=cotizaciones)
 
 
 # ---------- /ranking ----------

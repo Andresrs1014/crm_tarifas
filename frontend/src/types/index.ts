@@ -277,6 +277,12 @@ export interface ChartPoint {
   value: number
 }
 
+export interface MonthPoint {
+  name: string
+  prospectos: number
+  clientes: number
+}
+
 export interface DashboardCharts {
   prospectos_vs_clientes: ChartPoint[]
   pipeline_estados: ChartPoint[]
@@ -285,6 +291,8 @@ export interface DashboardCharts {
   billing_por_linea: ChartPoint[]
   pipeline_cotizaciones: ChartPoint[]
   lineas_cotizadas: ChartPoint[]
+  registros_por_mes: MonthPoint[]
+  gestion_clientes: ChartPoint[]
 }
 
 export interface RankingEntry {
@@ -294,4 +302,29 @@ export interface RankingEntry {
   clientes: number
   visitas: number
   valor_facturado: number
+}
+
+export interface RecordReciente {
+  id: string
+  empresa: string
+  tipo: string
+  comercial_nombre: string | null
+  servicios: string[]
+  estado: string
+  fecha: string
+}
+
+export interface CotizacionReciente {
+  id: string
+  numero: string
+  empresa: string
+  lineas: string[]
+  estado: string
+  fecha: string
+  vencida: boolean
+}
+
+export interface DashboardRecientes {
+  registros: RecordReciente[]
+  cotizaciones: CotizacionReciente[]
 }
