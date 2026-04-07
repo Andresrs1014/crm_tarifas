@@ -89,6 +89,20 @@ function cloneItems(items: ItemsMap): ItemsMap {
 }
 
 // ─────────────────────────────────────────────────────────
+// Tipo base del estado (equivalente a typeof INITIAL_STATE)
+// ─────────────────────────────────────────────────────────
+
+type CotWizardState = DatosGenerales & {
+  id: string | null
+  numero: string | null
+  paso: 1 | 2 | 3 | 4 | 5
+  lineas: string[]
+  items: ItemsMap
+  obs_plantillas: Record<string, string[]>
+  obs_libre: string
+}
+
+// ─────────────────────────────────────────────────────────
 // Interfaz del store
 // ─────────────────────────────────────────────────────────
 

@@ -30,7 +30,7 @@ type Tab = 'items' | 'obs' | 'columnas'
 export default function Biblioteca() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [tabs, setTabs] = useState<Record<string, Tab>>({})
-  const toast = useToastStore()
+  const toast = useToastStore((s) => s)
   const qc = useQueryClient()
   const isSuperadmin = useAuthStore((s) => s.user?.is_superadmin ?? false)
 
