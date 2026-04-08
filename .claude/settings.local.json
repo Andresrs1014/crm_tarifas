@@ -1,7 +1,21 @@
 {
   "permissions": {
     "allow": [
-      "Bash(./venv/Scripts/pip install:*)"
+      "Bash(./venv/Scripts/pip install:*)",
+      "Bash(netstat -ano)",
+      "Bash(./venv/Scripts/python -c \"from app.routers.dashboard import router; from app.schemas.dashboard import DashboardCharts, DashboardStats, DashboardRecientes; print\\(''OK''\\)\")",
+      "Bash(cmd /c \"taskkill /IM python.exe /F\")",
+      "Bash(find C:/crm_tarifas/backend -name \"*.pyc\" -delete)",
+      "Bash(find C:/crm_tarifas/backend -name \"__pycache__\" -type d -exec rm -rf {} +)",
+      "Bash(./venv/Scripts/python -c \":*)",
+      "Bash(venv/Scripts/alembic upgrade:*)",
+      "Bash(venv/Scripts/alembic stamp:*)",
+      "Bash(venv/Scripts/python -c \":*)",
+      "Bash(npx tsc:*)",
+      "Bash(grep -c \"console.error\\\\|TODO\\\\|FIXME\\\\|BUG\\\\|HACK\" /c/crm_tarifas/frontend/src/pages/wizard/*.tsx /c/crm_tarifas/frontend/src/api/*.ts)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"fix: login falla en servidor — baseURL siempre vacío en build de producción:*)",
+      "Bash(git push:*)"
     ]
   }
 }
