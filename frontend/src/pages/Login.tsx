@@ -21,8 +21,18 @@ export default function Login() {
       const user = await getMeApi()
       login(token.access_token, user)
       navigate('/dashboard')
-    } catch {
-      setError('Usuario o contraseña incorrectos')
+    } catch (err: unknown) {
+      // Mostrar error específico para facilitar diagnóstico
+      const axiosErr = err as { response?: { status: number; data?: { detail?: string } }; message?: string; code?: string }
+      if (axiosErr?.response?.status === 401) {
+        setError('Usuario o contraseña incorrectos')
+      } else if (axiosErr?.response?.status) {
+        setError(`Error del servidor (${axiosErr.response.status}): ${axiosErr.response.data?.detail ?? 'Error interno'}`)
+      } else if (axiosErr?.code === 'ERR_NETWORK' || axiosErr?.message?.includes('Network')) {
+        setError('No se puede conectar con el servidor. Verifica que el backend esté corriendo.')
+      } else {
+        setError(`Error inesperado: ${axiosErr?.message ?? 'Desconocido'}`)
+      }
     } finally {
       setLoading(false)
     }
