@@ -4,6 +4,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session
 
+from sqlalchemy.exc import IntegrityError
+from sqlmodel import select
+
 from app.auth.service import get_user_by_username, hash_password
 from app.auth.router import router as auth_router
 from app.routers.comerciales import router as comerciales_router
@@ -29,21 +32,32 @@ from app.seed import seed_biblioteca, seed_cot_counter
 
 
 def _seed_superadmin() -> None:
-    """Crea el superadmin inicial si no existe ningún usuario."""
+    """Crea el superadmin inicial si no existe. Idempotente: verifica por username Y email."""
+    email = f"{settings.first_superadmin_username}@zymo.local"
     with Session(engine) as session:
-        existing = get_user_by_username(session, settings.first_superadmin_username)
+        existing = session.exec(
+            select(User).where(
+                (User.username == settings.first_superadmin_username) |
+                (User.email == email)
+            )
+        ).first()
         if existing:
+            print(f"[seed] Superadmin ya existe, omitiendo.")
             return
         superadmin = User(
             username=settings.first_superadmin_username,
-            email=f"{settings.first_superadmin_username}@zymo.local",
+            email=email,
             hashed_password=hash_password(settings.first_superadmin_password),
             is_active=True,
             is_superadmin=True,
         )
         session.add(superadmin)
-        session.commit()
-        print(f"[seed] Superadmin '{settings.first_superadmin_username}' creado.")
+        try:
+            session.commit()
+            print(f"[seed] Superadmin '{settings.first_superadmin_username}' creado.")
+        except IntegrityError:
+            session.rollback()
+            print(f"[seed] Superadmin ya existe (IntegrityError), omitiendo.")
 
 
 @asynccontextmanager
