@@ -93,7 +93,27 @@ def list_records(
     if fecha_hasta:
         query = query.where(Record.fecha <= fecha_hasta)
     records = session.exec(query.order_by(Record.created_at.desc())).all()
-    return [RecordRead.model_validate(r) for r in records]
+
+    # Carga el primer contacto de cada record en una sola query
+    from sqlalchemy import text as _text
+    ids = [str(r.id) for r in records]
+    contacto_map: dict[str, str] = {}
+    if ids:
+        placeholders = ",".join(f"'{i}'" for i in ids)
+        rows = session.execute(_text(f"""
+            SELECT record_id, nombre FROM contactos
+            WHERE record_id IN ({placeholders})
+            GROUP BY record_id
+            HAVING MIN(orden)
+        """)).all()
+        contacto_map = {str(r[0]): r[1] for r in rows}
+
+    result = []
+    for r in records:
+        read = RecordRead.model_validate(r)
+        read.contacto_nombre = contacto_map.get(str(r.id))
+        result.append(read)
+    return result
 
 
 @router.post("/", response_model=RecordReadDetalle, status_code=status.HTTP_201_CREATED)

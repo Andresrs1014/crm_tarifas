@@ -29,16 +29,18 @@ const schema = z.object({
   observaciones: z.string().optional(),
   fecha: z.string(),
   // prospecto fields
-  estado_prospecto: z.enum(['seguimiento', 'cerrado', 'perdido', 'frio']).optional(),
-  visita: z.enum(['no', 'si', 'virtual', 'llamada']).optional(),
-  facturado_p: z.enum(['no', 'si', 'parcial']).optional(),
+  estado_prospecto: z.enum(['seguimiento', 'cerrado', 'perdido', 'frio', '']).optional(),
+  visita: z.enum(['no', 'si', 'virtual', 'llamada', '']).optional(),
+  fecha_visita: z.string().optional(),
+  facturado_p: z.enum(['no', 'si', 'parcial', '']).optional(),
   proximo_seguimiento: z.string().optional(),
   // cliente fields
-  estado_cliente: z.enum(['activo', 'en-riesgo', 'inactivo']).optional(),
-  visita_cliente: z.enum(['no', 'si', 'virtual', 'llamada']).optional(),
-  nuevo_servicio: z.enum(['si', 'no']).optional(),
+  estado_cliente: z.enum(['activo', 'en-riesgo', 'inactivo', '']).optional(),
+  visita_cliente: z.enum(['no', 'si', 'virtual', 'llamada', '']).optional(),
+  fecha_visita_cliente: z.string().optional(),
+  nuevo_servicio: z.enum(['si', 'no', '']).optional(),
   servicio_nuevo: z.string().optional(),
-  facturado: z.enum(['no', 'si', 'parcial']).optional(),
+  facturado: z.enum(['no', 'si', 'parcial', '']).optional(),
 })
 type FormValues = z.infer<typeof schema>
 
@@ -76,6 +78,8 @@ export default function Registro() {
 
   const tipo = watch('tipo')
   const tipoCliente = watch('tipo_cliente')
+  const facturadoP = watch('facturado_p')
+  const facturado = watch('facturado')
 
   const mutation = useMutation({
     mutationFn: createRecord,
@@ -88,11 +92,13 @@ export default function Registro() {
   })
 
   const onSubmit = (values: FormValues) => {
+    const totalBilling = Object.values(facturacionLineas).reduce((a, b) => a + b, 0)
     const payload: Record<string, unknown> = {
       ...values,
       servicios,
       contactos,
       ...(servicios.length > 0 ? { facturacion_lineas: facturacionLineas } : {}),
+      ...(values.tipo === 'prospecto' ? { valor_p: totalBilling } : { valor: totalBilling }),
     }
     // Clean empty strings
     Object.keys(payload).forEach((k) => {
@@ -162,14 +168,14 @@ export default function Registro() {
               <div>
                 <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Categoría</label>
                 <select {...register('categoria')}>
-                  <option value="">—</option>
-                  <option value="A">A</option>
-                  <option value="B">B</option>
-                  <option value="C">C</option>
+                  <option value="">— Sin categoría —</option>
+                  <option value="A">A — +16 operaciones/mes</option>
+                  <option value="B">B — 6 a 15 operaciones/mes</option>
+                  <option value="C">C — Menos de 5 operaciones/mes</option>
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Fecha</label>
+                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Fecha de Registro</label>
                 <input type="date" {...register('fecha')} />
               </div>
               <div>
@@ -231,23 +237,27 @@ export default function Registro() {
                     <select {...register('visita')}>
                       <option value="">—</option>
                       <option value="no">No</option>
-                      <option value="si">Sí</option>
-                      <option value="virtual">Virtual</option>
-                      <option value="llamada">Llamada</option>
+                      <option value="si">Sí — Presencial</option>
+                      <option value="virtual">Sí — Virtual</option>
+                      <option value="llamada">Sí — Llamada Comercial</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Facturado</label>
+                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Fecha de Visita</label>
+                    <input type="date" {...register('fecha_visita')} />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Próx. Seguimiento</label>
+                    <input type="date" {...register('proximo_seguimiento')} />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">¿Se facturó?</label>
                     <select {...register('facturado_p')}>
                       <option value="">—</option>
                       <option value="no">No</option>
                       <option value="si">Sí</option>
                       <option value="parcial">Parcial</option>
                     </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Próx. seguimiento</label>
-                    <input type="date" {...register('proximo_seguimiento')} />
                   </div>
                 </div>
               </>
@@ -269,10 +279,13 @@ export default function Registro() {
                     <select {...register('visita_cliente')}>
                       <option value="">—</option>
                       <option value="no">No</option>
-                      <option value="si">Sí</option>
-                      <option value="virtual">Virtual</option>
-                      <option value="llamada">Llamada</option>
+                      <option value="si">Sí — Presencial</option>
+                      <option value="virtual">Sí — Virtual</option>
                     </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Fecha de Visita / Gestión</label>
+                    <input type="date" {...register('fecha_visita_cliente')} />
                   </div>
                   <div>
                     <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">¿Nuevo servicio?</label>
@@ -283,8 +296,13 @@ export default function Registro() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Servicio nuevo</label>
-                    <input {...register('servicio_nuevo')} placeholder="Nombre del servicio" />
+                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Servicio cerrado</label>
+                    <select {...register('servicio_nuevo')}>
+                      <option value="">—</option>
+                      {lineasDisponibles.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Facturado</label>
@@ -321,7 +339,7 @@ export default function Registro() {
                 />
               ))}
             </div>
-            {servicios.length > 0 && (
+            {servicios.length > 0 && (tipo === 'prospecto' ? facturadoP && facturadoP !== 'no' : facturado && facturado !== 'no') && (
               <>
                 <p className="text-xs text-muted mb-3 uppercase tracking-wider font-condensed">Facturación por línea</p>
                 <BillingLines

@@ -1,131 +1,118 @@
 # ESTADO DEL PROYECTO — CRM Tarifas ZYMO
 
-_Última actualización: 2026-04-04_
+_Última actualización: 2026-04-08_
 
 ---
 
 ## Resumen general
 
-El CRM está en producción vía Docker. Login, autenticación JWT, navegación, todas las páginas principales, cotizaciones y SAC están operativos.
+CRM operativo en producción vía Docker. Todas las funcionalidades del prototipo original (`crm_nuevo.md`) han sido implementadas y el código está listo para despliegue.
 
-**Stack:** FastAPI (backend) + React/Vite/Tailwind (frontend) + PostgreSQL + Docker Compose.
-
----
-
-## Lo que está implementado
-
-### Backend
-- Modelos: `Record`, `Contacto`, `Cotizacion`, `TarifaEspecial`, `User`
-- Campos añadidos en esta iteración: `direccion`, `categoria` (Record); `cumpleanos`, `recibe_regalos`, `fotos_entrega`, `fotos_fda`, `fda_entregado`, `direccion` (Contacto); `paqueteadora`, `tarifa_tipo`, `tarifa_especial_id` (Cotizacion)
-- Routers activos: `/api/records`, `/api/contactos`, `/api/cotizaciones`, `/api/biblioteca`, `/api/tarifas-especiales`, `/api/sac`
-- Autenticación JWT HS256, 8 h de expiración
-- Dashboard: `/api/dashboard/stats`, `/api/dashboard/charts`
-
-### Frontend
-- Layout con sidebar fijo, reloj en vivo (fecha/hora en español, formato 12h)
-- Páginas: Dashboard, Prospectos, Clientes, Equipo, Cotizaciones, Servicios (Biblioteca), SAC, Registro, Detalle
-- Logo transparente (`/logo_transparent.png`) sin fondo blanco, tamaño `h-14`
-- Sidebar: "Nuevo Registro" destacado, separador, nav principal, enlace Admin solo para superadmin
-- Auth store (Zustand persist) con interceptor 401 → logout automático
-
-### Infraestructura
-- Docker Compose con servicios: `db` (Postgres), `backend`, `frontend` (nginx)
-- Variables de entorno en `.env` (no en código)
-- Proxy Vite configurado para dev local (`/api → http://localhost:8000`)
-  > **Nota:** Reiniciar `npm run dev` después de cambiar `vite.config.ts` para que el proxy aplique.
+**Stack:** FastAPI + SQLModel (SQLite) · React 18 + Vite + TypeScript + Tailwind · Docker Compose · nginx (proxy)
 
 ---
 
-## Pendientes — Prioridad Alta (UX crítica)
+## Funcionalidades implementadas
 
-Estos cambios son pequeños pero visibles al usuario.
+### Autenticación
+- Login JWT (HS256, 8 h de expiración)
+- Interceptor automático 401 → logout + redirect
+- Roles: `superadmin` / usuario normal
+- Gestión de usuarios en `/admin/usuarios` (solo superadmin)
 
-### P1 — Layout centrado en todas las páginas
-Todas las páginas (Prospectos, Clientes, Equipo, Cotizaciones, Servicios) tienen el contenido pegado a la izquierda.
+### CRM — Prospectos y Clientes
+- CRUD completo con múltiples contactos por empresa
+- Campos: empresa, NIT, ciudad, dirección, categoría (A/B/C), comercial, tipo cliente, comisión, servicios, visita, facturación, valor, estado, próximo seguimiento, observaciones
+- Contactos con campos SAC: cumpleaños, recibe regalos, dirección
+- Filtros: búsqueda, estado, comercial, facturado
+- Exportar Excel con todos los campos
+- Carga masiva desde Excel (`/registro/importar`)
+- Detalle con edición inline y botón "Nueva cotización" (pre-rellena wizard)
+
+### Cotizaciones — Wizard
+- **Paso 1 — Datos generales**: autocomplete empresa desde CRM, pre-rellena todos los datos del cliente/contacto automáticamente; selector de contacto cuando hay múltiples
+- **Paso 2 — Líneas**: selección de servicios + tipo de tarifa (biblioteca estándar vs. tarifa especial)
+- **Paso 3 — Items**: selección y edición de ítems por línea; selector de paqueteadora para servicio Paqueteo
+- **Paso 4 — Observaciones**: plantillas por línea + texto libre
+- **Paso 5 — Preview**: HTML completo de la cotización + exportar PDF
+- Guardar borrador disponible en **todos los pasos (1–5)**
+- **Importar desde PDF**: extrae grupos y tarifas automáticamente (pdf.js vía CDN), vista previa editable antes de abrir wizard
+- Duplicar cotización
+- Actualizar tarifas (incremento porcentual sobre ítems tipo moneda, crea nueva versión)
+- Link público de cotización (`/cot/:numero`)
+
+### Dashboard
+- KPIs: total prospectos, clientes, cotizaciones, facturación
+- Cotizaciones en curso, vencidas, rechazadas, en negociación
+- Gráficas: Gestión de Clientes, Registros por Mes, Pipeline de Cotizaciones, Líneas más Cotizadas, Actividad por Comercial
+- Filtro por tipo (prospecto/cliente)
+- Exportar Excel con registros filtrados
+- Estados vacíos con mensaje cuando no hay datos
+- Tablas de actividad reciente (últimos registros y cotizaciones)
+
+### Equipo
+- Gestión de comerciales (CRUD: nombre, cargo, email, teléfono)
+- Ranking de gestión con medallas (prospectos, clientes, visitas, facturado)
+
+### Biblioteca (Tarifas)
+- Gestión de líneas de negocio con grupos, ítems y observaciones
+- Columnas extra configurables por línea (solo superadmin)
+- Tarifas especiales: conjuntos de tarifas personalizadas por servicio
+
+### SAC (Servicio al Cliente)
+- Tracking de cumpleaños por mes con KPIs
+- Registro de fotos de entrega de regalos
+- Sección Fin de Año con control de entregas
+- Exportación XLSX
+
+---
+
+## Infraestructura de deploy
+
 ```
-max-width: 1400px  |  margin: 0 auto  |  padding: 28px 32px
+crm_tarifas/
+├── docker-compose.yml         ← Orquesta backend + frontend
+├── .env                       ← Variables secretas (NO en repo)
+├── .env.example               ← Plantilla con instrucciones
+├── backend/
+│   ├── Dockerfile
+│   └── alembic/versions/      ← Migraciones de BD
+└── frontend/
+    ├── Dockerfile             ← Build multistage, VITE_API_URL vacío en prod
+    └── nginx.conf             ← Proxy /api/ → backend:8000, SPA fallback
 ```
-Envolver con un `PageContainer` o aplicar clases directamente en cada página.
 
-### P2 — Colores de servicio correctos
-Las tarjetas/chips de servicio deben usar estos colores exactos:
+### Levantar en servidor
 
-| Servicio | Color |
+```bash
+git pull origin frfrbranch
+cp .env.example .env
+# Editar .env con SECRET_KEY real y credenciales de admin
+nano .env
+
+docker compose up -d --build
+# Las migraciones corren automáticamente al iniciar el backend
+```
+
+### Variables de entorno requeridas (`.env`)
+
+| Variable | Descripción |
 |---|---|
-| Zona Franca | `#00c2ff` (cyan) |
-| Depósito Aduanero | `#f5a623` (gold) |
-| CEDI | `#f5a623` (gold) |
-| Transporte | `#00e676` (verde) |
-| Paqueteo | `#a855f7` (purple) |
-| Aduana | `#ff4444` (rojo) |
-
-### P3 — Tarjetas de Servicios (Biblioteca) ancho completo
-Cada tarjeta debe ocupar el ancho total del contenedor:
-- `background: #1a2235`, `border: 1px solid #1e3050`, `border-radius: 12px`, `padding: 16px 20px`, `gap: 16px`
-
-### P4 — Servicios de interés en Nuevo Registro desde backend
-La sección "Servicios de interés" en `/registro` debe consumir `GET /api/biblioteca` en lugar de una lista hardcodeada. Cada servicio se muestra como chip seleccionable con su color (ver P2).
-
-### P5 — StatCard número en blanco
-El número grande en StatCard usa color neón. Cambiar a blanco. El color de acento solo en la barra superior y el label.
-- Archivo: `frontend/src/components/StatCard.tsx`
-
-### P6 — Header: título dinámico de página a la izquierda
-El espacio izquierdo del header está vacío. Agregar el nombre de la página actual a la izquierda (o quitar el header y dar espacio al contenido).
-- Archivo: `frontend/src/components/Layout.tsx`
-
-### P7 — Botón "Nuevo" en Prospectos y Clientes
-Agregar botón "Nuevo Registro" en el header de `/prospectos` y `/clientes` que navegue a `/registro`.
-- Archivos: `Prospectos.tsx`, `Clientes.tsx`
-
-### P8 — Loading state: skeleton con animate-pulse
-Reemplazar el texto de carga por un skeleton de filas con `animate-pulse`.
-- Archivos: `Prospectos.tsx`, `Clientes.tsx`, `Cotizaciones.tsx`
-
-### P9 — Empty state: ícono + mensaje centrado
-Cuando no hay registros, mostrar un ícono + texto centrado (actualmente es texto plano gris).
-- Mismos archivos que P8.
-
-### P10 — Detalle.tsx: usar PageContainer
-`Detalle.tsx` usa `p-6 max-w-4xl` directo. Envolver en `PageContainer` para consistencia.
+| `SECRET_KEY` | Clave JWT — generar con `openssl rand -hex 32` |
+| `DATABASE_URL` | `sqlite:///./data/crm_tarifas.db` |
+| `FIRST_SUPERADMIN_USERNAME` | Usuario del primer admin (solo aplica en BD vacía) |
+| `FIRST_SUPERADMIN_PASSWORD` | Password del primer admin |
 
 ---
 
-## Pendientes — Funcionalidades grandes
-
-### Carga masiva de registros
-**Estado:** No implementado.
-
-**Backend:**
-- Endpoint `POST /api/records/import` — recibe Excel/CSV, valida columnas mínimas (`empresa`, `tipo`), retorna resumen de creados/errores
-- Dependencia: `openpyxl` en `requirements.txt`
-
-**Frontend:**
-- Dependencia: `xlsx` (SheetJS) — `npm install xlsx`
-- Wizard 3 pasos:
-  1. Subir archivo (drag & drop, preview primeras filas)
-  2. Mapear columnas (Excel → campo del sistema)
-  3. Confirmar e importar (mostrar resumen)
-- Botón "Importar" en `/prospectos` y `/clientes`
-- Ruta sugerida: `/registro/importar`
-
-### Gestión de usuarios (`/admin/usuarios`)
-**Estado:** Backend tiene modelo `User` y auth. Frontend no tiene UI.
-
-- Solo visible para `is_superadmin = true`
-- CRUD: listar, crear, cambiar contraseña, desactivar usuario
-- Ruta: `/admin/usuarios` (ya existe el NavLink en Layout.tsx)
-
----
-
-## Archivos clave de referencia
+## Archivos clave
 
 | Archivo | Propósito |
 |---|---|
-| `docs/DATA_MODEL.md` | Modelo de datos completo con todos los campos |
-| `docs/CHANGELOG.md` | Historial detallado de cambios por fase |
-| `backend/app/models/` | Modelos SQLAlchemy |
-| `frontend/src/types/index.ts` | Tipos TypeScript del frontend |
-| `frontend/src/components/Layout.tsx` | Sidebar + header |
-| `frontend/src/store/authStore.ts` | Auth Zustand store |
+| `docs/DATA_MODEL.md` | Esquema completo de tablas y campos |
+| `docs/CHANGELOG.md` | Historial de cambios por sesión |
+| `backend/app/models/` | Modelos SQLModel |
+| `frontend/src/types/index.ts` | Tipos TypeScript globales |
+| `frontend/src/store/cotWizardStore.ts` | Estado del wizard de cotizaciones |
+| `frontend/src/utils/exportExcel.ts` | Funciones de exportación Excel |
 | `frontend/src/api/client.ts` | Axios con interceptor 401 |

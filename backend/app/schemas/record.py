@@ -28,12 +28,14 @@ class RecordCreate(BaseModel):
     # Prospecto
     estado_prospecto: Optional[str] = None  # seguimiento|cerrado|perdido|frio
     visita: Optional[str] = None            # no|si|virtual|llamada
+    fecha_visita: Optional[date] = None
     facturado_p: Optional[str] = None       # no|si|parcial
     valor_p: Optional[int] = None           # COP
 
     # Cliente
     estado_cliente: Optional[str] = None   # activo|en-riesgo|inactivo
     visita_cliente: Optional[str] = None   # no|si|virtual|llamada
+    fecha_visita_cliente: Optional[date] = None
     nuevo_servicio: Optional[str] = None   # si|no
     servicio_nuevo: Optional[str] = None
     facturado: Optional[str] = None        # no|si|parcial
@@ -61,11 +63,13 @@ class RecordUpdate(BaseModel):
 
     estado_prospecto: Optional[str] = None
     visita: Optional[str] = None
+    fecha_visita: Optional[date] = None
     facturado_p: Optional[str] = None
     valor_p: Optional[int] = None
 
     estado_cliente: Optional[str] = None
     visita_cliente: Optional[str] = None
+    fecha_visita_cliente: Optional[date] = None
     nuevo_servicio: Optional[str] = None
     servicio_nuevo: Optional[str] = None
     facturado: Optional[str] = None
@@ -80,28 +84,31 @@ class RecordRead(BaseModel):
     id: uuid.UUID
     tipo: str
     empresa: str
-    nit: Optional[str]
-    ciudad: Optional[str]
-    direccion: Optional[str]
-    categoria: Optional[str]
-    comercial_id: Optional[uuid.UUID]
+    nit: Optional[str] = None
+    ciudad: Optional[str] = None
+    contacto_nombre: Optional[str] = None   # primer contacto del record
+    direccion: Optional[str] = None
+    categoria: Optional[str] = None
+    comercial_id: Optional[uuid.UUID] = None
     tipo_cliente: str
-    cliente_indirecto_id: Optional[uuid.UUID]
-    comision: Optional[str]
+    cliente_indirecto_id: Optional[uuid.UUID] = None
+    comision: Optional[str] = None
     servicios: list[str]
-    observaciones: Optional[str]
+    observaciones: Optional[str] = None
     fecha: date
-    proximo_seguimiento: Optional[date]
-    estado_prospecto: Optional[str]
-    visita: Optional[str]
-    facturado_p: Optional[str]
-    valor_p: Optional[int]
-    estado_cliente: Optional[str]
-    visita_cliente: Optional[str]
-    nuevo_servicio: Optional[str]
-    servicio_nuevo: Optional[str]
-    facturado: Optional[str]
-    valor: Optional[int]
+    proximo_seguimiento: Optional[date] = None
+    estado_prospecto: Optional[str] = None
+    visita: Optional[str] = None
+    fecha_visita: Optional[date] = None
+    facturado_p: Optional[str] = None
+    valor_p: Optional[int] = None
+    estado_cliente: Optional[str] = None
+    visita_cliente: Optional[str] = None
+    fecha_visita_cliente: Optional[date] = None
+    nuevo_servicio: Optional[str] = None
+    servicio_nuevo: Optional[str] = None
+    facturado: Optional[str] = None
+    valor: Optional[int] = None
     facturacion_lineas: dict[str, int]
     created_at: datetime
     updated_at: datetime

@@ -12,6 +12,12 @@ class ComercialActivity(BaseModel):
     total: int
 
 
+class MonthPoint(BaseModel):
+    name: str        # "YYYY-MM"
+    prospectos: int
+    clientes: int
+
+
 class DashboardStats(BaseModel):
     total_records: int
     total_prospectos: int
@@ -22,6 +28,8 @@ class DashboardStats(BaseModel):
     facturacion_por_linea: dict[str, int]
     cotizaciones_por_estado: dict[str, int]
     total_cotizaciones: int
+    cotizaciones_en_curso: int
+    cotizaciones_vencidas: int
 
 
 class RankingEntry(BaseModel):
@@ -29,8 +37,8 @@ class RankingEntry(BaseModel):
     nombre: str
     prospectos: int
     clientes: int
-    visitas: int          # actividades registradas
-    valor_facturado: int  # suma de valor + valor_p en records
+    visitas: int
+    valor_facturado: int
 
 
 class DashboardCharts(BaseModel):
@@ -41,3 +49,30 @@ class DashboardCharts(BaseModel):
     billing_por_linea: list[ChartPoint]
     pipeline_cotizaciones: list[ChartPoint]
     lineas_cotizadas: list[ChartPoint]
+    registros_por_mes: list[MonthPoint]
+    gestion_clientes: list[ChartPoint]
+
+
+class RecordReciente(BaseModel):
+    id: str
+    empresa: str
+    tipo: str
+    comercial_nombre: str | None
+    servicios: list[str]
+    estado: str
+    fecha: str
+
+
+class CotizacionReciente(BaseModel):
+    id: str
+    numero: str
+    empresa: str
+    lineas: list[str]
+    estado: str
+    fecha: str
+    vencida: bool
+
+
+class DashboardRecientes(BaseModel):
+    registros: list[RecordReciente]
+    cotizaciones: list[CotizacionReciente]

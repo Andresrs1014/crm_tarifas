@@ -9,6 +9,7 @@ class UserCreate(BaseModel):
     username: str
     email: EmailStr
     password: str
+    nombre: Optional[str] = None   # nombre completo → crea comercial automáticamente
 
 
 class UserRead(BaseModel):

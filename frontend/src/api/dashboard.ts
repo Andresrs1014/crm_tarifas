@@ -1,5 +1,5 @@
 import api from './client'
-import type { DashboardStats, DashboardCharts, RankingEntry } from '../types'
+import type { DashboardStats, DashboardCharts, DashboardRecientes, RankingEntry } from '../types'
 
 export interface DashboardFilters {
   comercial_id?: string
@@ -19,5 +19,10 @@ export async function getDashboardCharts(filters: DashboardFilters = {}): Promis
 
 export async function getRankingApi(): Promise<RankingEntry[]> {
   const { data } = await api.get<RankingEntry[]>('/api/dashboard/ranking')
+  return data
+}
+
+export async function getRecientesApi(): Promise<DashboardRecientes> {
+  const { data } = await api.get<DashboardRecientes>('/api/dashboard/recientes')
   return data
 }

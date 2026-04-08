@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import PageContainer from '../components/PageContainer'
 import { useNavigate } from 'react-router-dom'
-import { Eye, Trash2, Upload, Users as UsersIcon } from 'lucide-react'
+import { Eye, Trash2, Upload, Download, Users as UsersIcon } from 'lucide-react'
 import { getRecords, deleteRecord } from '../api/records'
 import { getComercialesApi } from '../api/comerciales'
 import Badge from '../components/Badge'
@@ -10,6 +10,7 @@ import ConfirmModal from '../components/ConfirmModal'
 import { useToastStore } from '../store/toastStore'
 import { fmtCOP, fmtDate } from '../utils/format'
 import { SERVICIO_COLORS } from '../types'
+import { exportProspectos } from '../utils/exportExcel'
 
 export default function Prospectos() {
   const [search, setSearch] = useState('')
@@ -57,17 +58,16 @@ export default function Prospectos() {
         <div className="flex items-center gap-3">
           <span className="text-muted text-sm">{records.length} registros</span>
           <button
+            onClick={() => exportProspectos(records, comerciales)}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted hover:text-white border border-border transition"
+          >
+            <Download size={14} /> Exportar Excel
+          </button>
+          <button
             onClick={() => navigate('/registro/importar?tipo=prospecto')}
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted hover:text-white border border-border transition"
           >
             <Upload size={14} /> Importar
-          </button>
-          <button
-            onClick={() => navigate('/registro')}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition"
-            style={{ background: '#00c2ff', color: '#0a0e1a' }}
-          >
-            + Nuevo
           </button>
         </div>
       </div>
@@ -101,7 +101,7 @@ export default function Prospectos() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
-                {['Empresa', 'Ciudad', 'Comercial', 'Servicios', 'Visita', 'Estado', 'Facturado', 'Valor', 'Próx. Seguimiento', ''].map((h) => (
+                {['Empresa', 'Contacto', 'Comercial', 'Servicios', 'Visita', 'Estado', 'Facturado', 'Valor', 'Próx. Seguimiento', ''].map((h) => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-condensed uppercase text-muted tracking-wider whitespace-nowrap">
                     {h}
                   </th>
@@ -146,7 +146,7 @@ export default function Prospectos() {
                     </div>
                     {r.nit && <p className="text-xs text-muted">NIT {r.nit}</p>}
                   </td>
-                  <td className="px-4 py-3 text-muted">{r.ciudad ?? '—'}</td>
+                  <td className="px-4 py-3 text-muted">{r.contacto_nombre ?? '—'}</td>
                   <td className="px-4 py-3 text-muted">{comercialNombre(r.comercial_id)}</td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">

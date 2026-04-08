@@ -1,9 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Read(//c/Users/USUARIO/.claude/plugins/marketplaces/ui-ux-pro-max-skill/**)",
-      "Bash(python src/ui-ux-pro-max/scripts/search.py \"dashboard CRM admin sidebar navigation\" --domain ux -n 5)",
-      "Bash(grep -n \"SAC\\\\|sac\\\\|cumpleano\\\\|birthday\\\\|borrador\\\\|draft\\\\|vigencia\\\\|estado.*cot\\\\|ranking\\\\|proximoSeguimiento\\\\|proximo_seguimiento\\\\|recibeRegalos\\\\|fotosEntrega\\\\|actualizacion.*tarifa\\\\|tarifa.*actualizacion\\\\|fin.*de.*ano\\\\|finDeAno\" E:/crm_tarifas/frontend/src/pages/*.tsx)"
+      "Bash(./venv/Scripts/pip install:*)"
     ]
   }
 }

@@ -62,6 +62,20 @@ def register(
         hashed_password=hash_password(user_in.password),
     )
     session.add(new_user)
+
+    # Si se provee nombre completo, crear el comercial asociado automáticamente
+    if user_in.nombre:
+        from app.models.comercial import Comercial
+        from sqlmodel import select as _select
+        existe = session.exec(
+            _select(Comercial).where(Comercial.email == user_in.email)
+        ).first()
+        if not existe:
+            session.add(Comercial(
+                nombre=user_in.nombre,
+                email=user_in.email,
+            ))
+
     session.commit()
     session.refresh(new_user)
     return new_user

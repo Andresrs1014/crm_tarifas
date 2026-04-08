@@ -13,7 +13,7 @@ export default function Usuarios() {
   const [showCreate, setShowCreate] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [showPwd, setShowPwd] = useState(false)
-  const [form, setForm] = useState({ username: '', email: '', password: '' })
+  const [form, setForm] = useState({ nombre: '', username: '', email: '', password: '' })
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users'],
@@ -26,7 +26,7 @@ export default function Usuarios() {
       qc.invalidateQueries({ queryKey: ['users'] })
       toast.add('Usuario creado')
       setShowCreate(false)
-      setForm({ username: '', email: '', password: '' })
+      setForm({ nombre: '', username: '', email: '', password: '' })
     },
     onError: () => toast.add('Error al crear usuario', 'error'),
   })
@@ -52,7 +52,7 @@ export default function Usuarios() {
   })
 
   const handleCreate = () => {
-    if (!form.username || !form.email || !form.password) {
+    if (!form.nombre || !form.username || !form.email || !form.password) {
       toast.add('Completa todos los campos', 'warning')
       return
     }
@@ -78,7 +78,15 @@ export default function Usuarios() {
       {showCreate && (
         <div className="bg-surface border border-border rounded-xl p-5 mb-6">
           <h2 className="font-condensed text-xs uppercase text-muted tracking-wider mb-4">Crear usuario</h2>
-          <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="grid grid-cols-4 gap-3 mb-4">
+            <div>
+              <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Nombre completo</label>
+              <input
+                value={form.nombre}
+                onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
+                placeholder="Nombre y apellido"
+              />
+            </div>
             <div>
               <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Usuario</label>
               <input
@@ -125,7 +133,7 @@ export default function Usuarios() {
               {createMutation.isPending ? 'Creando...' : 'Crear'}
             </button>
             <button
-              onClick={() => { setShowCreate(false); setForm({ username: '', email: '', password: '' }) }}
+              onClick={() => { setShowCreate(false); setForm({ nombre: '', username: '', email: '', password: '' }) }}
               className="px-4 py-2 rounded-lg text-sm text-muted hover:text-white border border-border transition"
             >
               Cancelar

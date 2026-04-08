@@ -13,7 +13,7 @@ export default function StatCard({ label, value, accent = '#00c2ff', sub }: Stat
         style={{ background: accent }}
       />
       <p className="text-muted text-xs uppercase tracking-wider mb-2 font-condensed">{label}</p>
-      <p className="text-3xl font-bold font-condensed" style={{ color: accent }}>
+      <p className="text-3xl font-bold font-condensed" style={{ color: '#e8edf5' }}>
         {value}
       </p>
       {sub && <p className="text-muted text-xs mt-1">{sub}</p>}

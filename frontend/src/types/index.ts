@@ -228,6 +228,7 @@ export interface RecordRead {
   empresa: string
   nit: string | null
   ciudad: string | null
+  contacto_nombre: string | null   // primer contacto del record
   direccion: string | null
   categoria: string | null         // A|B|C
   comercial_id: string | null
@@ -240,10 +241,12 @@ export interface RecordRead {
   proximo_seguimiento: string | null
   estado_prospecto: EstadoProspecto | null
   visita: 'no' | 'si' | 'virtual' | 'llamada' | null
+  fecha_visita: string | null
   facturado_p: 'no' | 'si' | 'parcial' | null
   valor_p: number | null
   estado_cliente: EstadoCliente | null
   visita_cliente: 'no' | 'si' | 'virtual' | 'llamada' | null
+  fecha_visita_cliente: string | null
   nuevo_servicio: 'si' | 'no' | null
   servicio_nuevo: string | null
   facturado: 'no' | 'si' | 'parcial' | null
@@ -270,11 +273,19 @@ export interface DashboardStats {
   facturacion_por_linea: Record<string, number>
   cotizaciones_por_estado: Record<string, number>
   total_cotizaciones: number
+  cotizaciones_en_curso?: number
+  cotizaciones_vencidas?: number
 }
 
 export interface ChartPoint {
   name: string
   value: number
+}
+
+export interface MonthPoint {
+  name: string
+  prospectos: number
+  clientes: number
 }
 
 export interface DashboardCharts {
@@ -285,6 +296,8 @@ export interface DashboardCharts {
   billing_por_linea: ChartPoint[]
   pipeline_cotizaciones: ChartPoint[]
   lineas_cotizadas: ChartPoint[]
+  registros_por_mes: MonthPoint[]
+  gestion_clientes: ChartPoint[]
 }
 
 export interface RankingEntry {
@@ -294,4 +307,29 @@ export interface RankingEntry {
   clientes: number
   visitas: number
   valor_facturado: number
+}
+
+export interface RecordReciente {
+  id: string
+  empresa: string
+  tipo: string
+  comercial_nombre: string | null
+  servicios: string[]
+  estado: string
+  fecha: string
+}
+
+export interface CotizacionReciente {
+  id: string
+  numero: string
+  empresa: string
+  lineas: string[]
+  estado: string
+  fecha: string
+  vencida: boolean
+}
+
+export interface DashboardRecientes {
+  registros: RecordReciente[]
+  cotizaciones: CotizacionReciente[]
 }

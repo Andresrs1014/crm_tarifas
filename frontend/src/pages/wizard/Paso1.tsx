@@ -2,9 +2,9 @@ import { useState, useRef, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useCotWizardStore } from '../../store/cotWizardStore'
 import { getComercialesApi } from '../../api/comerciales'
-import { getRecords } from '../../api/records'
+import { getRecords, getRecord } from '../../api/records'
 import { today } from '../../utils/format'
-import type { RecordRead } from '../../types'
+import type { RecordRead, Contacto } from '../../types'
 
 export default function Paso1() {
   const s = useCotWizardStore()
@@ -13,6 +13,8 @@ export default function Paso1() {
   // Autocomplete empresa
   const [empQuery, setEmpQuery] = useState(s.empresa)
   const [empDropdown, setEmpDropdown] = useState(false)
+  const [loadingRecord, setLoadingRecord] = useState(false)
+  const [contactosList, setContactosList] = useState<Contacto[]>([])
   const empRef = useRef<HTMLDivElement>(null)
 
   const { data: comerciales = [] } = useQuery({
@@ -38,14 +40,27 @@ export default function Paso1() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const selectEmpresa = (r: RecordRead) => {
-    set({
-      empresa: r.empresa,
-      nit: r.nit ?? '',
-      record_id: r.id,
-    })
+  const applyContacto = (c: Contacto) => {
+    set({ contacto: c.nombre, cargo: c.cargo ?? '', email: c.email ?? '', telefono: c.telefono ?? '' })
+  }
+
+  const selectEmpresa = async (r: RecordRead) => {
     setEmpQuery(r.empresa)
     setEmpDropdown(false)
+    setContactosList([])
+    set({ empresa: r.empresa, nit: r.nit ?? '', record_id: r.id, comercial_id: r.comercial_id ?? '' })
+    setLoadingRecord(true)
+    try {
+      const detalle = await getRecord(r.id)
+      if (detalle.contactos.length > 1) {
+        setContactosList(detalle.contactos)
+        applyContacto(detalle.contactos[0])
+      } else if (detalle.contactos.length === 1) {
+        applyContacto(detalle.contactos[0])
+      }
+    } finally {
+      setLoadingRecord(false)
+    }
   }
 
   const handleEmpChange = (v: string) => {
@@ -103,9 +118,12 @@ export default function Paso1() {
               ))}
             </div>
           )}
-          {s.record_id && (
+          {loadingRecord && (
+            <p className="text-xs mt-1 text-muted animate-pulse">Cargando datos del cliente...</p>
+          )}
+          {s.record_id && !loadingRecord && (
             <p className="text-xs mt-1" style={{ color: '#00e676' }}>
-              Vinculado al CRM
+              ✓ Vinculado al CRM — datos pre-llenados
             </p>
           )}
         </div>
@@ -118,6 +136,27 @@ export default function Paso1() {
             placeholder="900.123.456-7"
           />
         </div>
+
+        {/* Selector de contacto — aparece solo si el cliente tiene varios */}
+        {contactosList.length > 1 && (
+          <div className="col-span-2">
+            <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">
+              Seleccionar contacto ({contactosList.length} disponibles)
+            </label>
+            <select
+              onChange={(e) => {
+                const c = contactosList[Number(e.target.value)]
+                if (c) applyContacto(c)
+              }}
+            >
+              {contactosList.map((c, i) => (
+                <option key={c.id} value={i}>
+                  {c.nombre}{c.cargo ? ` — ${c.cargo}` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div>
           <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Comercial</label>
