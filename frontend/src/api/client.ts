@@ -1,8 +1,11 @@
 import axios from 'axios'
 import { useAuthStore } from '../store/authStore'
 
+// En producción siempre usamos URL relativa → nginx proxea /api/ al backend.
+// En desarrollo el proxy de Vite (vite.config.ts) hace lo mismo.
+// NUNCA hardcodear localhost aquí: el build se sirve a browsers externos.
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? '',
+  baseURL: import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL ?? ''),
 })
 
 api.interceptors.request.use((config) => {
