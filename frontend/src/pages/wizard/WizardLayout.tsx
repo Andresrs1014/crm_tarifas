@@ -5,6 +5,7 @@ import { useCotWizardStore, buildCotPayload } from '../../store/cotWizardStore'
 import { getCotizacionApi, createCotizacionApi, updateCotizacionApi } from '../../api/cotizaciones'
 import { getBibliotecaApi } from '../../api/biblioteca'
 import { useToastStore } from '../../store/toastStore'
+import PageContainer from '../../components/PageContainer'
 import Paso1 from './Paso1'
 import Paso2 from './Paso2'
 import Paso3 from './Paso3'
@@ -113,12 +114,30 @@ export default function WizardLayout() {
     }
   }
 
+  const handleSaveDraft = async () => {
+    const state = useCotWizardStore.getState()
+    const payload = buildCotPayload(state)
+    payload.estado = 'borrador'
+    try {
+      if (state.id) {
+        await updateCotizacionApi(state.id, payload as Record<string, unknown>)
+        toast.add('Borrador guardado')
+      } else {
+        const cot = await createCotizacionApi(payload as Record<string, unknown>)
+        useCotWizardStore.setState({ id: cot.id, numero: cot.numero })
+        toast.add(`Borrador ${cot.numero} creado`)
+      }
+    } catch {
+      toast.add('Error al guardar borrador', 'error')
+    }
+  }
+
   if (isEdit && loadingCot && wizId !== id) {
-    return <div className="p-6 text-muted">Cargando cotización...</div>
+    return <PageContainer><div className="text-muted">Cargando cotización...</div></PageContainer>
   }
 
   return (
-    <div className="p-6 max-w-5xl">
+    <PageContainer>
       {/* Título */}
       <div className="flex items-center gap-3 mb-6">
         <button
@@ -174,24 +193,32 @@ export default function WizardLayout() {
         {paso === 5 && <Paso5 biblioteca={biblioteca} onSave={handleSave} />}
       </div>
 
-      {/* Navegación (solo pasos 1-4) */}
+      {/* Navegación (pasos 1-4) */}
       {paso < 5 && (
-        <div className="flex justify-between">
+        <div className="flex justify-between items-center">
           <button
             onClick={paso === 1 ? () => navigate('/cotizaciones') : handleBack}
             className="px-5 py-2.5 rounded-lg text-sm text-muted hover:text-white transition border border-border"
           >
             {paso === 1 ? 'Cancelar' : '← Anterior'}
           </button>
-          <button
-            onClick={handleNext}
-            className="px-6 py-2.5 rounded-lg text-sm font-medium transition"
-            style={{ background: '#00c2ff', color: '#0a0e1a' }}
-          >
-            Siguiente →
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={handleSaveDraft}
+              className="px-5 py-2.5 rounded-lg text-sm font-medium transition border border-border text-muted hover:text-white"
+            >
+              Guardar borrador
+            </button>
+            <button
+              onClick={handleNext}
+              className="px-6 py-2.5 rounded-lg text-sm font-medium transition"
+              style={{ background: '#00c2ff', color: '#0a0e1a' }}
+            >
+              Siguiente →
+            </button>
+          </div>
         </div>
       )}
-    </div>
+    </PageContainer>
   )
 }

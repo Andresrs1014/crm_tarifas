@@ -7,6 +7,7 @@ export async function listUsers(): Promise<UserRead[]> {
 }
 
 export async function createUser(payload: {
+  nombre?: string
   username: string
   email: string
   password: string

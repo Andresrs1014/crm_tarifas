@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Save, Trash2 } from 'lucide-react'
+import { ArrowLeft, Save, Trash2, FileText } from 'lucide-react'
 import { getRecord, updateRecord, deleteRecord } from '../api/records'
 import { getComercialesApi } from '../api/comerciales'
 import Badge from '../components/Badge'
@@ -10,17 +10,20 @@ import ContactosList from '../components/ContactosList'
 import ActividadesTimeline from '../components/ActividadesTimeline'
 import BillingLines from '../components/BillingLines'
 import ConfirmModal from '../components/ConfirmModal'
+import PageContainer from '../components/PageContainer'
 import { useToastStore } from '../store/toastStore'
 import { fmtCOP, fmtDate } from '../utils/format'
 import { getBibliotecaApi } from '../api/biblioteca'
 import { SERVICIOS } from '../types'
 import type { ContactoCreate } from '../types'
+import { useCotWizardStore } from '../store/cotWizardStore'
 
 export default function Detalle() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const toast = useToastStore()
   const qc = useQueryClient()
+  const { resetWizard, setDatosGenerales } = useCotWizardStore()
   const [editing, setEditing] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
@@ -85,11 +88,13 @@ export default function Detalle() {
       fecha: record.fecha,
       estado_prospecto: record.estado_prospecto ?? '',
       visita: record.visita ?? '',
+      fecha_visita: record.fecha_visita ?? '',
       facturado_p: record.facturado_p ?? '',
       valor_p: record.valor_p ?? '',
       proximo_seguimiento: record.proximo_seguimiento ?? '',
       estado_cliente: record.estado_cliente ?? '',
       visita_cliente: record.visita_cliente ?? '',
+      fecha_visita_cliente: record.fecha_visita_cliente ?? '',
       nuevo_servicio: record.nuevo_servicio ?? '',
       servicio_nuevo: record.servicio_nuevo ?? '',
       facturado: record.facturado ?? '',
@@ -111,7 +116,15 @@ export default function Detalle() {
   }
 
   const handleSave = () => {
-    const payload: Record<string, unknown> = { ...form, servicios, facturacion_lineas: facturacionLineas, contactos }
+    if (!record) return
+    const totalBilling = Object.values(facturacionLineas).reduce((a, b) => a + b, 0)
+    const payload: Record<string, unknown> = {
+      ...form,
+      servicios,
+      facturacion_lineas: facturacionLineas,
+      contactos,
+      ...(record.tipo === 'prospecto' ? { valor_p: totalBilling } : { valor: totalBilling }),
+    }
     Object.keys(payload).forEach((k) => {
       if (payload[k] === '' || payload[k] === undefined) delete payload[k]
     })
@@ -123,22 +136,39 @@ export default function Detalle() {
   const comercialNombre = (cid: string | null) =>
     comerciales.find((c) => c.id === cid)?.nombre ?? '—'
 
+  const handleNuevaCotizacion = () => {
+    if (!record) return
+    const primerContacto = record.contactos[0]
+    resetWizard()
+    setDatosGenerales({
+      empresa: record.empresa,
+      nit: record.nit ?? '',
+      record_id: record.id,
+      comercial_id: record.comercial_id ?? '',
+      contacto: primerContacto?.nombre ?? '',
+      cargo: primerContacto?.cargo ?? '',
+      email: primerContacto?.email ?? '',
+      telefono: primerContacto?.telefono ?? '',
+    })
+    navigate('/cotizaciones/nueva')
+  }
+
   if (isLoading) {
     return (
-      <div className="p-6 text-muted">Cargando...</div>
+      <PageContainer><div className="text-muted">Cargando...</div></PageContainer>
     )
   }
 
   if (!record) {
     return (
-      <div className="p-6 text-muted">Registro no encontrado.</div>
+      <PageContainer><div className="text-muted">Registro no encontrado.</div></PageContainer>
     )
   }
 
   const isProspecto = record.tipo === 'prospecto'
 
   return (
-    <div className="p-6 max-w-4xl">
+    <PageContainer>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
@@ -159,6 +189,12 @@ export default function Detalle() {
         <div className="flex gap-2">
           {!editing ? (
             <>
+              <button
+                onClick={handleNuevaCotizacion}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition border border-border text-muted hover:text-white"
+              >
+                <FileText size={14} /> Nueva cotización
+              </button>
               <button
                 onClick={startEdit}
                 className="px-4 py-2 rounded-lg text-sm font-medium transition"
@@ -235,10 +271,10 @@ export default function Detalle() {
                 <div>
                   <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Categoría</label>
                   <select value={String(form.categoria ?? '')} onChange={(e) => setField('categoria', e.target.value)}>
-                    <option value="">—</option>
-                    <option value="A">A</option>
-                    <option value="B">B</option>
-                    <option value="C">C</option>
+                    <option value="">— Sin categoría —</option>
+                    <option value="A">A — +16 operaciones/mes</option>
+                    <option value="B">B — 6 a 15 operaciones/mes</option>
+                    <option value="C">C — Menos de 5 operaciones/mes</option>
                   </select>
                 </div>
                 <div>
@@ -311,11 +347,15 @@ export default function Detalle() {
                     <SelectField label="Estado" value={String(form.estado_prospecto ?? '')} onChange={(v) => setField('estado_prospecto', v)}
                       options={[['', '—'], ['seguimiento', 'Seguimiento'], ['cerrado', 'Cerrado'], ['perdido', 'Perdido'], ['frio', 'Frío']]} />
                     <SelectField label="Visita" value={String(form.visita ?? '')} onChange={(v) => setField('visita', v)}
-                      options={[['', '—'], ['no', 'No'], ['si', 'Sí'], ['virtual', 'Virtual'], ['llamada', 'Llamada']]} />
-                    <SelectField label="Facturado" value={String(form.facturado_p ?? '')} onChange={(v) => setField('facturado_p', v)}
+                      options={[['', '—'], ['no', 'No'], ['si', 'Sí — Presencial'], ['virtual', 'Sí — Virtual'], ['llamada', 'Sí — Llamada']]} />
+                    <div>
+                      <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Fecha de Visita</label>
+                      <input type="date" value={String(form.fecha_visita ?? '')} onChange={(e) => setField('fecha_visita', e.target.value)} />
+                    </div>
+                    <SelectField label="¿Se facturó?" value={String(form.facturado_p ?? '')} onChange={(v) => setField('facturado_p', v)}
                       options={[['', '—'], ['no', 'No'], ['si', 'Sí'], ['parcial', 'Parcial']]} />
                     <div>
-                      <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Próx. seguimiento</label>
+                      <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Próx. Seguimiento</label>
                       <input type="date" value={String(form.proximo_seguimiento ?? '')} onChange={(e) => setField('proximo_seguimiento', e.target.value)} />
                     </div>
                   </>
@@ -324,12 +364,21 @@ export default function Detalle() {
                     <SelectField label="Estado" value={String(form.estado_cliente ?? '')} onChange={(v) => setField('estado_cliente', v)}
                       options={[['', '—'], ['activo', 'Activo'], ['en-riesgo', 'En riesgo'], ['inactivo', 'Inactivo']]} />
                     <SelectField label="Visita" value={String(form.visita_cliente ?? '')} onChange={(v) => setField('visita_cliente', v)}
-                      options={[['', '—'], ['no', 'No'], ['si', 'Sí'], ['virtual', 'Virtual'], ['llamada', 'Llamada']]} />
+                      options={[['', '—'], ['no', 'No'], ['si', 'Sí — Presencial'], ['virtual', 'Sí — Virtual']]} />
+                    <div>
+                      <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Fecha de Visita / Gestión</label>
+                      <input type="date" value={String(form.fecha_visita_cliente ?? '')} onChange={(e) => setField('fecha_visita_cliente', e.target.value)} />
+                    </div>
                     <SelectField label="Nuevo servicio" value={String(form.nuevo_servicio ?? '')} onChange={(v) => setField('nuevo_servicio', v)}
                       options={[['', '—'], ['si', 'Sí'], ['no', 'No']]} />
                     <div>
-                      <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Servicio nuevo</label>
-                      <input value={String(form.servicio_nuevo ?? '')} onChange={(e) => setField('servicio_nuevo', e.target.value)} />
+                      <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Servicio cerrado</label>
+                      <select value={String(form.servicio_nuevo ?? '')} onChange={(e) => setField('servicio_nuevo', e.target.value)}>
+                        <option value="">—</option>
+                        {lineasDisponibles.map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
                     </div>
                     <SelectField label="Facturado" value={String(form.facturado ?? '')} onChange={(v) => setField('facturado', v)}
                       options={[['', '—'], ['no', 'No'], ['si', 'Sí'], ['parcial', 'Parcial']]} />
@@ -378,6 +427,8 @@ export default function Detalle() {
                   ))}
                 </div>
                 {servicios.length > 0 && (
+                  (isProspecto ? form.facturado_p && form.facturado_p !== 'no' : form.facturado && form.facturado !== 'no')
+                ) && (
                   <BillingLines
                     servicios={servicios}
                     value={facturacionLineas}
@@ -440,7 +491,7 @@ export default function Detalle() {
         onCancel={() => setConfirmDelete(false)}
         loading={deleteMutation.isPending}
       />
-    </div>
+    </PageContainer>
   )
 }
 

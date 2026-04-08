@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import PageContainer from '../components/PageContainer'
 import { useNavigate } from 'react-router-dom'
-import { Eye, Trash2, Upload, Building2 as Building2Icon } from 'lucide-react'
+import { Eye, Trash2, Upload, Download, Building2 as Building2Icon } from 'lucide-react'
 import { getRecords, deleteRecord } from '../api/records'
 import { getComercialesApi } from '../api/comerciales'
 import Badge from '../components/Badge'
@@ -10,24 +10,28 @@ import ConfirmModal from '../components/ConfirmModal'
 import { useToastStore } from '../store/toastStore'
 import { fmtCOP, fmtDate } from '../utils/format'
 import { SERVICIO_COLORS } from '../types'
+import { exportClientes } from '../utils/exportExcel'
 
 export default function Clientes() {
   const [search, setSearch] = useState('')
   const [estado, setEstado] = useState('')
   const [comercialId, setComercialId] = useState('')
+  const [facturado, setFacturado] = useState('')
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const toast = useToastStore()
   const navigate = useNavigate()
   const qc = useQueryClient()
 
   const { data: records = [], isLoading } = useQuery({
-    queryKey: ['records', 'cliente', search, estado, comercialId],
+    queryKey: ['records', 'cliente', search, estado, comercialId, facturado],
     queryFn: () => getRecords({
       tipo: 'cliente',
       ...(search ? { search } : {}),
       ...(estado ? { estado_cliente: estado } : {}),
       ...(comercialId ? { comercial_id: comercialId } : {}),
-    }),
+    }).then(data =>
+      facturado ? data.filter(r => r.facturado === facturado) : data
+    ),
   })
 
   const { data: comerciales = [] } = useQuery({
@@ -57,6 +61,12 @@ export default function Clientes() {
         <div className="flex items-center gap-3">
           <span className="text-muted text-sm">{records.length} registros</span>
           <button
+            onClick={() => exportClientes(records, comerciales)}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted hover:text-white border border-border transition"
+          >
+            <Download size={14} /> Exportar Excel
+          </button>
+          <button
             onClick={() => navigate('/registro/importar?tipo=cliente')}
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted hover:text-white border border-border transition"
           >
@@ -85,6 +95,12 @@ export default function Clientes() {
             <option key={c.id} value={c.id}>{c.nombre}</option>
           ))}
         </select>
+        <select className="w-40" value={facturado} onChange={(e) => setFacturado(e.target.value)}>
+          <option value="">Facturación: todos</option>
+          <option value="si">Facturado</option>
+          <option value="parcial">Parcial</option>
+          <option value="no">No facturado</option>
+        </select>
       </div>
 
       {/* Tabla */}
@@ -93,7 +109,7 @@ export default function Clientes() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
-                {['Empresa', 'Ciudad', 'Comercial', 'Servicios', 'Visita', 'Estado', 'Facturado', 'Valor', 'Últ. Actualización', ''].map((h) => (
+                {['Empresa', 'Contacto', 'Comercial', 'Servicios', 'Visita', 'Nuevo Svc.', 'Estado', 'Facturado', 'Valor', ''].map((h) => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-condensed uppercase text-muted tracking-wider whitespace-nowrap">
                     {h}
                   </th>
@@ -103,7 +119,7 @@ export default function Clientes() {
             <tbody>
               {isLoading && Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} className="border-b border-border">
-                  {['70%', '45%', '55%', '80%', '40%', '50%', '45%', '55%', '60%', '20%'].map((w, j) => (
+                  {['70%', '45%', '55%', '80%', '40%', '50%', '45%', '45%', '55%', '20%'].map((w, j) => (
                     <td key={j} className="px-4 py-3">
                       <div className="h-4 bg-surface2 rounded animate-pulse" style={{ width: w }} />
                     </td>
@@ -138,7 +154,7 @@ export default function Clientes() {
                     </div>
                     {r.nit && <p className="text-xs text-muted">NIT {r.nit}</p>}
                   </td>
-                  <td className="px-4 py-3 text-muted">{r.ciudad ?? '—'}</td>
+                  <td className="px-4 py-3 text-muted">{r.contacto_nombre ?? '—'}</td>
                   <td className="px-4 py-3 text-muted">{comercialNombre(r.comercial_id)}</td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
@@ -157,10 +173,17 @@ export default function Clientes() {
                     </div>
                   </td>
                   <td className="px-4 py-3"><Badge value={r.visita_cliente} /></td>
+                  <td className="px-4 py-3">
+                    {r.nuevo_servicio === 'si'
+                      ? <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: '#a855f722', color: '#a855f7' }}>
+                          {r.servicio_nuevo || 'Sí'}
+                        </span>
+                      : <span className="text-xs text-muted">—</span>
+                    }
+                  </td>
                   <td className="px-4 py-3"><Badge value={r.estado_cliente} /></td>
                   <td className="px-4 py-3"><Badge value={r.facturado} /></td>
                   <td className="px-4 py-3 text-muted">{fmtCOP(r.valor)}</td>
-                  <td className="px-4 py-3 text-muted whitespace-nowrap">{fmtDate(r.updated_at)}</td>
                   <td className="px-4 py-3">
                     <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                       <button

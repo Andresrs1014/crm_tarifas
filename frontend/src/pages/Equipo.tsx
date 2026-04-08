@@ -4,8 +4,8 @@ import PageContainer from '../components/PageContainer'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, X, Check, Trophy } from 'lucide-react'
-import { getComercialesApi, createComercialApi, updateComercialApi, deleteComercialApi } from '../api/comerciales'
+import { Pencil, Trash2, X, Check, Trophy } from 'lucide-react'
+import { getComercialesApi, updateComercialApi, deleteComercialApi } from '../api/comerciales'
 import { getRankingApi } from '../api/dashboard'
 import ConfirmModal from '../components/ConfirmModal'
 import { useToastStore } from '../store/toastStore'
@@ -80,7 +80,6 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 export default function Equipo() {
-  const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<Comercial | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const toast = useToastStore()
@@ -98,17 +97,6 @@ export default function Equipo() {
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
-  })
-
-  const createMutation = useMutation({
-    mutationFn: createComercialApi,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['comerciales'] })
-      toast.add('Comercial creado')
-      reset()
-      setShowForm(false)
-    },
-    onError: () => toast.add('Error al crear', 'error'),
   })
 
   const updateMutation = useMutation({
@@ -139,27 +127,24 @@ export default function Equipo() {
   })
 
   const onSubmit = (data: FormValues) => {
-    const payload = {
-      nombre: data.nombre,
-      cargo: data.cargo || undefined,
-      email: data.email || undefined,
-      tel: data.tel || undefined,
-    }
-    if (editing) {
-      updateMutation.mutate({ id: editing.id, data: payload })
-    } else {
-      createMutation.mutate(payload)
-    }
+    if (!editing) return
+    updateMutation.mutate({
+      id: editing.id,
+      data: {
+        nombre: data.nombre,
+        cargo: data.cargo || undefined,
+        email: data.email || undefined,
+        tel: data.tel || undefined,
+      },
+    })
   }
 
   const startEdit = (c: Comercial) => {
     setEditing(c)
-    setShowForm(false)
     reset({ nombre: c.nombre, cargo: c.cargo ?? '', email: c.email ?? '', tel: c.tel ?? '' })
   }
 
   const cancelForm = () => {
-    setShowForm(false)
     setEditing(null)
     reset()
   }
@@ -170,22 +155,16 @@ export default function Equipo() {
         <h1 className="font-condensed font-bold text-2xl" style={{ color: '#e8edf5' }}>
           Equipo Comercial
         </h1>
-        {!showForm && !editing && (
-          <button
-            onClick={() => { setShowForm(true); reset() }}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition"
-            style={{ background: '#00c2ff', color: '#0a0e1a' }}
-          >
-            <Plus size={16} /> Nuevo comercial
-          </button>
+        {!editing && (
+          <p className="text-xs text-muted">Los miembros se crean desde <strong style={{ color: '#e8edf5' }}>Usuarios</strong></p>
         )}
       </div>
 
-      {/* Form */}
-      {(showForm || editing) && (
+      {/* Form edición */}
+      {editing && (
         <div className="bg-surface border border-border rounded-xl p-5 mb-5">
           <h2 className="font-condensed font-bold text-base mb-4" style={{ color: '#e8edf5' }}>
-            {editing ? 'Editar comercial' : 'Nuevo comercial'}
+            Editar comercial
           </h2>
           <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
@@ -224,11 +203,11 @@ export default function Equipo() {
               </button>
               <button
                 type="submit"
-                disabled={createMutation.isPending || updateMutation.isPending}
+                disabled={updateMutation.isPending}
                 className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium transition disabled:opacity-50"
                 style={{ background: '#00c2ff', color: '#0a0e1a' }}
               >
-                <Check size={14} /> {editing ? 'Guardar' : 'Crear'}
+                <Check size={14} /> Guardar
               </button>
             </div>
           </form>

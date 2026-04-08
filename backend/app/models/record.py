@@ -39,12 +39,14 @@ class Record(SQLModel, table=True):
     # Prospecto-specific
     estado_prospecto: Optional[str] = Field(default=None)  # seguimiento|cerrado|perdido|frio
     visita: Optional[str] = Field(default=None)             # no|si|virtual|llamada
+    fecha_visita: Optional[date] = Field(default=None)
     facturado_p: Optional[str] = Field(default=None)        # no|si|parcial
     valor_p: Optional[int] = Field(default=None)            # COP
 
     # Cliente-specific
     estado_cliente: Optional[str] = Field(default=None)    # activo|en-riesgo|inactivo
     visita_cliente: Optional[str] = Field(default=None)    # no|si|virtual|llamada
+    fecha_visita_cliente: Optional[date] = Field(default=None)
     nuevo_servicio: Optional[str] = Field(default=None)    # si|no
     servicio_nuevo: Optional[str] = Field(default=None)
     facturado: Optional[str] = Field(default=None)         # no|si|parcial

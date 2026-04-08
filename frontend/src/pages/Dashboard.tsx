@@ -8,10 +8,23 @@ import {
 } from 'recharts'
 import { getDashboardStats, getDashboardCharts, getRankingApi, getRecientesApi } from '../api/dashboard'
 import { getComercialesApi } from '../api/comerciales'
+import { getRecords } from '../api/records'
 import StatCard from '../components/StatCard'
 import { fmtCOP } from '../utils/format'
+import { exportTodos } from '../utils/exportExcel'
 
 const PIE_COLORS = ['#00c2ff', '#a855f7', '#00e676', '#f5a623', '#ff6b6b', '#00ffcc']
+
+function EmptyChart({ msg = 'Sin datos aún' }: { msg?: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-2 text-muted" style={{ minHeight: 160 }}>
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" opacity={0.4}>
+        <path d="M3 3v18h18" /><path d="M7 16l4-4 4 4 4-7" />
+      </svg>
+      <p className="text-xs">{msg}</p>
+    </div>
+  )
+}
 const GESTION_COLORS = ['#00e676', '#f5a623', '#8899b4', '#00c2ff', '#a855f7', '#f5a623']
 
 const TOOLTIP_STYLE = {
@@ -31,6 +44,7 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const [comercialId, setComercialId] = useState('')
   const [mes, setMes] = useState('')
+  const [tipoFiltro, setTipoFiltro] = useState('')
 
   const filters = {
     ...(comercialId ? { comercial_id: comercialId } : {}),
@@ -58,17 +72,35 @@ export default function Dashboard() {
     queryFn: getRecientesApi,
   })
 
+  const { data: allRecords = [] } = useQuery({
+    queryKey: ['records', 'all-export', tipoFiltro],
+    queryFn: () => getRecords(tipoFiltro ? { tipo: tipoFiltro } : {}),
+    staleTime: 1000 * 60,
+  })
+
   return (
     <PageContainer>
       {/* Header + Filtros */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="font-condensed font-bold text-2xl" style={{ color: '#e8edf5' }}>Dashboard</h1>
-        <div className="flex gap-3">
+        <div className="flex gap-3 items-center">
           <select className="w-44" value={comercialId} onChange={(e) => setComercialId(e.target.value)}>
             <option value="">Todos los comerciales</option>
             {comerciales?.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
           </select>
+          <select className="w-40" value={tipoFiltro} onChange={(e) => setTipoFiltro(e.target.value)}>
+            <option value="">Todos los tipos</option>
+            <option value="prospecto">Prospectos</option>
+            <option value="cliente">Clientes</option>
+          </select>
           <input type="month" className="w-36" value={mes} onChange={(e) => setMes(e.target.value)} />
+          <button
+            onClick={() => exportTodos(allRecords, comerciales ?? [])}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted hover:text-white border border-border transition whitespace-nowrap"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            Exportar Excel
+          </button>
         </div>
       </div>
 
@@ -94,13 +126,14 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div className="bg-surface rounded-xl border border-border p-5">
           <h3 className="font-condensed text-sm uppercase text-muted tracking-wider mb-4">Prospectos vs Clientes</h3>
-          <ResponsiveContainer width="100%" height={200}>
+          <ResponsiveContainer width="100%" height={220}>
             <PieChart>
-              <Pie data={charts?.prospectos_vs_clientes ?? []} cx="50%" cy="50%" outerRadius={70} dataKey="value"
-                label={({ name, value }) => `${name}: ${value}`}>
+              <Pie data={charts?.prospectos_vs_clientes ?? []} cx="50%" cy="45%" outerRadius={65} dataKey="value"
+                label={false} labelLine={false}>
                 {charts?.prospectos_vs_clientes.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
               </Pie>
-              <Tooltip {...TOOLTIP_STYLE} />
+              <Tooltip {...TOOLTIP_STYLE} formatter={(v, name) => [v, name]} />
+              <Legend wrapperStyle={{ fontSize: 11, color: '#8899b4' }} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -131,14 +164,18 @@ export default function Dashboard() {
 
         <div className="bg-surface rounded-xl border border-border p-5">
           <h3 className="font-condensed text-sm uppercase text-muted tracking-wider mb-4">Actividad por Comercial</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={charts?.actividad_por_comercial?.map(c => ({ name: c.name, value: c.total })) ?? []}>
-              <XAxis dataKey="name" tick={{ fill: '#8899b4', fontSize: 10 }} />
-              <YAxis tick={{ fill: '#8899b4', fontSize: 11 }} />
-              <Tooltip {...TOOLTIP_STYLE} />
-              <Bar dataKey="value" fill="#00e676" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          {(charts?.actividad_por_comercial ?? []).length === 0 ? (
+            <EmptyChart msg="Registra actividades en prospectos y clientes para ver datos aquí" />
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={charts!.actividad_por_comercial.map(c => ({ name: c.name, value: c.total }))}>
+                <XAxis dataKey="name" tick={{ fill: '#8899b4', fontSize: 10 }} />
+                <YAxis tick={{ fill: '#8899b4', fontSize: 11 }} />
+                <Tooltip {...TOOLTIP_STYLE} />
+                <Bar dataKey="value" fill="#00e676" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
@@ -146,24 +183,24 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div className="bg-surface rounded-xl border border-border p-5 lg:col-span-2">
           <h3 className="font-condensed text-sm uppercase text-muted tracking-wider mb-4">Registros por Mes</h3>
-          <ResponsiveContainer width="100%" height={200}>
+          <ResponsiveContainer width="100%" height={240}>
             <LineChart data={charts?.registros_por_mes ?? []}>
               <XAxis dataKey="name" tick={{ fill: '#8899b4', fontSize: 11 }} />
               <YAxis tick={{ fill: '#8899b4', fontSize: 11 }} allowDecimals={false} />
               <Tooltip {...TOOLTIP_STYLE} />
               <Legend wrapperStyle={{ fontSize: 12, color: '#8899b4' }} />
-              <Line type="monotone" dataKey="prospectos" stroke="#00c2ff" strokeWidth={2} dot={false} name="Prospectos" />
-              <Line type="monotone" dataKey="clientes" stroke="#00e676" strokeWidth={2} dot={false} name="Clientes" />
+              <Line type="monotone" dataKey="prospectos" stroke="#00c2ff" strokeWidth={2} dot={{ r: 3, fill: '#00c2ff' }} name="Prospectos" />
+              <Line type="monotone" dataKey="clientes" stroke="#00e676" strokeWidth={2} dot={{ r: 3, fill: '#00e676' }} name="Clientes" />
             </LineChart>
           </ResponsiveContainer>
         </div>
 
         <div className="bg-surface rounded-xl border border-border p-5">
           <h3 className="font-condensed text-sm uppercase text-muted tracking-wider mb-4">Gestión Clientes</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={charts?.gestion_clientes ?? []} layout="vertical">
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={charts?.gestion_clientes ?? []} layout="vertical" margin={{ left: 4, right: 12 }}>
               <XAxis type="number" tick={{ fill: '#8899b4', fontSize: 11 }} allowDecimals={false} />
-              <YAxis dataKey="name" type="category" tick={{ fill: '#8899b4', fontSize: 10 }} width={80} />
+              <YAxis dataKey="name" type="category" tick={{ fill: '#8899b4', fontSize: 10 }} width={90} />
               <Tooltip {...TOOLTIP_STYLE} />
               <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                 {charts?.gestion_clientes.map((_, i) => (
@@ -179,27 +216,36 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div className="bg-surface rounded-xl border border-border p-5">
           <h3 className="font-condensed text-sm uppercase text-muted tracking-wider mb-4">Pipeline Cotizaciones</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie data={charts?.pipeline_cotizaciones ?? []} cx="50%" cy="50%" outerRadius={70} dataKey="value"
-                label={({ name, value }) => `${name}: ${value}`}>
-                {charts?.pipeline_cotizaciones.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-              </Pie>
-              <Tooltip {...TOOLTIP_STYLE} />
-            </PieChart>
-          </ResponsiveContainer>
+          {(charts?.pipeline_cotizaciones ?? []).length === 0 ? (
+            <EmptyChart msg="Crea cotizaciones para ver el pipeline aquí" />
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie data={charts!.pipeline_cotizaciones} cx="50%" cy="45%" outerRadius={65} dataKey="value"
+                  label={false} labelLine={false}>
+                  {charts!.pipeline_cotizaciones.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                </Pie>
+                <Tooltip {...TOOLTIP_STYLE} formatter={(v, name) => [v, name]} />
+                <Legend wrapperStyle={{ fontSize: 11, color: '#8899b4' }} />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
         </div>
 
         <div className="bg-surface rounded-xl border border-border p-5">
           <h3 className="font-condensed text-sm uppercase text-muted tracking-wider mb-4">Líneas más Cotizadas</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={charts?.lineas_cotizadas ?? []} layout="vertical">
-              <XAxis type="number" tick={{ fill: '#8899b4', fontSize: 11 }} />
-              <YAxis dataKey="name" type="category" tick={{ fill: '#8899b4', fontSize: 10 }} width={100} />
-              <Tooltip {...TOOLTIP_STYLE} />
-              <Bar dataKey="value" fill="#f5a623" radius={[0, 4, 4, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          {(charts?.lineas_cotizadas ?? []).length === 0 ? (
+            <EmptyChart msg="Crea cotizaciones con líneas de servicio para ver datos aquí" />
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={charts!.lineas_cotizadas} layout="vertical">
+                <XAxis type="number" tick={{ fill: '#8899b4', fontSize: 11 }} />
+                <YAxis dataKey="name" type="category" tick={{ fill: '#8899b4', fontSize: 10 }} width={100} />
+                <Tooltip {...TOOLTIP_STYLE} />
+                <Bar dataKey="value" fill="#f5a623" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
 
         <div className="bg-surface rounded-xl border border-border p-5">
