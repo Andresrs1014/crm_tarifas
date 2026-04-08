@@ -14,8 +14,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 8  # 8 horas
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-# ---------- password ----------
-
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
@@ -23,8 +21,6 @@ def hash_password(password: str) -> str:
 def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
-
-# ---------- JWT ----------
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
@@ -35,10 +31,12 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return jwt.encode(to_encode, settings.secret_key, algorithm=ALGORITHM)
 
 
-# ---------- user queries ----------
-
 def get_user_by_username(session: Session, username: str) -> Optional[User]:
     return session.exec(select(User).where(User.username == username)).first()
+
+
+def get_user_by_email(session: Session, email: str) -> Optional[User]:
+    return session.exec(select(User).where(User.email == email)).first()
 
 
 def authenticate_user(session: Session, username: str, password: str) -> Optional[User]:
