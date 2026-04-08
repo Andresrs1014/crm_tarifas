@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import PageContainer from '../components/PageContainer'
-import { Plus, UserCheck, UserX, Trash2, Eye, EyeOff } from 'lucide-react'
+import { Plus, UserCheck, UserX, Trash2, Eye, EyeOff, ShieldCheck, ShieldOff } from 'lucide-react'
 import { listUsers, createUser, updateUser, deleteUser } from '../api/users'
 import ConfirmModal from '../components/ConfirmModal'
 import { useToastStore } from '../store/toastStore'
@@ -13,7 +13,7 @@ export default function Usuarios() {
   const [showCreate, setShowCreate] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [showPwd, setShowPwd] = useState(false)
-  const [form, setForm] = useState({ nombre: '', username: '', email: '', password: '' })
+  const [form, setForm] = useState({ nombre: '', username: '', email: '', password: '', is_superadmin: false })
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users'],
@@ -26,14 +26,14 @@ export default function Usuarios() {
       qc.invalidateQueries({ queryKey: ['users'] })
       toast.add('Usuario creado')
       setShowCreate(false)
-      setForm({ nombre: '', username: '', email: '', password: '' })
+      setForm({ nombre: '', username: '', email: '', password: '', is_superadmin: false })
     },
     onError: () => toast.add('Error al crear usuario', 'error'),
   })
 
   const toggleMutation = useMutation({
-    mutationFn: ({ id, is_active }: { id: string; is_active: boolean }) =>
-      updateUser(id, { is_active }),
+    mutationFn: ({ id, is_active, is_superadmin }: { id: string; is_active?: boolean; is_superadmin?: boolean }) =>
+      updateUser(id, { is_active, is_superadmin }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] })
       toast.add('Usuario actualizado')
@@ -123,6 +123,17 @@ export default function Usuarios() {
               </div>
             </div>
           </div>
+          <div className="flex items-center gap-4 mb-4">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={form.is_superadmin}
+                onChange={e => setForm(f => ({ ...f, is_superadmin: e.target.checked }))}
+                className="w-4 h-4 accent-accent"
+              />
+              <span className="text-xs text-muted uppercase tracking-wider font-condensed">Administrador</span>
+            </label>
+          </div>
           <div className="flex gap-2">
             <button
               onClick={handleCreate}
@@ -133,7 +144,7 @@ export default function Usuarios() {
               {createMutation.isPending ? 'Creando...' : 'Crear'}
             </button>
             <button
-              onClick={() => { setShowCreate(false); setForm({ nombre: '', username: '', email: '', password: '' }) }}
+              onClick={() => { setShowCreate(false); setForm({ nombre: '', username: '', email: '', password: '', is_superadmin: false }) }}
               className="px-4 py-2 rounded-lg text-sm text-muted hover:text-white border border-border transition"
             >
               Cancelar
@@ -187,6 +198,13 @@ export default function Usuarios() {
                 <td className="px-4 py-3 text-muted">{fmtDate(u.created_at)}</td>
                 <td className="px-4 py-3">
                   <div className="flex gap-2">
+                    <button
+                      title={u.is_superadmin ? 'Quitar admin' : 'Hacer admin'}
+                      onClick={() => toggleMutation.mutate({ id: u.id, is_superadmin: !u.is_superadmin })}
+                      className={`transition ${u.is_superadmin ? 'text-gold hover:text-muted' : 'text-muted hover:text-gold'}`}
+                    >
+                      {u.is_superadmin ? <ShieldCheck size={15} /> : <ShieldOff size={15} />}
+                    </button>
                     <button
                       title={u.is_active ? 'Desactivar' : 'Activar'}
                       onClick={() => toggleMutation.mutate({ id: u.id, is_active: !u.is_active })}

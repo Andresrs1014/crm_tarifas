@@ -10,6 +10,7 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     nombre: Optional[str] = None   # nombre completo → crea comercial automáticamente
+    is_superadmin: Optional[bool] = False
 
 
 class UserRead(BaseModel):
@@ -30,6 +31,7 @@ class Token(BaseModel):
 
 class UserUpdate(BaseModel):
     is_active: Optional[bool] = None
+    is_superadmin: Optional[bool] = None
     password: Optional[str] = None
     email: Optional[EmailStr] = None
 

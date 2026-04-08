@@ -11,6 +11,7 @@ export async function createUser(payload: {
   username: string
   email: string
   password: string
+  is_superadmin?: boolean
 }): Promise<UserRead> {
   const { data } = await api.post<UserRead>('/api/auth/register', payload)
   return data
@@ -18,7 +19,7 @@ export async function createUser(payload: {
 
 export async function updateUser(
   id: string,
-  payload: { is_active?: boolean; password?: string; email?: string }
+  payload: { is_active?: boolean; is_superadmin?: boolean; password?: string; email?: string }
 ): Promise<UserRead> {
   const { data } = await api.put<UserRead>(`/api/auth/users/${id}`, payload)
   return data
