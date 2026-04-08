@@ -23,10 +23,15 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-export default function App() {
+function SSOHandler() {
   useSSOToken()
+  return null
+}
+
+export default function App() {
   return (
     <BrowserRouter>
+      <SSOHandler />
       <Routes>
         {/* Rutas públicas */}
         <Route path="/login" element={<Login />} />
