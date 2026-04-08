@@ -15,6 +15,7 @@ import Biblioteca from './pages/Biblioteca'
 import Usuarios from './pages/Usuarios'
 import ImportWizard from './pages/ImportWizard'
 import SAC from './pages/SAC'
+import { useSSOToken } from './hooks/useSSOToken'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -23,6 +24,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  useSSOToken()
   return (
     <BrowserRouter>
       <Routes>
