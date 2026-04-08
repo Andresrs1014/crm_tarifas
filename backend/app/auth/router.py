@@ -60,6 +60,7 @@ def register(
         username=user_in.username,
         email=user_in.email,
         hashed_password=hash_password(user_in.password),
+        is_superadmin=user_in.is_superadmin or False,
     )
     session.add(new_user)
 
@@ -105,8 +106,10 @@ def update_user(
     user = session.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    if user.id == current_user.id:
-        raise HTTPException(status_code=400, detail="No puedes modificar tu propio estado")
+    if user.id == current_user.id and data.is_superadmin is False:
+        raise HTTPException(status_code=400, detail="No puedes quitarte el rol de administrador")
+    if user.id == current_user.id and data.is_active is False:
+        raise HTTPException(status_code=400, detail="No puedes desactivar tu propia cuenta")
     update_data = data.model_dump(exclude_unset=True)
     if "password" in update_data:
         update_data["hashed_password"] = hash_password(update_data.pop("password"))
