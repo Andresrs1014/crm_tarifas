@@ -15,7 +15,13 @@
       "Bash(grep -c \"console.error\\\\|TODO\\\\|FIXME\\\\|BUG\\\\|HACK\" /c/crm_tarifas/frontend/src/pages/wizard/*.tsx /c/crm_tarifas/frontend/src/api/*.ts)",
       "Bash(git add:*)",
       "Bash(git commit -m \"fix: login falla en servidor — baseURL siempre vacío en build de producción:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(curl -s http://localhost:5173)",
+      "Bash(curl -s http://localhost:8000)",
+      "Read(//c/crm_tarifas/**)",
+      "Bash(python3 -c ':*)",
+      "Bash(python -c ':*)",
+      "Bash(xargs cat:*)"
     ]
   }
 }
