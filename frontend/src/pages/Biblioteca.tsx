@@ -34,7 +34,7 @@ export default function Biblioteca() {
   const qc = useQueryClient()
   const isSuperadmin = useAuthStore((s) => s.user?.is_superadmin ?? false)
 
-  const { data: lineas = [], isLoading } = useQuery({
+  const { data: lineas = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['biblioteca'],
     queryFn: getBibliotecaApi,
     staleTime: 0,
@@ -56,6 +56,30 @@ export default function Biblioteca() {
     )
   }
 
+  if (isError) {
+    return (
+      <PageContainer>
+        <div className="flex items-center gap-3 mb-2">
+          <Settings size={22} style={{ color: '#8899b4' }} />
+          <h1 className="font-condensed font-bold text-2xl tracking-wider" style={{ color: '#e8edf5' }}>
+            BIBLIOTECA DE{' '}
+            <span style={{ color: '#00c2ff' }}>SERVICIOS</span>
+          </h1>
+        </div>
+        <div className="mt-8 flex flex-col items-center gap-3 py-12 rounded-xl border" style={{ borderColor: '#ff444433', background: '#1a1225' }}>
+          <p className="text-sm font-medium" style={{ color: '#ff6b6b' }}>No se pudo cargar la biblioteca de servicios.</p>
+          <button
+            onClick={() => refetch()}
+            className="px-4 py-2 rounded-lg text-sm font-medium transition"
+            style={{ background: '#00c2ff', color: '#0a0e1a' }}
+          >
+            Reintentar
+          </button>
+        </div>
+      </PageContainer>
+    )
+  }
+
   return (
     <PageContainer>
       {/* Encabezado */}
@@ -72,6 +96,12 @@ export default function Biblioteca() {
 
       {/* Acordeones */}
       <div className="space-y-3">
+        {lineas.length === 0 && (
+          <div className="flex flex-col items-center gap-2 py-16 rounded-xl border" style={{ borderColor: '#1e3050', background: '#1a2235' }}>
+            <p className="text-muted text-sm">No hay líneas de servicio configuradas.</p>
+            <p className="text-xs" style={{ color: '#4a5568' }}>Contacta al administrador para inicializar la biblioteca.</p>
+          </div>
+        )}
         {lineas.map((linea) => {
           const color = SERVICIO_COLORS[linea.nombre] ?? '#8899b4'
           const icon = SVC_ICONS[linea.nombre] ?? '📋'
