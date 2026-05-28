@@ -1,21 +1,42 @@
 version: "3.9"
 
 services:
+  crm-db:
+    image: postgres:15-alpine
+    container_name: crm_postgres
+    environment:
+      POSTGRES_DB: crm_tarifas
+      POSTGRES_USER: ${DB_USER:-crm_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-crm_pass}
+    volumes:
+      - crm_pgdata:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-crm_user} -d crm_tarifas"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: crm_tarifas_backend
+    container_name: crm_backend
     ports:
-      - "8000:8000"
+      - "3003:3003"
     volumes:
-      - sqlite_data:/app/data
+      - crm_uploads:/app/uploads
     env_file:
       - .env
+    depends_on:
+      crm-db:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
-      interval: 10s
+      test: ["CMD", "wget", "-qO-", "http://localhost:3003/api/health"]
+      interval: 15s
       timeout: 5s
       retries: 5
       start_period: 30s
@@ -24,13 +45,14 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: crm_tarifas_frontend
+    container_name: crm_frontend
     ports:
-      - "80:80"
+      - "82:80"
     depends_on:
       backend:
         condition: service_healthy
     restart: unless-stopped
 
 volumes:
-  sqlite_data:
+  crm_pgdata:
+  crm_uploads:
