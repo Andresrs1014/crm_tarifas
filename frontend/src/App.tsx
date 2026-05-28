@@ -21,6 +21,10 @@ import SAC from './pages/SAC'
 import Usuarios from './pages/Usuarios'
 import ImportWizard from './pages/ImportWizard'
 import WizardLayout from './pages/wizard/WizardLayout'
+import MatrizRiesgos from './pages/MatrizRiesgos'
+import GestionDocumental from './pages/GestionDocumental'
+import Preliquidador from './pages/Preliquidador'
+import CalendarioVisitas from './pages/CalendarioVisitas'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -85,6 +89,10 @@ export default function App() {
             <Route path="cotizaciones/:id/editar" element={<WizardLayout />} />
             <Route path="biblioteca" element={<Biblioteca />} />
             <Route path="sac" element={<SAC />} />
+            <Route path="matriz-riesgos" element={<MatrizRiesgos />} />
+            <Route path="gestion-documental" element={<GestionDocumental />} />
+            <Route path="preliquidador" element={<Preliquidador />} />
+            <Route path="calendario" element={<CalendarioVisitas />} />
             <Route
               path="admin/usuarios"
               element={

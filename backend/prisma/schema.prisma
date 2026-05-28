@@ -66,6 +66,8 @@ model Record {
   actividades        Actividad[]
   cotizaciones       Cotizacion[]
   crmMeta            CrmMeta?
+  matrizRiesgo       MatrizRiesgo?
+  gestionDocumental  GestionDocumental?
   createdAt          DateTime    @default(now()) @map("created_at")
   updatedAt          DateTime    @updatedAt @map("updated_at")
 
@@ -194,4 +196,37 @@ model CotNumeroCounter {
   valor Int @default(0)
 
   @@map("cot_numero_counter")
+}
+
+model GestionDocumental {
+  id          String   @id @default(uuid())
+  recordId    String   @unique @map("record_id")
+  record      Record   @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  docs        Json     @default("{}") @map("docs") // { docId: { estado, obs, fecha } }
+  cicloActual Int      @default(2025) @map("ciclo_actual")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("gestion_documental")
+}
+
+model MatrizRiesgo {
+  id          String   @id @default(uuid())
+  recordId    String   @unique @map("record_id")
+  record      Record   @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  companias   Json     @default("[]")
+  mercancia   String?
+  tipoPersona String?  @map("tipo_persona")
+  tiempo      String?
+  capital     String?
+  frecuencia  String?
+  facturacion String?
+  cert        String?
+  anFin       String?  @map("an_fin")
+  puntaje     Float    @default(0)
+  riesgo      String   @default("PENDIENTE")
+  control     String?
+  frecControl String?  @map("frec_control")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("matriz_riesgos")
 }
