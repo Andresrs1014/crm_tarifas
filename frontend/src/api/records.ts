@@ -1,48 +1,32 @@
-import api from './client'
-import type { RecordRead, RecordDetalle, ActividadCreate, Actividad } from '../types'
+import client from './client'
+import type { CRMRecord, RecordCreate } from '../types'
 
-export interface RecordFilters {
+export const getRecords = (params?: {
   tipo?: string
-  comercial_id?: string
-  estado_prospecto?: string
-  estado_cliente?: string
+  estado?: string
+  comercialId?: string
   search?: string
-  fecha_desde?: string
-  fecha_hasta?: string
-}
+  fecha?: string
+}) =>
+  client.get<CRMRecord[]>('/api/records', { params }).then((r) => r.data)
 
-export async function getRecords(filters: RecordFilters = {}): Promise<RecordRead[]> {
-  const { data } = await api.get<RecordRead[]>('/api/records', { params: filters })
-  return data
-}
+export const getRecord = (id: string) =>
+  client.get<CRMRecord>(`/api/records/${id}`).then((r) => r.data)
 
-export async function getRecord(id: string): Promise<RecordDetalle> {
-  const { data } = await api.get<RecordDetalle>(`/api/records/${id}`)
-  return data
-}
+export const createRecord = (data: RecordCreate) =>
+  client.post<CRMRecord>('/api/records', data).then((r) => r.data)
 
-export async function createRecord(payload: Record<string, unknown>): Promise<RecordDetalle> {
-  const { data } = await api.post<RecordDetalle>('/api/records', payload)
-  return data
-}
+export const updateRecord = (id: string, data: Partial<RecordCreate>) =>
+  client.put<CRMRecord>(`/api/records/${id}`, data).then((r) => r.data)
 
-export async function updateRecord(id: string, payload: Record<string, unknown>): Promise<RecordDetalle> {
-  const { data } = await api.put<RecordDetalle>(`/api/records/${id}`, payload)
-  return data
-}
+export const deleteRecord = (id: string) =>
+  client.delete(`/api/records/${id}`).then((r) => r.data)
 
-export async function deleteRecord(id: string): Promise<void> {
-  await api.delete(`/api/records/${id}`)
-}
-
-export async function addActividad(recordId: string, payload: ActividadCreate): Promise<Actividad> {
-  const { data } = await api.post<Actividad>(`/api/records/${recordId}/actividades`, payload)
-  return data
-}
-
-export async function importRecords(
-  rows: Record<string, unknown>[]
-): Promise<{ created: number; errors: Array<{ empresa: string; error: string }> }> {
-  const { data } = await api.post('/api/records/import', rows)
-  return data
+export const importRecords = (file: File, tipo: string) => {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('tipo', tipo)
+  return client.post('/api/records/import', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }).then((r) => r.data)
 }

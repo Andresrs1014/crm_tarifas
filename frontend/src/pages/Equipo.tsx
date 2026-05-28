@@ -1,305 +1,277 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import PageContainer from '../components/PageContainer'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { Pencil, Trash2, X, Check, Trophy } from 'lucide-react'
-import { getComercialesApi, updateComercialApi, deleteComercialApi } from '../api/comerciales'
-import { getRankingApi } from '../api/dashboard'
-import ConfirmModal from '../components/ConfirmModal'
-import { useToastStore } from '../store/toastStore'
-import type { Comercial, RankingEntry } from '../types'
+import {
+  getComercialesApi, createComercial, updateComercial, deleteComercial,
+} from '../api/comerciales'
+import { toast } from '../store/toastStore'
+import type { Comercial, ComercialCreate } from '../types'
 
-const MEDAL_COLORS = ['#FFD700', '#C0C0C0', '#CD7F32'] as const
+// ─── Formulario ────────────────────────────────────────────────────────────────
 
-function fmtCurrency(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`
-  return `$${n}`
+const EMPTY_FORM: ComercialCreate = {
+  nombre: '', cargo: '', email: '', tel: '',
 }
 
-function RankingCard({ entry, position }: { entry: RankingEntry; position: number }) {
-  const medal = MEDAL_COLORS[position] ?? null
-  const isTop3 = position < 3
+function ComercialForm({
+  initial,
+  onSave,
+  onCancel,
+  loading,
+}: {
+  initial: ComercialCreate
+  onSave: (data: ComercialCreate) => void
+  onCancel: () => void
+  loading: boolean
+}) {
+  const [form, setForm] = useState<ComercialCreate>(initial)
+  function set(k: keyof ComercialCreate, v: string) {
+    setForm((s) => ({ ...s, [k]: v }))
+  }
 
   return (
-    <div
-      className="bg-surface border border-border rounded-xl p-4 flex flex-col gap-3 transition hover:border-opacity-60"
-      style={isTop3 ? { borderColor: medal + '55' } : {}}
-    >
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div
-          className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-          style={{
-            background: isTop3 ? medal + '22' : '#1e3050',
-            color: isTop3 ? medal! : '#8899b4',
-          }}
+    <div className="card p-5 space-y-4 border border-accent/30">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs text-muted block mb-1">Nombre <span className="text-danger">*</span></label>
+          <input className="input w-full" value={form.nombre}
+            onChange={(e) => set('nombre', e.target.value)} placeholder="Nombre completo" autoFocus />
+        </div>
+        <div>
+          <label className="text-xs text-muted block mb-1">Cargo</label>
+          <input className="input w-full" value={form.cargo ?? ''}
+            onChange={(e) => set('cargo', e.target.value)} placeholder="Ej: Asesor Comercial" />
+        </div>
+        <div>
+          <label className="text-xs text-muted block mb-1">Email</label>
+          <input type="email" className="input w-full" value={form.email ?? ''}
+            onChange={(e) => set('email', e.target.value)} placeholder="nombre@empresa.com" />
+        </div>
+        <div>
+          <label className="text-xs text-muted block mb-1">Teléfono</label>
+          <input className="input w-full" value={form.tel ?? ''}
+            onChange={(e) => set('tel', e.target.value)} placeholder="+57 300 000 0000" />
+        </div>
+      </div>
+      <div className="flex gap-2 justify-end">
+        <button className="btn-secondary btn-sm" onClick={onCancel}>Cancelar</button>
+        <button
+          className="btn-primary btn-sm"
+          disabled={!form.nombre.trim() || loading}
+          onClick={() => onSave(form)}
         >
-          {isTop3 ? <Trophy size={14} /> : position + 1}
-        </div>
-        <div className="min-w-0">
-          <p className="font-condensed font-bold text-sm truncate" style={{ color: '#e8edf5' }}>
-            {entry.nombre}
-          </p>
-          {isTop3 && (
-            <p className="text-xs font-medium" style={{ color: medal! }}>
-              {position === 0 ? '1° Lugar' : position === 1 ? '2° Lugar' : '3° Lugar'}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-2">
-        <Stat label="Prospectos" value={entry.prospectos} color="#00c2ff" />
-        <Stat label="Clientes" value={entry.clientes} color="#00e676" />
-        <Stat label="Visitas" value={entry.visitas} color="#a855f7" />
-        <Stat label="Facturado" value={fmtCurrency(entry.valor_facturado)} color="#f5a623" />
+          {loading ? 'Guardando...' : 'Guardar'}
+        </button>
       </div>
     </div>
   )
 }
 
-function Stat({ label, value, color }: { label: string; value: string | number; color: string }) {
+// ─── Tarjeta comercial ─────────────────────────────────────────────────────────
+
+function ComercialCard({
+  comercial,
+  onEdit,
+  onDelete,
+}: {
+  comercial: Comercial
+  onEdit: () => void
+  onDelete: () => void
+}) {
+  const initials = comercial.nombre
+    .split(' ')
+    .slice(0, 2)
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+
   return (
-    <div className="bg-surface2 rounded-lg px-3 py-2">
-      <p className="text-xs text-muted font-condensed uppercase tracking-wider">{label}</p>
-      <p className="text-sm font-bold" style={{ color }}>{value}</p>
+    <div className="card p-5 space-y-3 hover:border-accent/30 transition-colors">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-3">
+          {/* Avatar */}
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+            style={{ background: '#00c2ff18', color: '#00c2ff' }}
+          >
+            {initials}
+          </div>
+          <div>
+            <p className="font-semibold text-foreground">{comercial.nombre}</p>
+            {comercial.cargo && <p className="text-xs text-muted">{comercial.cargo}</p>}
+          </div>
+        </div>
+        <div className="flex gap-1">
+          <button className="btn-ghost btn-sm px-2 py-1 text-xs" onClick={onEdit}>Editar</button>
+          <button className="btn-danger btn-sm px-2 py-1 text-xs" onClick={onDelete}>×</button>
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        {comercial.email && (
+          <a href={`mailto:${comercial.email}`}
+            className="flex items-center gap-2 text-xs text-accent hover:underline">
+            <span>📧</span>{comercial.email}
+          </a>
+        )}
+        {comercial.tel && (
+          <a href={`tel:${comercial.tel}`}
+            className="flex items-center gap-2 text-xs text-muted hover:text-foreground">
+            <span>📞</span>{comercial.tel}
+          </a>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between text-2xs text-muted pt-1 border-t border-border">
+        <span>Activo desde {new Date(comercial.createdAt).toLocaleDateString('es-CO')}</span>
+        <span className={comercial.activo ? 'text-success' : 'text-muted'}>
+          {comercial.activo ? '● Activo' : '○ Inactivo'}
+        </span>
+      </div>
     </div>
   )
 }
 
-const schema = z.object({
-  nombre: z.string().min(1, 'Requerido'),
-  cargo: z.string().optional(),
-  email: z.string().email('Email inválido').optional().or(z.literal('')),
-  tel: z.string().optional(),
-})
-type FormValues = z.infer<typeof schema>
+// ─── Página principal ──────────────────────────────────────────────────────────
 
 export default function Equipo() {
-  const [editing, setEditing] = useState<Comercial | null>(null)
-  const [deleteId, setDeleteId] = useState<string | null>(null)
-  const toast = useToastStore()
   const qc = useQueryClient()
+  const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
 
   const { data: comerciales = [], isLoading } = useQuery({
     queryKey: ['comerciales'],
     queryFn: getComercialesApi,
   })
 
-  const { data: ranking = [] } = useQuery({
-    queryKey: ['ranking'],
-    queryFn: getRankingApi,
-  })
-
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-  })
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: FormValues }) => updateComercialApi(id, data),
+  const createMut = useMutation({
+    mutationFn: createComercial,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['comerciales'] })
-      toast.add('Comercial actualizado')
-      setEditing(null)
-      reset()
+      toast.success('Comercial creado')
+      setShowForm(false)
     },
-    onError: () => toast.add('Error al actualizar', 'error'),
+    onError: () => toast.error('Error al crear comercial'),
   })
 
-  const deleteMutation = useMutation({
-    mutationFn: deleteComercialApi,
+  const updateMut = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<ComercialCreate> }) =>
+      updateComercial(id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['comerciales'] })
-      toast.add('Comercial eliminado')
-      setDeleteId(null)
+      toast.success('Comercial actualizado')
+      setEditingId(null)
     },
-    onError: (err: unknown) => {
-      const msg = (err as { response?: { status?: number } })?.response?.status === 409
-        ? 'No se puede eliminar: tiene registros asociados'
-        : 'Error al eliminar'
-      toast.add(msg, 'error')
-      setDeleteId(null)
-    },
+    onError: () => toast.error('Error al actualizar'),
   })
 
-  const onSubmit = (data: FormValues) => {
-    if (!editing) return
-    updateMutation.mutate({
-      id: editing.id,
-      data: {
-        nombre: data.nombre,
-        cargo: data.cargo || undefined,
-        email: data.email || undefined,
-        tel: data.tel || undefined,
-      },
-    })
-  }
+  const deleteMut = useMutation({
+    mutationFn: deleteComercial,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['comerciales'] })
+      toast.success('Comercial eliminado')
+      setConfirmId(null)
+    },
+    onError: () => toast.error('Error al eliminar'),
+  })
 
-  const startEdit = (c: Comercial) => {
-    setEditing(c)
-    reset({ nombre: c.nombre, cargo: c.cargo ?? '', email: c.email ?? '', tel: c.tel ?? '' })
-  }
-
-  const cancelForm = () => {
-    setEditing(null)
-    reset()
-  }
+  const comercialToEdit = comerciales.find((c) => c.id === editingId)
 
   return (
-    <PageContainer>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="font-condensed font-bold text-2xl" style={{ color: '#e8edf5' }}>
-          Equipo Comercial
-        </h1>
-        {!editing && (
-          <p className="text-xs text-muted">Los miembros se crean desde <strong style={{ color: '#e8edf5' }}>Usuarios</strong></p>
+    <div className="p-6 space-y-5">
+
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Equipo Comercial</h1>
+          <p className="text-sm text-muted mt-0.5">{comerciales.length} comerciales</p>
+        </div>
+        {!showForm && (
+          <button className="btn-primary btn-sm" onClick={() => setShowForm(true)}>
+            + Nuevo comercial
+          </button>
         )}
       </div>
 
-      {/* Form edición */}
-      {editing && (
-        <div className="bg-surface border border-border rounded-xl p-5 mb-5">
-          <h2 className="font-condensed font-bold text-base mb-4" style={{ color: '#e8edf5' }}>
-            Editar comercial
-          </h2>
-          <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">
-                Nombre *
-              </label>
-              <input {...register('nombre')} placeholder="Nombre completo" />
-              {errors.nombre && <p className="text-danger text-xs mt-1">{errors.nombre.message}</p>}
-            </div>
-            <div>
-              <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">
-                Cargo
-              </label>
-              <input {...register('cargo')} placeholder="Cargo" />
-            </div>
-            <div>
-              <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">
-                Teléfono
-              </label>
-              <input {...register('tel')} placeholder="Teléfono" />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">
-                Email
-              </label>
-              <input {...register('email')} type="email" placeholder="email@empresa.com" />
-              {errors.email && <p className="text-danger text-xs mt-1">{errors.email.message}</p>}
-            </div>
-            <div className="col-span-2 flex gap-2 justify-end">
-              <button
-                type="button"
-                onClick={cancelForm}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-muted hover:text-white transition"
-              >
-                <X size={14} /> Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={updateMutation.isPending}
-                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium transition disabled:opacity-50"
-                style={{ background: '#00c2ff', color: '#0a0e1a' }}
-              >
-                <Check size={14} /> Guardar
-              </button>
-            </div>
-          </form>
+      {/* Formulario nuevo */}
+      {showForm && (
+        <ComercialForm
+          initial={EMPTY_FORM}
+          loading={createMut.isPending}
+          onCancel={() => setShowForm(false)}
+          onSave={(data) => createMut.mutate(data)}
+        />
+      )}
+
+      {/* Formulario edición */}
+      {editingId && comercialToEdit && (
+        <div className="space-y-1">
+          <p className="text-xs text-muted">Editando: <strong className="text-foreground">{comercialToEdit.nombre}</strong></p>
+          <ComercialForm
+            initial={{
+              nombre: comercialToEdit.nombre,
+              cargo: comercialToEdit.cargo,
+              email: comercialToEdit.email,
+              tel: comercialToEdit.tel,
+            }}
+            loading={updateMut.isPending}
+            onCancel={() => setEditingId(null)}
+            onSave={(data) => updateMut.mutate({ id: editingId, data })}
+          />
         </div>
       )}
 
-      {/* Lista */}
-      <div className="bg-surface border border-border rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border">
-              {['Nombre', 'Cargo', 'Email', 'Teléfono', 'Estado', ''].map((h) => (
-                <th key={h} className="text-left px-4 py-3 text-xs font-condensed uppercase text-muted tracking-wider">
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
-              <tr>
-                <td colSpan={6} className="text-center py-10 text-muted">Cargando...</td>
-              </tr>
-            )}
-            {!isLoading && comerciales.length === 0 && (
-              <tr>
-                <td colSpan={6} className="text-center py-10 text-muted">Sin comerciales</td>
-              </tr>
-            )}
-            {comerciales.map((c) => (
-              <tr key={c.id} className="border-b border-border hover:bg-surface2 transition">
-                <td className="px-4 py-3 font-medium" style={{ color: '#e8edf5' }}>{c.nombre}</td>
-                <td className="px-4 py-3 text-muted">{c.cargo ?? '—'}</td>
-                <td className="px-4 py-3 text-muted">{c.email ?? '—'}</td>
-                <td className="px-4 py-3 text-muted">{c.tel ?? '—'}</td>
-                <td className="px-4 py-3">
-                  <span
-                    className="text-xs px-2 py-0.5 rounded-full font-medium"
-                    style={{
-                      background: c.activo ? '#00e67622' : '#8899b422',
-                      color: c.activo ? '#00e676' : '#8899b4',
-                    }}
-                  >
-                    {c.activo ? 'Activo' : 'Inactivo'}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => startEdit(c)}
-                      className="text-muted hover:text-accent transition"
-                    >
-                      <Pencil size={15} />
-                    </button>
-                    <button
-                      onClick={() => setDeleteId(c.id)}
-                      className="text-muted hover:text-danger transition"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* Grid de comerciales */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="card p-5 h-36 animate-pulse bg-surface2" />
+          ))}
+        </div>
+      ) : comerciales.length === 0 ? (
+        <div className="empty-state">
+          <div className="text-5xl mb-4">👥</div>
+          <p className="font-semibold text-foreground mb-1">Sin comerciales</p>
+          <p className="text-sm mb-4">Agrega el primer miembro del equipo comercial.</p>
+          <button className="btn-primary btn-sm" onClick={() => setShowForm(true)}>
+            + Nuevo comercial
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {comerciales.map((c) => (
+            <ComercialCard
+              key={c.id}
+              comercial={c}
+              onEdit={() => { setEditingId(c.id); setShowForm(false) }}
+              onDelete={() => setConfirmId(c.id)}
+            />
+          ))}
+        </div>
+      )}
 
-      <ConfirmModal
-        open={!!deleteId}
-        message="¿Eliminar este comercial? Solo es posible si no tiene registros asociados."
-        onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
-        onCancel={() => setDeleteId(null)}
-        loading={deleteMutation.isPending}
-      />
-
-      {/* Ranking de Gestión */}
-      {ranking.length > 0 && (
-        <div className="mt-8">
-          <div className="flex items-center gap-2 mb-4">
-            <Trophy size={16} style={{ color: '#FFD700' }} />
-            <h2 className="font-condensed font-bold text-lg" style={{ color: '#e8edf5' }}>
-              Ranking de Gestión
-            </h2>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {ranking.map((entry, i) => (
-              <RankingCard key={entry.comercial_id} entry={entry} position={i} />
-            ))}
+      {/* Modal confirmación eliminar */}
+      {confirmId && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+          onClick={() => setConfirmId(null)}>
+          <div className="card p-6 w-80 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-bold text-foreground">¿Eliminar comercial?</h3>
+            <p className="text-sm text-muted">
+              {comerciales.find((c) => c.id === confirmId)?.nombre} será eliminado del equipo.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button className="btn-secondary btn-sm" onClick={() => setConfirmId(null)}>Cancelar</button>
+              <button
+                className="btn-danger btn-sm"
+                disabled={deleteMut.isPending}
+                onClick={() => deleteMut.mutate(confirmId)}
+              >
+                {deleteMut.isPending ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            </div>
           </div>
         </div>
       )}
-    </PageContainer>
+    </div>
   )
 }

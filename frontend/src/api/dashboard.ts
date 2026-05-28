@@ -1,28 +1,17 @@
-import api from './client'
-import type { DashboardStats, DashboardCharts, DashboardRecientes, RankingEntry } from '../types'
+import client from './client'
+import type { DashboardStats, RankingComercial, Cotizacion, CRMRecord } from '../types'
 
-export interface DashboardFilters {
-  comercial_id?: string
+interface DashboardParams {
+  comercialId?: string
   mes?: string
   tipo?: string
 }
 
-export async function getDashboardStats(filters: DashboardFilters = {}): Promise<DashboardStats> {
-  const { data } = await api.get<DashboardStats>('/api/dashboard/stats', { params: filters })
-  return data
-}
+export const getDashboard = (params?: DashboardParams) =>
+  client.get<DashboardStats>('/api/dashboard', { params }).then((r) => r.data)
 
-export async function getDashboardCharts(filters: DashboardFilters = {}): Promise<DashboardCharts> {
-  const { data } = await api.get<DashboardCharts>('/api/dashboard/charts', { params: filters })
-  return data
-}
+export const getRanking = () =>
+  client.get<RankingComercial[]>('/api/dashboard/ranking').then((r) => r.data)
 
-export async function getRankingApi(): Promise<RankingEntry[]> {
-  const { data } = await api.get<RankingEntry[]>('/api/dashboard/ranking')
-  return data
-}
-
-export async function getRecientesApi(): Promise<DashboardRecientes> {
-  const { data } = await api.get<DashboardRecientes>('/api/dashboard/recientes')
-  return data
-}
+export const getRecientes = () =>
+  client.get<{ records: CRMRecord[]; cotizaciones: Cotizacion[] }>('/api/dashboard/recientes').then((r) => r.data)

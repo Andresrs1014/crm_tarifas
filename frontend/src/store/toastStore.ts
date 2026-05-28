@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type ToastType = 'success' | 'error' | 'warning'
+export type ToastType = 'success' | 'error' | 'info' | 'warning'
 
 interface Toast {
   id: string
@@ -8,22 +8,28 @@ interface Toast {
   type: ToastType
 }
 
-export interface ToastState {
+interface ToastState {
   toasts: Toast[]
-  add: (message: string, type?: ToastType) => void
+  push: (message: string, type?: ToastType) => void
   remove: (id: string) => void
 }
 
 export const useToastStore = create<ToastState>((set) => ({
   toasts: [],
-  add: (message, type = 'success') => {
-    const id = Date.now().toString()
+  push: (message, type = 'success') => {
+    const id = Math.random().toString(36).slice(2)
     set((s) => ({ toasts: [...s.toasts, { id, message, type }] }))
-    setTimeout(
-      () => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
-      4000
-    )
+    setTimeout(() => {
+      set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }))
+    }, 4000)
   },
-  remove: (id) =>
-    set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+  remove: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 }))
+
+// Convenience helpers
+export const toast = {
+  success: (msg: string) => useToastStore.getState().push(msg, 'success'),
+  error:   (msg: string) => useToastStore.getState().push(msg, 'error'),
+  info:    (msg: string) => useToastStore.getState().push(msg, 'info'),
+  warning: (msg: string) => useToastStore.getState().push(msg, 'warning'),
+}

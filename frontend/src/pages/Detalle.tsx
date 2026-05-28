@@ -1,37 +1,90 @@
 import { useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Save, Trash2, FileText } from 'lucide-react'
 import { getRecord, updateRecord, deleteRecord } from '../api/records'
-import { getComercialesApi } from '../api/comerciales'
-import Badge from '../components/Badge'
-import ServiceChip from '../components/ServiceChip'
-import ContactosList from '../components/ContactosList'
-import ActividadesTimeline from '../components/ActividadesTimeline'
-import BillingLines from '../components/BillingLines'
-import ConfirmModal from '../components/ConfirmModal'
-import PageContainer from '../components/PageContainer'
-import { useToastStore } from '../store/toastStore'
-import { fmtCOP, fmtDate } from '../utils/format'
-import { getBibliotecaApi } from '../api/biblioteca'
+import { getCotizaciones } from '../api/cotizaciones'
+import { createActividad, updateActividad, deleteActividad } from '../api/actividades'
+import { toast } from '../store/toastStore'
+import type { ActividadTipo, EstadoProspecto, EstadoCliente, TipoVisita, TipoFacturado } from '../types'
 import { SERVICIOS } from '../types'
-import type { ContactoCreate } from '../types'
-import { useCotWizardStore } from '../store/cotWizardStore'
+
+// ─── Constantes ───────────────────────────────────────────────────────────────
+
+const TIPO_ACT_ICON: Record<ActividadTipo, string> = {
+  llamada:     '📞',
+  reunion:     '🤝',
+  email:       '📧',
+  visita:      '🏢',
+  tarea:       '✅',
+  seguimiento: '🔔',
+}
+
+const ESTADO_BADGE_P: Record<string, string> = {
+  prospecto:            'badge-blue',
+  reconocimiento:       'badge-purple',
+  propuesta:            'badge-gold',
+  aceptacion_propuesta: 'badge-green',
+  creacion_sop:         'badge-gold',
+  facturado:            'badge-green',
+  frio:                 'badge-gray',
+  perdido:              'badge-red',
+}
+
+const ESTADO_BADGE_C: Record<string, string> = {
+  activo:     'badge-green',
+  'en-riesgo': 'badge-red',
+  inactivo:   'badge-gray',
+}
+
+const COT_BADGE: Record<string, string> = {
+  borrador:    'badge-gray',
+  enviada:     'badge-blue',
+  negociacion: 'badge-gold',
+  aprobada:    'badge-green',
+  rechazada:   'badge-red',
+}
+
+function fmt(n: number) {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`
+  return `$${n}`
+}
+
+type Tab = 'info' | 'actividades' | 'cotizaciones'
+
+// ─── Formulario actividad ──────────────────────────────────────────────────────
+
+interface ActForm {
+  tipo: ActividadTipo
+  descripcion: string
+  fecha: string
+  hora: string
+  lugar: string
+}
+
+const EMPTY_ACT: ActForm = {
+  tipo: 'llamada',
+  descripcion: '',
+  fecha: new Date().toISOString().slice(0, 10),
+  hora: '',
+  lugar: '',
+}
+
+// ─── Componente principal ──────────────────────────────────────────────────────
 
 export default function Detalle() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const toast = useToastStore()
   const qc = useQueryClient()
-  const { resetWizard, setDatosGenerales } = useCotWizardStore()
-  const [editing, setEditing] = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
 
-  // Edit state
-  const [form, setForm] = useState<Record<string, unknown>>({})
-  const [servicios, setServicios] = useState<string[]>([])
-  const [contactos, setContactos] = useState<ContactoCreate[]>([])
-  const [facturacionLineas, setFacturacionLineas] = useState<Record<string, number>>({})
+  const [tab, setTab] = useState<Tab>('info')
+  const [editing, setEditing] = useState(false)
+  const [confirmDel, setConfirmDel] = useState(false)
+  const [showActForm, setShowActForm] = useState(false)
+  const [actForm, setActForm] = useState<ActForm>(EMPTY_ACT)
+  const [editAct, setEditAct] = useState<string | null>(null)
+
+  // ── Queries ─────────────────────────────────────────────────────────────────
 
   const { data: record, isLoading } = useQuery({
     queryKey: ['record', id],
@@ -39,495 +92,682 @@ export default function Detalle() {
     enabled: !!id,
   })
 
-  const { data: comerciales = [] } = useQuery({
-    queryKey: ['comerciales'],
-    queryFn: getComercialesApi,
+  const { data: cotizaciones = [] } = useQuery({
+    queryKey: ['cotizaciones'],
+    queryFn: () => getCotizaciones(),
+    select: (data) => data.filter((c) => c.recordId === id),
+    enabled: tab === 'cotizaciones',
   })
 
-  const { data: biblioteca = [] } = useQuery({
-    queryKey: ['biblioteca'],
-    queryFn: getBibliotecaApi,
-    staleTime: 1000 * 60 * 5,
-  })
-  const lineasDisponibles = biblioteca.length > 0
-    ? biblioteca.map((l) => l.nombre)
-    : [...SERVICIOS]
+  // ── Estado edición ───────────────────────────────────────────────────────────
 
-  const updateMutation = useMutation({
-    mutationFn: (payload: Record<string, unknown>) => updateRecord(id!, payload),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['record', id] })
-      qc.invalidateQueries({ queryKey: ['records'] })
-      toast.add('Registro actualizado')
-      setEditing(false)
-    },
-    onError: () => toast.add('Error al actualizar', 'error'),
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: () => deleteRecord(id!),
-    onSuccess: () => {
-      toast.add('Registro eliminado')
-      navigate(record?.tipo === 'prospecto' ? '/prospectos' : '/clientes')
-    },
-    onError: () => toast.add('Error al eliminar', 'error'),
+  const [edit, setEdit] = useState({
+    empresa: '',
+    nit: '',
+    ciudad: '',
+    direccion: '',
+    observaciones: '',
+    proximoSeguimiento: '',
+    estadoProspecto: '' as EstadoProspecto | '',
+    estadoCliente: '' as EstadoCliente | '',
+    visita: '' as TipoVisita | '',
+    visitaCliente: '' as TipoVisita | '',
+    facturado: '' as TipoFacturado | '',
+    valor: '',
+    ingresosEsperados: '',
+    servicios: [] as string[],
   })
 
-  const startEdit = () => {
+  function startEdit() {
     if (!record) return
-    setForm({
+    setEdit({
       empresa: record.empresa,
       nit: record.nit ?? '',
       ciudad: record.ciudad ?? '',
       direccion: record.direccion ?? '',
-      categoria: record.categoria ?? '',
-      comercial_id: record.comercial_id ?? '',
-      tipo_cliente: record.tipo_cliente,
-      comision: record.comision ?? '',
       observaciones: record.observaciones ?? '',
-      fecha: record.fecha,
-      estado_prospecto: record.estado_prospecto ?? '',
+      proximoSeguimiento: record.proximoSeguimiento?.slice(0, 10) ?? '',
+      estadoProspecto: record.estadoProspecto ?? '',
+      estadoCliente: record.estadoCliente ?? '',
       visita: record.visita ?? '',
-      fecha_visita: record.fecha_visita ?? '',
-      facturado_p: record.facturado_p ?? '',
-      valor_p: record.valor_p ?? '',
-      proximo_seguimiento: record.proximo_seguimiento ?? '',
-      estado_cliente: record.estado_cliente ?? '',
-      visita_cliente: record.visita_cliente ?? '',
-      fecha_visita_cliente: record.fecha_visita_cliente ?? '',
-      nuevo_servicio: record.nuevo_servicio ?? '',
-      servicio_nuevo: record.servicio_nuevo ?? '',
+      visitaCliente: record.visitaCliente ?? '',
       facturado: record.facturado ?? '',
-      valor: record.valor ?? '',
+      valor: record.valor?.toString() ?? '',
+      ingresosEsperados: record.ingresosEsperados?.toString() ?? '',
+      servicios: [...record.servicios],
     })
-    setServicios([...record.servicios])
-    setContactos(record.contactos.map((c) => ({
-      nombre: c.nombre,
-      cargo: c.cargo ?? undefined,
-      telefono: c.telefono ?? undefined,
-      email: c.email ?? undefined,
-      orden: c.orden,
-      cumpleanos: c.cumpleanos ?? null,
-      recibe_regalos: c.recibe_regalos ?? null,
-      direccion: c.direccion ?? null,
-    })))
-    setFacturacionLineas({ ...record.facturacion_lineas })
     setEditing(true)
   }
 
-  const handleSave = () => {
-    if (!record) return
-    const totalBilling = Object.values(facturacionLineas).reduce((a, b) => a + b, 0)
-    const payload: Record<string, unknown> = {
-      ...form,
-      servicios,
-      facturacion_lineas: facturacionLineas,
-      contactos,
-      ...(record.tipo === 'prospecto' ? { valor_p: totalBilling } : { valor: totalBilling }),
-    }
-    Object.keys(payload).forEach((k) => {
-      if (payload[k] === '' || payload[k] === undefined) delete payload[k]
-    })
-    updateMutation.mutate(payload)
-  }
+  // ── Mutations ────────────────────────────────────────────────────────────────
 
-  const setField = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }))
+  const updateMut = useMutation({
+    mutationFn: () => updateRecord(id!, {
+      empresa: edit.empresa,
+      nit: edit.nit || undefined,
+      ciudad: edit.ciudad || undefined,
+      direccion: edit.direccion || undefined,
+      observaciones: edit.observaciones || undefined,
+      proximoSeguimiento: edit.proximoSeguimiento || undefined,
+      estadoProspecto: edit.estadoProspecto || undefined,
+      estadoCliente: edit.estadoCliente || undefined,
+      visita: edit.visita || undefined,
+      visitaCliente: edit.visitaCliente || undefined,
+      facturado: edit.facturado || undefined,
+      valor: edit.valor ? Number(edit.valor) : undefined,
+      ingresosEsperados: edit.ingresosEsperados ? Number(edit.ingresosEsperados) : undefined,
+      servicios: edit.servicios,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['record', id] })
+      qc.invalidateQueries({ queryKey: ['records'] })
+      toast.success('Registro actualizado')
+      setEditing(false)
+    },
+    onError: () => toast.error('Error al guardar'),
+  })
 
-  const comercialNombre = (cid: string | null) =>
-    comerciales.find((c) => c.id === cid)?.nombre ?? '—'
+  const deleteMut = useMutation({
+    mutationFn: () => deleteRecord(id!),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['records'] })
+      toast.success('Registro eliminado')
+      navigate(record?.tipo === 'cliente' ? '/clientes' : '/prospectos')
+    },
+    onError: () => toast.error('Error al eliminar'),
+  })
 
-  const handleNuevaCotizacion = () => {
-    if (!record) return
-    const primerContacto = record.contactos[0]
-    resetWizard()
-    setDatosGenerales({
-      empresa: record.empresa,
-      nit: record.nit ?? '',
-      record_id: record.id,
-      comercial_id: record.comercial_id ?? '',
-      contacto: primerContacto?.nombre ?? '',
-      cargo: primerContacto?.cargo ?? '',
-      email: primerContacto?.email ?? '',
-      telefono: primerContacto?.telefono ?? '',
-    })
-    navigate('/cotizaciones/nueva')
-  }
+  const createActMut = useMutation({
+    mutationFn: () => createActividad(id!, {
+      tipo: actForm.tipo,
+      descripcion: actForm.descripcion,
+      fecha: actForm.fecha,
+      hora: actForm.hora || undefined,
+      lugar: actForm.lugar || undefined,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['record', id] })
+      toast.success('Actividad registrada')
+      setShowActForm(false)
+      setActForm(EMPTY_ACT)
+    },
+    onError: () => toast.error('Error al registrar'),
+  })
+
+  const toggleHechoMut = useMutation({
+    mutationFn: ({ actId, hecho }: { actId: string; hecho: boolean }) =>
+      updateActividad(actId, { hecho }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['record', id] }),
+    onError: () => toast.error('Error al actualizar'),
+  })
+
+  const deleteActMut = useMutation({
+    mutationFn: (actId: string) => deleteActividad(actId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['record', id] })
+      toast.success('Actividad eliminada')
+      setEditAct(null)
+    },
+    onError: () => toast.error('Error al eliminar'),
+  })
+
+  // ── Loading ──────────────────────────────────────────────────────────────────
 
   if (isLoading) {
     return (
-      <PageContainer><div className="text-muted">Cargando...</div></PageContainer>
+      <div className="p-6 space-y-4">
+        <div className="h-12 w-64 bg-surface2 rounded animate-pulse" />
+        <div className="card p-6 h-48 animate-pulse bg-surface2" />
+        <div className="card p-6 h-64 animate-pulse bg-surface2" />
+      </div>
     )
   }
 
   if (!record) {
     return (
-      <PageContainer><div className="text-muted">Registro no encontrado.</div></PageContainer>
+      <div className="empty-state p-12">
+        <div className="text-4xl mb-3">🔍</div>
+        <p className="font-semibold text-foreground mb-1">Registro no encontrado</p>
+        <Link to="/prospectos" className="btn-primary btn-sm mt-2">Volver</Link>
+      </div>
     )
   }
 
   const isProspecto = record.tipo === 'prospecto'
+  const estadoBadge = isProspecto
+    ? ESTADO_BADGE_P[record.estadoProspecto ?? 'prospecto']
+    : ESTADO_BADGE_C[record.estadoCliente ?? 'activo']
+  const estadoLabel = isProspecto ? record.estadoProspecto : record.estadoCliente
+
+  const actividadesOrdenadas = [...record.actividades].sort(
+    (a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
+  )
+
+  // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <PageContainer>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate(isProspecto ? '/prospectos' : '/clientes')}
-            className="text-muted hover:text-white transition"
-          >
-            <ArrowLeft size={18} />
+    <div className="p-6 space-y-5 max-w-5xl mx-auto">
+
+      {/* Header ── */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="space-y-1">
+          <button onClick={() => navigate(-1)} className="text-xs text-muted hover:text-foreground flex items-center gap-1 mb-1">
+            ← Volver
           </button>
-          <div>
-            <h1 className="font-condensed font-bold text-2xl" style={{ color: '#e8edf5' }}>
-              {record.empresa}
-            </h1>
-            {record.nit && <p className="text-muted text-xs">NIT {record.nit}</p>}
+          <h1 className="text-2xl font-bold text-foreground">{record.empresa}</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={isProspecto ? 'badge-blue' : 'badge-gold'}>{record.tipo}</span>
+            <span className={estadoBadge ?? 'badge-gray'}>{estadoLabel}</span>
+            {record.nit && <span className="text-xs text-muted font-mono">NIT: {record.nit}</span>}
+            {record.categoria && (
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                style={{ background: `${record.categoria === 'A' ? '#f5a623' : record.categoria === 'B' ? '#00c2ff' : '#8899b4'}20`,
+                         color: record.categoria === 'A' ? '#f5a623' : record.categoria === 'B' ? '#00c2ff' : '#8899b4' }}>
+                Cat. {record.categoria}
+              </span>
+            )}
           </div>
-          <Badge value={isProspecto ? record.estado_prospecto : record.estado_cliente} />
         </div>
         <div className="flex gap-2">
-          {!editing ? (
+          {!editing && (
             <>
-              <button
-                onClick={handleNuevaCotizacion}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition border border-border text-muted hover:text-white"
-              >
-                <FileText size={14} /> Nueva cotización
-              </button>
-              <button
-                onClick={startEdit}
-                className="px-4 py-2 rounded-lg text-sm font-medium transition"
-                style={{ background: '#00c2ff', color: '#0a0e1a' }}
-              >
-                Editar
-              </button>
-              <button
-                onClick={() => setConfirmDelete(true)}
-                className="px-3 py-2 rounded-lg text-sm text-muted hover:text-danger transition border border-border"
-              >
-                <Trash2 size={15} />
-              </button>
+              <button className="btn-secondary btn-sm" onClick={startEdit}>Editar</button>
+              <button className="btn-danger btn-sm" onClick={() => setConfirmDel(true)}>Eliminar</button>
             </>
-          ) : (
+          )}
+          {editing && (
             <>
+              <button className="btn-secondary btn-sm" onClick={() => setEditing(false)}>Cancelar</button>
               <button
-                onClick={() => setEditing(false)}
-                className="px-4 py-2 rounded-lg text-sm text-muted hover:text-white transition border border-border"
+                className="btn-primary btn-sm"
+                disabled={updateMut.isPending}
+                onClick={() => updateMut.mutate()}
               >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={updateMutation.isPending}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition disabled:opacity-50"
-                style={{ background: '#00c2ff', color: '#0a0e1a' }}
-              >
-                <Save size={14} /> Guardar
+                {updateMut.isPending ? 'Guardando...' : 'Guardar'}
               </button>
             </>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-5">
-        {/* Columna izquierda: datos */}
-        <div className="col-span-2 space-y-5">
+      {/* Tabs ── */}
+      <div className="flex border-b border-border gap-0">
+        {(['info', 'actividades', 'cotizaciones'] as Tab[]).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`px-4 py-2.5 text-sm font-semibold capitalize border-b-2 transition-colors ${
+              tab === t
+                ? 'border-accent text-accent'
+                : 'border-transparent text-muted hover:text-foreground'
+            }`}
+          >
+            {t === 'info' ? 'Información' : t === 'actividades' ? `Actividades (${record.actividades.length})` : `Cotizaciones (${cotizaciones.length})`}
+          </button>
+        ))}
+      </div>
+
+      {/* ── TAB: INFO ─────────────────────────────────────────────────── */}
+      {tab === 'info' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
           {/* Datos generales */}
-          <div className="bg-surface border border-border rounded-xl p-5">
-            <h2 className="font-condensed text-xs uppercase text-muted tracking-wider mb-4">Datos generales</h2>
-            {!editing ? (
-              <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                <Info label="Ciudad" value={record.ciudad} />
-                <Info label="Comercial" value={comercialNombre(record.comercial_id)} />
-                <Info label="Tipo cliente" value={record.tipo_cliente} />
-                {record.categoria && <Info label="Categoría" value={record.categoria} />}
-                {record.comision && <Info label="Comisión" value={record.comision} />}
-                <Info label="Fecha" value={fmtDate(record.fecha)} />
-                <Info label="Actualizado" value={fmtDate(record.updated_at)} />
-                {record.direccion && <div className="col-span-2"><Info label="Dirección" value={record.direccion} /></div>}
-                {record.observaciones && (
-                  <div className="col-span-2">
-                    <p className="text-xs text-muted uppercase tracking-wider font-condensed mb-1">Observaciones</p>
-                    <p style={{ color: '#e8edf5' }}>{record.observaciones}</p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Empresa</label>
-                  <input value={String(form.empresa ?? '')} onChange={(e) => setField('empresa', e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">NIT</label>
-                  <input value={String(form.nit ?? '')} onChange={(e) => setField('nit', e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Ciudad</label>
-                  <input value={String(form.ciudad ?? '')} onChange={(e) => setField('ciudad', e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Categoría</label>
-                  <select value={String(form.categoria ?? '')} onChange={(e) => setField('categoria', e.target.value)}>
-                    <option value="">— Sin categoría —</option>
-                    <option value="A">A — +16 operaciones/mes</option>
-                    <option value="B">B — 6 a 15 operaciones/mes</option>
-                    <option value="C">C — Menos de 5 operaciones/mes</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Comercial</label>
-                  <select value={String(form.comercial_id ?? '')} onChange={(e) => setField('comercial_id', e.target.value)}>
-                    <option value="">Sin asignar</option>
-                    {comerciales.map((c) => (
-                      <option key={c.id} value={c.id}>{c.nombre}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Tipo cliente</label>
-                  <select value={String(form.tipo_cliente ?? 'directo')} onChange={(e) => setField('tipo_cliente', e.target.value)}>
-                    <option value="directo">Directo</option>
-                    <option value="indirecto">Indirecto</option>
-                    <option value="referido">Referido</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Comisión</label>
-                  <input value={String(form.comision ?? '')} onChange={(e) => setField('comision', e.target.value)} />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Dirección</label>
-                  <input value={String(form.direccion ?? '')} onChange={(e) => setField('direccion', e.target.value)} />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Observaciones</label>
-                  <textarea
-                    className="h-16 resize-none"
-                    value={String(form.observaciones ?? '')}
-                    onChange={(e) => setField('observaciones', e.target.value)}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
+          <div className="lg:col-span-2 space-y-4">
+            <div className="card p-5 space-y-4">
+              <h3 className="text-xs font-bold text-muted uppercase tracking-widest">Datos generales</h3>
 
-          {/* Estado */}
-          <div className="bg-surface border border-border rounded-xl p-5">
-            <h2 className="font-condensed text-xs uppercase text-muted tracking-wider mb-4">
-              {isProspecto ? 'Estado prospecto' : 'Estado cliente'}
-            </h2>
-            {!editing ? (
-              <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-muted block mb-1">Empresa</label>
+                  {editing
+                    ? <input className="input w-full" value={edit.empresa} onChange={(e) => setEdit((s) => ({ ...s, empresa: e.target.value }))} />
+                    : <p className="font-semibold text-foreground">{record.empresa}</p>}
+                </div>
+                <div>
+                  <label className="text-xs text-muted block mb-1">NIT</label>
+                  {editing
+                    ? <input className="input w-full" value={edit.nit} onChange={(e) => setEdit((s) => ({ ...s, nit: e.target.value }))} />
+                    : <p className="text-foreground font-mono">{record.nit || '—'}</p>}
+                </div>
+                <div>
+                  <label className="text-xs text-muted block mb-1">Ciudad</label>
+                  {editing
+                    ? <input className="input w-full" value={edit.ciudad} onChange={(e) => setEdit((s) => ({ ...s, ciudad: e.target.value }))} />
+                    : <p className="text-foreground">{record.ciudad || '—'}</p>}
+                </div>
+                <div>
+                  <label className="text-xs text-muted block mb-1">Dirección</label>
+                  {editing
+                    ? <input className="input w-full" value={edit.direccion} onChange={(e) => setEdit((s) => ({ ...s, direccion: e.target.value }))} />
+                    : <p className="text-foreground">{record.direccion || '—'}</p>}
+                </div>
+                <div>
+                  <label className="text-xs text-muted block mb-1">Comercial</label>
+                  <p className="text-foreground">{record.comercial?.nombre || '—'}</p>
+                </div>
+                <div>
+                  <label className="text-xs text-muted block mb-1">Tipo cliente</label>
+                  <p className="text-foreground capitalize">{record.tipoCliente}</p>
+                </div>
+              </div>
+
+              {/* Estado */}
+              <div className="grid grid-cols-2 gap-4">
                 {isProspecto ? (
                   <>
-                    <Info label="Estado" badge={record.estado_prospecto} />
-                    <Info label="Visita" badge={record.visita} />
-                    <Info label="Facturado" badge={record.facturado_p} />
-                    <Info label="Valor" value={fmtCOP(record.valor_p)} />
-                    <Info label="Próx. seguimiento" value={fmtDate(record.proximo_seguimiento)} />
-                  </>
-                ) : (
-                  <>
-                    <Info label="Estado" badge={record.estado_cliente} />
-                    <Info label="Visita" badge={record.visita_cliente} />
-                    <Info label="Nuevo servicio" badge={record.nuevo_servicio} />
-                    {record.servicio_nuevo && <Info label="Servicio" value={record.servicio_nuevo} />}
-                    <Info label="Facturado" badge={record.facturado} />
-                    <Info label="Valor" value={fmtCOP(record.valor)} />
-                  </>
-                )}
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                {isProspecto ? (
-                  <>
-                    <SelectField label="Estado" value={String(form.estado_prospecto ?? '')} onChange={(v) => setField('estado_prospecto', v)}
-                      options={[['', '—'], ['seguimiento', 'Seguimiento'], ['cerrado', 'Cerrado'], ['perdido', 'Perdido'], ['frio', 'Frío']]} />
-                    <SelectField label="Visita" value={String(form.visita ?? '')} onChange={(v) => setField('visita', v)}
-                      options={[['', '—'], ['no', 'No'], ['si', 'Sí — Presencial'], ['virtual', 'Sí — Virtual'], ['llamada', 'Sí — Llamada']]} />
                     <div>
-                      <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Fecha de Visita</label>
-                      <input type="date" value={String(form.fecha_visita ?? '')} onChange={(e) => setField('fecha_visita', e.target.value)} />
-                    </div>
-                    <SelectField label="¿Se facturó?" value={String(form.facturado_p ?? '')} onChange={(v) => setField('facturado_p', v)}
-                      options={[['', '—'], ['no', 'No'], ['si', 'Sí'], ['parcial', 'Parcial']]} />
-                    <div>
-                      <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Próx. Seguimiento</label>
-                      <input type="date" value={String(form.proximo_seguimiento ?? '')} onChange={(e) => setField('proximo_seguimiento', e.target.value)} />
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <SelectField label="Estado" value={String(form.estado_cliente ?? '')} onChange={(v) => setField('estado_cliente', v)}
-                      options={[['', '—'], ['activo', 'Activo'], ['en-riesgo', 'En riesgo'], ['inactivo', 'Inactivo']]} />
-                    <SelectField label="Visita" value={String(form.visita_cliente ?? '')} onChange={(v) => setField('visita_cliente', v)}
-                      options={[['', '—'], ['no', 'No'], ['si', 'Sí — Presencial'], ['virtual', 'Sí — Virtual']]} />
-                    <div>
-                      <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Fecha de Visita / Gestión</label>
-                      <input type="date" value={String(form.fecha_visita_cliente ?? '')} onChange={(e) => setField('fecha_visita_cliente', e.target.value)} />
-                    </div>
-                    <SelectField label="Nuevo servicio" value={String(form.nuevo_servicio ?? '')} onChange={(v) => setField('nuevo_servicio', v)}
-                      options={[['', '—'], ['si', 'Sí'], ['no', 'No']]} />
-                    <div>
-                      <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Servicio cerrado</label>
-                      <select value={String(form.servicio_nuevo ?? '')} onChange={(e) => setField('servicio_nuevo', e.target.value)}>
-                        <option value="">—</option>
-                        {lineasDisponibles.map((s) => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <SelectField label="Facturado" value={String(form.facturado ?? '')} onChange={(v) => setField('facturado', v)}
-                      options={[['', '—'], ['no', 'No'], ['si', 'Sí'], ['parcial', 'Parcial']]} />
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Servicios */}
-          <div className="bg-surface border border-border rounded-xl p-5">
-            <h2 className="font-condensed text-xs uppercase text-muted tracking-wider mb-4">Servicios</h2>
-            {!editing ? (
-              <>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {record.servicios.map((s) => (
-                    <ServiceChip key={s} label={s} selected onToggle={() => {}} />
-                  ))}
-                  {record.servicios.length === 0 && <p className="text-muted text-sm">Sin servicios</p>}
-                </div>
-                {Object.keys(record.facturacion_lineas).length > 0 && (
-                  <div className="space-y-1 text-sm">
-                    {Object.entries(record.facturacion_lineas).map(([svc, val]) => (
-                      <div key={svc} className="flex justify-between text-muted">
-                        <span>{svc}</span>
-                        <span>{fmtCOP(val)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {lineasDisponibles.map((s) => (
-                    <ServiceChip
-                      key={s}
-                      label={s}
-                      selected={servicios.includes(s)}
-                      onToggle={() =>
-                        setServicios((prev) =>
-                          prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
+                      <label className="text-xs text-muted block mb-1">Estado prospecto</label>
+                      {editing
+                        ? (
+                          <select className="filter-select w-full" value={edit.estadoProspecto}
+                            onChange={(e) => setEdit((s) => ({ ...s, estadoProspecto: e.target.value as EstadoProspecto }))}>
+                            {['prospecto','reconocimiento','propuesta','aceptacion_propuesta','creacion_sop','facturado','frio','perdido'].map((v) => (
+                              <option key={v} value={v}>{v}</option>
+                            ))}
+                          </select>
                         )
-                      }
-                    />
-                  ))}
-                </div>
-                {servicios.length > 0 && (
-                  (isProspecto ? form.facturado_p && form.facturado_p !== 'no' : form.facturado && form.facturado !== 'no')
-                ) && (
-                  <BillingLines
-                    servicios={servicios}
-                    value={facturacionLineas}
-                    onChange={setFacturacionLineas}
-                  />
+                        : <span className={ESTADO_BADGE_P[record.estadoProspecto ?? 'prospecto'] ?? 'badge-gray'}>{record.estadoProspecto}</span>}
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted block mb-1">Visita</label>
+                      {editing
+                        ? (
+                          <select className="filter-select w-full" value={edit.visita}
+                            onChange={(e) => setEdit((s) => ({ ...s, visita: e.target.value as TipoVisita }))}>
+                            {['no','si','virtual','llamada'].map((v) => <option key={v} value={v}>{v}</option>)}
+                          </select>
+                        )
+                        : <span className={record.visita && record.visita !== 'no' ? 'badge-green' : 'badge-gray'}>{record.visita || 'no'}</span>}
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted block mb-1">Ingresos esperados</label>
+                      {editing
+                        ? <input type="number" className="input w-full" value={edit.ingresosEsperados}
+                            onChange={(e) => setEdit((s) => ({ ...s, ingresosEsperados: e.target.value }))} />
+                        : <p className="font-mono text-success">{record.ingresosEsperados ? fmt(record.ingresosEsperados) : '—'}</p>}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label className="text-xs text-muted block mb-1">Estado cliente</label>
+                      {editing
+                        ? (
+                          <select className="filter-select w-full" value={edit.estadoCliente}
+                            onChange={(e) => setEdit((s) => ({ ...s, estadoCliente: e.target.value as EstadoCliente }))}>
+                            {['activo','en-riesgo','inactivo'].map((v) => <option key={v} value={v}>{v}</option>)}
+                          </select>
+                        )
+                        : <span className={ESTADO_BADGE_C[record.estadoCliente ?? 'activo'] ?? 'badge-gray'}>{record.estadoCliente}</span>}
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted block mb-1">Facturado</label>
+                      {editing
+                        ? (
+                          <select className="filter-select w-full" value={edit.facturado}
+                            onChange={(e) => setEdit((s) => ({ ...s, facturado: e.target.value as TipoFacturado }))}>
+                            {['no','si','parcial'].map((v) => <option key={v} value={v}>{v}</option>)}
+                          </select>
+                        )
+                        : <span className={record.facturado === 'si' ? 'badge-green' : record.facturado === 'parcial' ? 'badge-gold' : 'badge-gray'}>{record.facturado || 'no'}</span>}
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted block mb-1">Valor facturación</label>
+                      {editing
+                        ? <input type="number" className="input w-full" value={edit.valor}
+                            onChange={(e) => setEdit((s) => ({ ...s, valor: e.target.value }))} />
+                        : <p className="font-mono text-success">{record.valor ? fmt(record.valor) : '—'}</p>}
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted block mb-1">Visita cliente</label>
+                      {editing
+                        ? (
+                          <select className="filter-select w-full" value={edit.visitaCliente}
+                            onChange={(e) => setEdit((s) => ({ ...s, visitaCliente: e.target.value as TipoVisita }))}>
+                            {['no','si','virtual','llamada'].map((v) => <option key={v} value={v}>{v}</option>)}
+                          </select>
+                        )
+                        : <span className={record.visitaCliente && record.visitaCliente !== 'no' ? 'badge-green' : 'badge-gray'}>{record.visitaCliente || 'no'}</span>}
+                    </div>
+                  </>
                 )}
-              </>
-            )}
+
+                <div>
+                  <label className="text-xs text-muted block mb-1">Próximo seguimiento</label>
+                  {editing
+                    ? <input type="date" className="input w-full" value={edit.proximoSeguimiento}
+                        onChange={(e) => setEdit((s) => ({ ...s, proximoSeguimiento: e.target.value }))} />
+                    : <p className="text-foreground">{record.proximoSeguimiento
+                        ? new Date(record.proximoSeguimiento).toLocaleDateString('es-CO')
+                        : '—'}</p>}
+                </div>
+              </div>
+
+              {/* Observaciones */}
+              <div>
+                <label className="text-xs text-muted block mb-1">Observaciones</label>
+                {editing
+                  ? <textarea className="input w-full h-20 resize-none" value={edit.observaciones}
+                      onChange={(e) => setEdit((s) => ({ ...s, observaciones: e.target.value }))} />
+                  : <p className="text-foreground text-sm whitespace-pre-wrap">{record.observaciones || '—'}</p>}
+              </div>
+
+              {/* Servicios */}
+              <div>
+                <label className="text-xs text-muted block mb-2">Servicios</label>
+                {editing ? (
+                  <div className="flex flex-wrap gap-2">
+                    {SERVICIOS.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setEdit((prev) => ({
+                          ...prev,
+                          servicios: prev.servicios.includes(s)
+                            ? prev.servicios.filter((x) => x !== s)
+                            : [...prev.servicios, s],
+                        }))}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-semibold border transition-all ${
+                          edit.servicios.includes(s)
+                            ? 'bg-accent/15 border-accent text-accent'
+                            : 'border-border text-muted hover:border-muted hover:text-foreground'
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {record.servicios.length > 0
+                      ? record.servicios.map((s) => <span key={s} className="stag">{s}</span>)
+                      : <span className="text-muted text-sm">—</span>}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Contactos (modo edición) */}
-          {editing && (
-            <div className="bg-surface border border-border rounded-xl p-5">
-              <h2 className="font-condensed text-xs uppercase text-muted tracking-wider mb-4">Contactos</h2>
-              <ContactosList value={contactos} onChange={setContactos} />
-            </div>
-          )}
-        </div>
-
-        {/* Columna derecha: contactos + actividades */}
-        <div className="space-y-5">
-          {/* Contactos (vista) */}
-          {!editing && (
-            <div className="bg-surface border border-border rounded-xl p-5">
-              <h2 className="font-condensed text-xs uppercase text-muted tracking-wider mb-3">Contactos</h2>
+          {/* Panel lateral: Contactos */}
+          <div className="space-y-4">
+            <div className="card p-5 space-y-3">
+              <h3 className="text-xs font-bold text-muted uppercase tracking-widest">Contactos</h3>
               {record.contactos.length === 0 ? (
-                <p className="text-muted text-sm">Sin contactos</p>
+                <p className="text-sm text-muted">Sin contactos registrados.</p>
               ) : (
-                <div className="space-y-3">
-                  {record.contactos.map((c) => (
-                    <div key={c.id} className="text-sm border-b border-border last:border-0 pb-2 last:pb-0">
-                      <p className="font-medium" style={{ color: '#e8edf5' }}>{c.nombre}</p>
-                      {c.cargo && <p className="text-xs text-muted">{c.cargo}</p>}
-                      {c.email && <p className="text-xs text-muted">{c.email}</p>}
-                      {c.telefono && <p className="text-xs text-muted">{c.telefono}</p>}
-                      {c.cumpleanos && <p className="text-xs text-muted">🎂 {c.cumpleanos}</p>}
-                      {c.recibe_regalos && c.recibe_regalos !== 'no' && (
-                        <p className="text-xs" style={{ color: '#00c2ff' }}>
-                          {c.recibe_regalos === 'si' ? '🎁 Recibe regalos' : '🎁 Tal vez'}
-                        </p>
+                record.contactos.map((c) => (
+                  <div key={c.id} className="border-b border-border last:border-0 pb-3 last:pb-0 space-y-1">
+                    <p className="font-semibold text-foreground text-sm">{c.nombre}</p>
+                    {c.cargo && <p className="text-xs text-muted">{c.cargo}</p>}
+                    {c.email && (
+                      <a href={`mailto:${c.email}`} className="text-xs text-accent block hover:underline">
+                        {c.email}
+                      </a>
+                    )}
+                    {c.telefono && <p className="text-xs text-muted font-mono">{c.telefono}</p>}
+                    <div className="flex gap-2 mt-1">
+                      {c.cumpleanos && (
+                        <span className="text-xs text-muted">🎂 {c.cumpleanos}</span>
+                      )}
+                      {c.recibeRegalos && (
+                        <span className="text-xs text-gold">🎁 Recibe regalos</span>
                       )}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))
               )}
+            </div>
+
+            {/* Metadata */}
+            <div className="card p-5 space-y-2">
+              <h3 className="text-xs font-bold text-muted uppercase tracking-widest mb-2">Metadata</h3>
+              <div className="text-xs space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-muted">Creado</span>
+                  <span className="text-foreground">{new Date(record.createdAt).toLocaleDateString('es-CO')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted">Actualizado</span>
+                  <span className="text-foreground">{new Date(record.updatedAt).toLocaleDateString('es-CO')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted">Fecha registro</span>
+                  <span className="text-foreground">{new Date(record.fecha).toLocaleDateString('es-CO')}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: ACTIVIDADES ────────────────────────────────────────────── */}
+      {tab === 'actividades' && (
+        <div className="space-y-4">
+
+          {/* Botón nueva actividad */}
+          <div className="flex justify-end">
+            <button className="btn-primary btn-sm" onClick={() => { setShowActForm(!showActForm); setActForm(EMPTY_ACT) }}>
+              {showActForm ? 'Cancelar' : '+ Nueva actividad'}
+            </button>
+          </div>
+
+          {/* Formulario nueva actividad */}
+          {showActForm && (
+            <div className="card p-5 space-y-4 border border-accent/30">
+              <h3 className="text-sm font-bold text-foreground">Nueva actividad</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-muted block mb-1">Tipo</label>
+                  <select className="filter-select w-full" value={actForm.tipo}
+                    onChange={(e) => setActForm((s) => ({ ...s, tipo: e.target.value as ActividadTipo }))}>
+                    {(['llamada','reunion','email','visita','tarea','seguimiento'] as ActividadTipo[]).map((t) => (
+                      <option key={t} value={t}>{TIPO_ACT_ICON[t]} {t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-muted block mb-1">Fecha</label>
+                  <input type="date" className="input w-full" value={actForm.fecha}
+                    onChange={(e) => setActForm((s) => ({ ...s, fecha: e.target.value }))} />
+                </div>
+                {actForm.tipo === 'visita' && (
+                  <>
+                    <div>
+                      <label className="text-xs text-muted block mb-1">Hora</label>
+                      <input type="time" className="input w-full" value={actForm.hora}
+                        onChange={(e) => setActForm((s) => ({ ...s, hora: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted block mb-1">Lugar</label>
+                      <input className="input w-full" placeholder="Dirección o lugar" value={actForm.lugar}
+                        onChange={(e) => setActForm((s) => ({ ...s, lugar: e.target.value }))} />
+                    </div>
+                  </>
+                )}
+              </div>
+              <div>
+                <label className="text-xs text-muted block mb-1">Descripción</label>
+                <textarea
+                  className="input w-full h-20 resize-none"
+                  placeholder="Describe la actividad..."
+                  value={actForm.descripcion}
+                  onChange={(e) => setActForm((s) => ({ ...s, descripcion: e.target.value }))}
+                />
+              </div>
+              <div className="flex justify-end">
+                <button
+                  className="btn-primary btn-sm"
+                  disabled={!actForm.descripcion.trim() || createActMut.isPending}
+                  onClick={() => createActMut.mutate()}
+                >
+                  {createActMut.isPending ? 'Guardando...' : 'Guardar actividad'}
+                </button>
+              </div>
             </div>
           )}
 
-          {/* Actividades */}
-          <div className="bg-surface border border-border rounded-xl p-5">
-            <ActividadesTimeline recordId={record.id} actividades={record.actividades} queryKey={['record', id!]} />
+          {/* Timeline de actividades */}
+          {actividadesOrdenadas.length === 0 ? (
+            <div className="empty-state">
+              <div className="text-4xl mb-3">📅</div>
+              <p className="font-semibold text-foreground mb-1">Sin actividades</p>
+              <p className="text-sm">Registra llamadas, reuniones, visitas...</p>
+            </div>
+          ) : (
+            <div className="relative space-y-0">
+              {/* Línea vertical */}
+              <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-border" />
+
+              {actividadesOrdenadas.map((act) => (
+                <div key={act.id} className="relative flex gap-4 pb-5">
+                  {/* Ícono tipo */}
+                  <div className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center text-base flex-shrink-0 border-2 transition-colors ${
+                    act.hecho
+                      ? 'bg-success/10 border-success/40'
+                      : 'bg-surface2 border-border'
+                  }`}>
+                    {TIPO_ACT_ICON[act.tipo as ActividadTipo] ?? '📌'}
+                  </div>
+
+                  {/* Contenido */}
+                  <div className={`flex-1 card p-4 space-y-1.5 ${act.hecho ? 'opacity-60' : ''}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <span className="text-xs font-bold text-muted uppercase">{act.tipo}</span>
+                        {act.tipo === 'visita' && (act as { hora?: string; lugar?: string }).hora && (
+                          <span className="ml-2 text-xs text-accent font-mono">
+                            {(act as { hora?: string }).hora}
+                          </span>
+                        )}
+                        {act.tipo === 'visita' && (act as { lugar?: string }).lugar && (
+                          <span className="ml-2 text-xs text-muted">
+                            📍 {(act as { lugar?: string }).lugar}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-xs text-muted whitespace-nowrap">
+                          {new Date(act.fecha).toLocaleDateString('es-CO')}
+                        </span>
+                        <button
+                          className={`text-xs px-2 py-0.5 rounded-md border transition-colors ${
+                            act.hecho
+                              ? 'border-success/40 text-success'
+                              : 'border-border text-muted hover:border-success/40 hover:text-success'
+                          }`}
+                          onClick={() => toggleHechoMut.mutate({ actId: act.id, hecho: !act.hecho })}
+                          title={act.hecho ? 'Marcar pendiente' : 'Marcar hecho'}
+                        >
+                          {act.hecho ? '✓ Hecho' : 'Completar'}
+                        </button>
+                        <button
+                          className="text-xs text-danger/60 hover:text-danger"
+                          onClick={() => {
+                            if (editAct === act.id) { setEditAct(null) }
+                            else deleteActMut.mutate(act.id)
+                          }}
+                          title="Eliminar"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-sm text-foreground">{act.descripcion}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TAB: COTIZACIONES ───────────────────────────────────────────── */}
+      {tab === 'cotizaciones' && (
+        <div className="space-y-4">
+          <div className="flex justify-end">
+            <Link
+              to={`/cotizaciones/nueva?recordId=${id}`}
+              className="btn-primary btn-sm"
+            >
+              + Nueva cotización
+            </Link>
+          </div>
+
+          {cotizaciones.length === 0 ? (
+            <div className="empty-state">
+              <div className="text-4xl mb-3">📋</div>
+              <p className="font-semibold text-foreground mb-1">Sin cotizaciones</p>
+              <p className="text-sm">Crea la primera cotización para este cliente.</p>
+            </div>
+          ) : (
+            <div className="table-card">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Número</th>
+                    <th>Estado</th>
+                    <th>Líneas</th>
+                    <th>Comercial</th>
+                    <th>Fecha</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cotizaciones.map((cot) => (
+                    <tr key={cot.id}>
+                      <td className="font-mono text-accent font-semibold">{cot.numero}</td>
+                      <td>
+                        <span className={COT_BADGE[cot.estado] ?? 'badge-gray'}>{cot.estado}</span>
+                      </td>
+                      <td>
+                        <div className="flex flex-wrap gap-1">
+                          {cot.lineas.slice(0, 2).map((l) => (
+                            <span key={l} className="stag">{l}</span>
+                          ))}
+                          {cot.lineas.length > 2 && <span className="stag">+{cot.lineas.length - 2}</span>}
+                        </div>
+                      </td>
+                      <td className="text-sm text-muted">{cot.comercial}</td>
+                      <td className="text-xs text-muted">
+                        {new Date(cot.createdAt).toLocaleDateString('es-CO')}
+                      </td>
+                      <td>
+                        <Link
+                          to={`/cotizaciones/${cot.id}`}
+                          className="btn-ghost btn-sm px-2 py-1 text-xs"
+                        >
+                          Ver
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modal: confirmar eliminación ── */}
+      {confirmDel && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+          onClick={() => setConfirmDel(false)}>
+          <div className="card p-6 w-80 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-bold text-foreground">¿Eliminar {record.empresa}?</h3>
+            <p className="text-sm text-muted">Se eliminarán todos los contactos y actividades asociados. Esta acción no se puede deshacer.</p>
+            <div className="flex gap-2 justify-end">
+              <button className="btn-secondary btn-sm" onClick={() => setConfirmDel(false)}>Cancelar</button>
+              <button
+                className="btn-danger btn-sm"
+                disabled={deleteMut.isPending}
+                onClick={() => deleteMut.mutate()}
+              >
+                {deleteMut.isPending ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-
-      <ConfirmModal
-        open={confirmDelete}
-        message="¿Eliminar este registro? Se eliminarán también sus contactos y actividades."
-        onConfirm={() => deleteMutation.mutate()}
-        onCancel={() => setConfirmDelete(false)}
-        loading={deleteMutation.isPending}
-      />
-    </PageContainer>
-  )
-}
-
-// Helpers
-function Info({ label, value, badge }: { label: string; value?: string | null; badge?: string | null }) {
-  return (
-    <div>
-      <p className="text-xs text-muted uppercase tracking-wider font-condensed mb-0.5">{label}</p>
-      {badge !== undefined ? (
-        <Badge value={badge} />
-      ) : (
-        <p style={{ color: '#e8edf5' }}>{value ?? '—'}</p>
       )}
-    </div>
-  )
-}
-
-function SelectField({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  options: [string, string][]
-}) {
-  return (
-    <div>
-      <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">{label}</label>
-      <select value={value} onChange={(e) => onChange(e.target.value)}>
-        {options.map(([v, l]) => (
-          <option key={v} value={v}>{l}</option>
-        ))}
-      </select>
     </div>
   )
 }

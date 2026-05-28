@@ -2,175 +2,256 @@
 @tailwind components;
 @tailwind utilities;
 
-* { box-sizing: border-box; }
-
-body {
-  background-color: #0a0e1a;
-  color: #e8edf5;
-  font-family: 'Barlow', sans-serif;
-  margin: 0;
-}
-
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #111827; }
-::-webkit-scrollbar-thumb { background: #1e3050; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #2a4070; }
-
-/* Inputs base */
-input, select, textarea {
-  background-color: #1a2235;
-  color: #e8edf5;
-  border: 1px solid #1e3050;
-  border-radius: 6px;
-  padding: 8px 12px;
-  font-family: 'Barlow', sans-serif;
-  font-size: 14px;
-  width: 100%;
-  outline: none;
-  transition: border-color 0.15s;
-}
-input:focus, select:focus, textarea:focus {
-  border-color: #00c2ff;
-}
-input::placeholder, textarea::placeholder {
-  color: #8899b4;
-}
-select option {
-  background: #1a2235;
-}
-
-/* ─── Cotización — estilos para preview y print ─── */
-.cot-preview {
-  background: #fff;
-  color: #1a1a2e;
-  border-radius: 12px;
-  padding: 48px;
-  max-width: 820px;
-  margin: 0 auto;
-  font-family: 'Barlow', sans-serif;
-}
-.cot-preview-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 32px;
-  padding-bottom: 24px;
-  border-bottom: 3px solid #002366;
-}
-.cot-preview-meta {
-  text-align: right;
-  font-size: 13px;
-  color: #555;
-}
-.cot-preview-meta strong {
-  display: block;
-  font-size: 18px;
-  color: #002366;
-  font-family: 'Barlow Condensed', sans-serif;
-  letter-spacing: 1px;
-}
-.cot-cliente-box {
-  background: #f0f4ff;
-  border-left: 4px solid #002366;
-  border-radius: 4px;
-  padding: 16px 20px;
-  margin-bottom: 28px;
-  font-size: 13px;
-  color: #333;
-}
-.cot-cliente-box strong {
-  font-size: 16px;
-  color: #002366;
-  display: block;
-  margin-bottom: 4px;
-}
-.cot-seccion-titulo {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 20px;
-  font-weight: 800;
-  color: #002366;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  margin: 28px 0 4px;
-  padding-bottom: 8px;
-  border-bottom: 2px solid #002366;
-}
-.cot-grupo-titulo {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 14px;
-  font-weight: 700;
-  color: #444;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  margin: 18px 0 8px;
-}
-.cot-tabla {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 8px;
-}
-.cot-tabla th {
-  background: #002366;
-  color: #fff;
-  padding: 10px 14px;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  text-align: left;
-}
-.cot-tabla td {
-  padding: 9px 14px;
-  border-bottom: 1px solid #e0e4f0;
-  font-size: 13px;
-  color: #333;
-}
-.cot-tabla tr:nth-child(even) td { background: #f8f9ff; }
-.cot-tabla td.tarifa {
-  font-weight: 700;
-  color: #002366;
-  white-space: nowrap;
-}
-.cot-obs-box {
-  background: #f8f9ff;
-  border: 1px solid #dde3f5;
-  border-radius: 8px;
-  padding: 20px 24px;
-  margin-top: 28px;
-}
-.cot-obs-titulo {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 14px;
-  font-weight: 700;
-  color: #002366;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  margin-bottom: 12px;
-}
-.cot-footer-line {
-  margin-top: 36px;
-  padding-top: 16px;
-  border-top: 2px solid #002366;
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  color: #888;
-}
-
-/* ─── Print: mostrar solo la cotización ─── */
-@media print {
-  @page { margin: 15mm; }
-  body * { visibility: hidden; }
-  .cot-preview,
-  .cot-preview * { visibility: visible; }
-  .cot-preview {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    box-shadow: none;
-    border-radius: 0;
-    padding: 0;
+@layer base {
+  html {
+    font-family: 'DM Sans', sans-serif;
+    color-scheme: dark;
   }
-  .print-hide { display: none !important; }
+
+  body {
+    @apply bg-bg text-foreground;
+    min-height: 100vh;
+    overflow-x: hidden;
+    /* Subtle grid texture */
+    background-image:
+      linear-gradient(rgba(0,194,255,0.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,194,255,0.015) 1px, transparent 1px);
+    background-size: 40px 40px;
+    background-attachment: fixed;
+  }
+
+  * { box-sizing: border-box; }
+
+  /* Focus visible — visible for keyboard, hidden for mouse */
+  :focus-visible {
+    outline: 2px solid #00c2ff;
+    outline-offset: 2px;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #0a0e1a; }
+  ::-webkit-scrollbar-thumb { background: #1e3050; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #8899b4; }
+
+  /* Numbers always tabular */
+  .tabular { font-variant-numeric: tabular-nums; }
+}
+
+@layer components {
+
+  /* ─── Inputs ─────────────────────────────────────────────── */
+  .input {
+    @apply w-full bg-surface2 border border-border rounded-lg px-3 py-2.5
+           text-foreground text-sm placeholder:text-muted
+           focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20
+           transition-[color,background-color,border-color,box-shadow] duration-150;
+  }
+
+  .input-sm { @apply input py-1.5 text-xs; }
+
+  /* ─── Buttons ────────────────────────────────────────────── */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5
+           font-semibold text-sm rounded-lg border border-transparent
+           transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-150
+           cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed select-none;
+    touch-action: manipulation;
+  }
+
+  .btn-primary {
+    @apply btn bg-accent text-bg
+           shadow-[0_2px_12px_rgba(0,194,255,0.25)]
+           hover:shadow-[0_4px_20px_rgba(0,194,255,0.4)]
+           hover:-translate-y-px active:translate-y-0 active:shadow-none
+           hover:bg-accent/90;
+  }
+
+  .btn-secondary {
+    @apply btn bg-surface2 text-muted border-border
+           hover:text-foreground hover:border-muted/60;
+  }
+
+  .btn-danger {
+    @apply btn bg-danger/10 text-danger border-danger/30
+           hover:bg-danger/20 hover:border-danger/50;
+  }
+
+  .btn-ghost {
+    @apply btn bg-transparent text-muted hover:text-foreground hover:bg-surface2;
+  }
+
+  .btn-sm  { @apply px-3 py-1.5 text-xs; }
+  .btn-icon { @apply btn p-2; }
+
+  /* ─── Cards ──────────────────────────────────────────────── */
+  .card {
+    @apply bg-surface border border-border rounded-xl
+           transition-[border-color] duration-150;
+  }
+
+  .card-padded { @apply card p-6; }
+
+  /* Glass variant — for hero/KPI cards */
+  .card-glass {
+    @apply rounded-xl border border-white/[0.06]
+           transition-[border-color,box-shadow] duration-200;
+    background: linear-gradient(135deg, rgba(26,34,53,0.8) 0%, rgba(17,24,39,0.6) 100%);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  .card-glass:hover {
+    border-color: rgba(0,194,255,0.2);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(0,194,255,0.1), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  /* ─── Badges ─────────────────────────────────────────────── */
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full
+           text-2xs font-semibold uppercase tracking-wide;
+  }
+
+  .badge-blue   { @apply badge bg-accent/15 text-accent; }
+  .badge-green  { @apply badge bg-success/15 text-success; }
+  .badge-gold   { @apply badge bg-gold/15 text-gold; }
+  .badge-red    { @apply badge bg-danger/15 text-danger; }
+  .badge-purple { @apply badge bg-purple/15 text-purple; }
+  .badge-gray   { @apply badge bg-muted/15 text-muted; }
+
+  /* ─── Status dot ─────────────────────────────────────────── */
+  .status-dot {
+    @apply w-2 h-2 rounded-full flex-shrink-0;
+  }
+
+  /* ─── Section titles ─────────────────────────────────────── */
+  .section-title {
+    @apply font-bold text-2xl tracking-wide text-foreground mb-5 flex items-center gap-3;
+  }
+
+  /* ─── Table ──────────────────────────────────────────────── */
+  .table-card {
+    @apply bg-surface border border-border rounded-xl overflow-hidden mb-7;
+  }
+
+  .table-header {
+    @apply px-5 py-3.5 flex items-center justify-between gap-3
+           border-b border-border bg-surface2 flex-wrap;
+  }
+
+  .table-title {
+    @apply font-bold text-sm tracking-widest text-foreground uppercase;
+  }
+
+  .filter-input {
+    @apply bg-surface border border-border rounded-lg px-3 py-1.5 text-sm text-foreground
+           placeholder:text-muted focus:outline-none focus:border-accent
+           transition-[border-color] duration-150;
+  }
+
+  .filter-select {
+    @apply bg-surface border border-border rounded-lg px-3 py-1.5 text-sm text-foreground
+           focus:outline-none focus:border-accent transition-[border-color] duration-150 cursor-pointer;
+  }
+
+  table { @apply w-full border-collapse; }
+
+  thead th {
+    @apply px-4 py-3 text-left text-2xs text-muted uppercase tracking-widest
+           font-semibold bg-surface2 border-b border-border whitespace-nowrap;
+  }
+
+  tbody tr {
+    @apply border-b border-border/40 transition-colors duration-100 hover:bg-accent/[0.025];
+  }
+
+  tbody td {
+    @apply px-4 py-3 text-sm;
+  }
+
+  /* ─── Service tags ───────────────────────────────────────── */
+  .stag {
+    @apply inline-block bg-accent/10 text-accent rounded
+           px-2 py-0.5 text-2xs font-semibold tracking-wide;
+  }
+
+  /* ─── Wizard step dots ───────────────────────────────────── */
+  .step-dot { @apply w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 flex-shrink-0 z-10 transition-[color,background-color,border-color,box-shadow] duration-300; }
+  .step-dot-pending { @apply step-dot bg-surface2 border-border text-muted; }
+  .step-dot-active  { @apply step-dot bg-accent border-accent text-bg shadow-accent; }
+  .step-dot-done    { @apply step-dot bg-accent2 border-accent2 text-white; }
+
+  /* ─── Empty state ────────────────────────────────────────── */
+  .empty-state {
+    @apply flex flex-col items-center justify-center py-16 text-muted gap-3;
+  }
+  .empty-state svg { @apply opacity-30; }
+  .empty-state p   { @apply text-sm opacity-70; }
+
+  /* ─── Cotizacion estado tags ─────────────────────────────── */
+  .tag-borrador    { @apply badge-gray; }
+  .tag-enviada     { @apply badge-blue; }
+  .tag-negociacion { @apply badge-gold; }
+  .tag-aprobada    { @apply badge-green; }
+  .tag-rechazada   { @apply badge-red; }
+
+  /* ─── Skeleton loader ────────────────────────────────────── */
+  .skeleton {
+    @apply bg-surface2 rounded animate-pulse;
+  }
+
+  /* ─── Divider ────────────────────────────────────────────── */
+  .divider {
+    @apply border-t border-border my-4;
+  }
+
+  /* ─── Stat highlight (big numbers) ──────────────────────── */
+  .stat-value {
+    @apply text-2xl font-bold tabular leading-none;
+  }
+
+  /* ─── Inline form row ────────────────────────────────────── */
+  .form-row { @apply flex items-center gap-3 flex-wrap; }
+  .form-col { @apply flex flex-col gap-1.5; }
+  .form-label { @apply text-xs text-muted font-medium; }
+
+  /* ─── Print ──────────────────────────────────────────────── */
+  @media print {
+    @page { size: A4 portrait; margin: 0 !important; }
+    header, nav, aside, .no-print { display: none !important; }
+    body {
+      background: #fff !important;
+      color: #1a1a2e !important;
+      background-image: none !important;
+    }
+    .cot-preview {
+      background: #fff !important;
+      color: #1a1a2e !important;
+      box-shadow: none !important;
+      padding: 16mm 14mm !important;
+      max-width: 100% !important;
+    }
+  }
+}
+
+/* ─── Animations ─────────────────────────────────────────────── */
+@keyframes fadeIn  { from { opacity: 0 } to { opacity: 1 } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: translateY(0) } }
+@keyframes shimmer { from { background-position: -200% 0 } to { background-position: 200% 0 } }
+
+.animate-fade-in  { animation: fadeIn  0.2s ease-out both; }
+.animate-slide-up { animation: slideUp 0.25s ease-out both; }
+
+/* Staggered page load */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.10s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.20s; }
+
+/* Disable all animations for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

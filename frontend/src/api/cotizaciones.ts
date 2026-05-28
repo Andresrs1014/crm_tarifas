@@ -1,64 +1,26 @@
-import api from './client'
-import type { CotizacionRead } from '../types'
+import client from './client'
+import type { Cotizacion, CotizacionCreate } from '../types'
 
-export interface CotFilters {
-  search?: string
-  estado?: string
-  comercial_id?: string
-  fecha?: string
-}
+export const getCotizaciones = (params?: { estado?: string; search?: string }) =>
+  client.get<Cotizacion[]>('/api/cotizaciones', { params }).then((r) => r.data)
 
-export async function getCotizacionesApi(filters: CotFilters = {}): Promise<CotizacionRead[]> {
-  const { data } = await api.get<CotizacionRead[]>('/api/cotizaciones', { params: filters })
-  return data
-}
+export const getCotizacion = (id: string) =>
+  client.get<Cotizacion>(`/api/cotizaciones/${id}`).then((r) => r.data)
 
-export async function getCotizacionApi(id: string): Promise<CotizacionRead> {
-  const { data } = await api.get<CotizacionRead>(`/api/cotizaciones/${id}`)
-  return data
-}
+export const getCotizacionPublica = (numero: string) =>
+  client.get<Cotizacion>(`/api/cot/${numero}`).then((r) => r.data)
 
-export async function createCotizacionApi(payload: Record<string, unknown>): Promise<CotizacionRead> {
-  const { data } = await api.post<CotizacionRead>('/api/cotizaciones', payload)
-  return data
-}
+export const createCotizacion = (data: CotizacionCreate) =>
+  client.post<Cotizacion>('/api/cotizaciones', data).then((r) => r.data)
 
-export async function updateCotizacionApi(
-  id: string,
-  payload: Record<string, unknown>
-): Promise<CotizacionRead> {
-  const { data } = await api.put<CotizacionRead>(`/api/cotizaciones/${id}`, payload)
-  return data
-}
+export const updateCotizacion = (id: string, data: Partial<CotizacionCreate>) =>
+  client.put<Cotizacion>(`/api/cotizaciones/${id}`, data).then((r) => r.data)
 
-export async function deleteCotizacionApi(id: string): Promise<void> {
-  await api.delete(`/api/cotizaciones/${id}`)
-}
+export const deleteCotizacion = (id: string) =>
+  client.delete(`/api/cotizaciones/${id}`).then((r) => r.data)
 
-export async function duplicarCotizacionApi(id: string): Promise<CotizacionRead> {
-  const { data } = await api.post<CotizacionRead>(`/api/cotizaciones/${id}/duplicar`)
-  return data
-}
+export const duplicarCotizacion = (id: string) =>
+  client.post<Cotizacion>(`/api/cotizaciones/${id}/duplicar`).then((r) => r.data)
 
-export interface ActualizarTarifasBody {
-  porcentaje: number
-  items_keys: string[]
-}
-
-export async function actualizarTarifasApi(
-  id: string,
-  body: ActualizarTarifasBody
-): Promise<CotizacionRead> {
-  const { data } = await api.post<CotizacionRead>(
-    `/api/cotizaciones/${id}/actualizar-tarifas`,
-    body
-  )
-  return data
-}
-
-// Endpoint público — no requiere token (el cliente lo omite si no hay sesión)
-export async function getCotPublicaApi(numero: string): Promise<CotizacionRead> {
-  const normalized = numero.replace(/^COT(\d+)$/i, 'COT-$1')
-  const { data } = await api.get<CotizacionRead>(`/api/cotizaciones/public/${normalized}`)
-  return data
-}
+export const actualizarTarifas = (id: string, incremento: number) =>
+  client.post<Cotizacion>(`/api/cotizaciones/${id}/actualizar-tarifas`, { incremento }).then((r) => r.data)

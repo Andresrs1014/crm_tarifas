@@ -1,37 +1,52 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import PageContainer from '../components/PageContainer'
-import { useNavigate } from 'react-router-dom'
-import { Eye, Trash2, Upload, Download, Building2 as Building2Icon } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
 import { getRecords, deleteRecord } from '../api/records'
 import { getComercialesApi } from '../api/comerciales'
-import Badge from '../components/Badge'
-import ConfirmModal from '../components/ConfirmModal'
-import { useToastStore } from '../store/toastStore'
-import { fmtCOP, fmtDate } from '../utils/format'
-import { SERVICIO_COLORS } from '../types'
-import { exportClientes } from '../utils/exportExcel'
+import { toast } from '../store/toastStore'
+
+const ESTADOS_CLIENTE: { value: string; label: string }[] = [
+  { value: '',          label: 'Todos los estados' },
+  { value: 'activo',    label: 'Activo' },
+  { value: 'en-riesgo', label: 'En riesgo' },
+  { value: 'inactivo',  label: 'Inactivo' },
+]
+
+const ESTADO_BADGE: Record<string, string> = {
+  activo:    'badge-green',
+  'en-riesgo': 'badge-red',
+  inactivo:  'badge-gray',
+}
+
+const FACTURADO_BADGE: Record<string, string> = {
+  si:      'badge-green',
+  parcial: 'badge-gold',
+  no:      'badge-gray',
+}
+
+const CATEGORIA_COLOR: Record<string, string> = {
+  A: '#f5a623',
+  B: '#00c2ff',
+  C: '#8899b4',
+}
+
+function fmt(n: number) {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`
+  return `$${n}`
+}
 
 export default function Clientes() {
-  const [search, setSearch] = useState('')
-  const [estado, setEstado] = useState('')
-  const [comercialId, setComercialId] = useState('')
-  const [facturado, setFacturado] = useState('')
-  const [deleteId, setDeleteId] = useState<string | null>(null)
-  const toast = useToastStore()
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const [search, setSearch]           = useState('')
+  const [estado, setEstado]           = useState('')
+  const [comercialId, setComercialId] = useState('')
+  const [confirmId, setConfirmId]     = useState<string | null>(null)
 
-  const { data: records = [], isLoading } = useQuery({
-    queryKey: ['records', 'cliente', search, estado, comercialId, facturado],
-    queryFn: () => getRecords({
-      tipo: 'cliente',
-      ...(search ? { search } : {}),
-      ...(estado ? { estado_cliente: estado } : {}),
-      ...(comercialId ? { comercial_id: comercialId } : {}),
-    }).then(data =>
-      facturado ? data.filter(r => r.facturado === facturado) : data
-    ),
+  const { data: clientes = [], isLoading } = useQuery({
+    queryKey: ['records', 'cliente', estado, comercialId, search],
+    queryFn: () => getRecords({ tipo: 'cliente', estado: estado || undefined, comercialId: comercialId || undefined, search: search || undefined }),
   })
 
   const { data: comerciales = [] } = useQuery({
@@ -39,181 +54,165 @@ export default function Clientes() {
     queryFn: getComercialesApi,
   })
 
-  const deleteMutation = useMutation({
+  const deleteMut = useMutation({
     mutationFn: deleteRecord,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['records', 'cliente'] })
-      toast.add('Cliente eliminado')
-      setDeleteId(null)
+      qc.invalidateQueries({ queryKey: ['records'] })
+      toast.success('Cliente eliminado')
+      setConfirmId(null)
     },
-    onError: () => toast.add('Error al eliminar', 'error'),
+    onError: () => toast.error('Error al eliminar'),
   })
 
-  const comercialNombre = (id: string | null) =>
-    comerciales.find((c) => c.id === id)?.nombre ?? '—'
+  // Totales rápidos
+  const facturacionTotal = clientes.reduce((s, c) => s + (c.valor ?? 0), 0)
+  const enRiesgo = clientes.filter((c) => c.estadoCliente === 'en-riesgo').length
 
   return (
-    <PageContainer>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="font-condensed font-bold text-2xl" style={{ color: '#e8edf5' }}>
-          Clientes
-        </h1>
-        <div className="flex items-center gap-3">
-          <span className="text-muted text-sm">{records.length} registros</span>
-          <button
-            onClick={() => exportClientes(records, comerciales)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted hover:text-white border border-border transition"
-          >
-            <Download size={14} /> Exportar Excel
-          </button>
-          <button
-            onClick={() => navigate('/registro/importar?tipo=cliente')}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted hover:text-white border border-border transition"
-          >
-            <Upload size={14} /> Importar
-          </button>
+    <div className="p-6 space-y-5">
+
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Clientes Activos</h1>
+          <p className="text-sm text-muted mt-0.5">
+            {clientes.length} clientes · {fmt(facturacionTotal)} facturado
+            {enRiesgo > 0 && <span className="ml-2 text-danger font-semibold">⚠ {enRiesgo} en riesgo</span>}
+          </p>
         </div>
+        <Link to="/registro" className="btn-primary btn-sm">
+          + Nuevo cliente
+        </Link>
       </div>
 
       {/* Filtros */}
-      <div className="flex gap-3 mb-5">
+      <div className="flex flex-wrap gap-3">
         <input
-          className="flex-1"
-          placeholder="Buscar por empresa o NIT..."
+          className="filter-input flex-1 min-w-48"
+          placeholder="Buscar empresa o NIT..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <select className="w-44" value={estado} onChange={(e) => setEstado(e.target.value)}>
-          <option value="">Todos los estados</option>
-          <option value="activo">Activo</option>
-          <option value="en-riesgo">En riesgo</option>
-          <option value="inactivo">Inactivo</option>
+        <select className="filter-select" value={estado} onChange={(e) => setEstado(e.target.value)}>
+          {ESTADOS_CLIENTE.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
         </select>
-        <select className="w-44" value={comercialId} onChange={(e) => setComercialId(e.target.value)}>
+        <select className="filter-select" value={comercialId} onChange={(e) => setComercialId(e.target.value)}>
           <option value="">Todos los comerciales</option>
-          {comerciales.map((c) => (
-            <option key={c.id} value={c.id}>{c.nombre}</option>
-          ))}
-        </select>
-        <select className="w-40" value={facturado} onChange={(e) => setFacturado(e.target.value)}>
-          <option value="">Facturación: todos</option>
-          <option value="si">Facturado</option>
-          <option value="parcial">Parcial</option>
-          <option value="no">No facturado</option>
+          {comerciales.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
       </div>
 
       {/* Tabla */}
-      <div className="bg-surface border border-border rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+      <div className="table-card">
+        {isLoading ? (
+          <div className="p-8 space-y-3">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-10 bg-surface2 rounded animate-pulse" />
+            ))}
+          </div>
+        ) : clientes.length === 0 ? (
+          <div className="empty-state">
+            <div className="text-4xl mb-3">🏢</div>
+            <p className="font-semibold text-foreground mb-1">Sin clientes</p>
+            <p className="text-sm">Cambia los filtros o crea un nuevo cliente.</p>
+          </div>
+        ) : (
+          <table>
             <thead>
-              <tr className="border-b border-border">
-                {['Empresa', 'Contacto', 'Comercial', 'Servicios', 'Visita', 'Nuevo Svc.', 'Estado', 'Facturado', 'Valor', ''].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-condensed uppercase text-muted tracking-wider whitespace-nowrap">
-                    {h}
-                  </th>
-                ))}
+              <tr>
+                <th>Empresa</th>
+                <th>Tipo</th>
+                <th>Comercial</th>
+                <th>Estado</th>
+                <th>Servicios</th>
+                <th>Facturación</th>
+                <th>Visita</th>
+                <th>Cat.</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
-              {isLoading && Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i} className="border-b border-border">
-                  {['70%', '45%', '55%', '80%', '40%', '50%', '45%', '45%', '55%', '20%'].map((w, j) => (
-                    <td key={j} className="px-4 py-3">
-                      <div className="h-4 bg-surface2 rounded animate-pulse" style={{ width: w }} />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-              {!isLoading && records.length === 0 && (
-                <tr>
-                  <td colSpan={10} className="py-16 text-center">
-                    <div className="flex flex-col items-center gap-3 text-muted">
-                      <Building2Icon size={36} className="opacity-30" />
-                      <p className="text-sm">No hay clientes que mostrar</p>
-                    </div>
+              {clientes.map((c) => (
+                <tr key={c.id} className="cursor-pointer" onClick={() => navigate(`/detalle/${c.id}`)}>
+                  <td>
+                    <div className="font-semibold text-foreground">{c.empresa}</div>
+                    {c.nit && <div className="text-xs text-muted">NIT: {c.nit}</div>}
                   </td>
-                </tr>
-              )}
-              {records.map((r) => (
-                <tr
-                  key={r.id}
-                  className="border-b border-border hover:bg-surface2 transition cursor-pointer"
-                  onClick={() => navigate(`/clientes/${r.id}`)}
-                >
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium" style={{ color: '#e8edf5' }}>{r.empresa}</p>
-                      {r.categoria && (
-                        <span className="text-xs px-1.5 py-0.5 rounded font-condensed font-bold"
-                          style={{ background: r.categoria === 'A' ? '#00c2ff22' : r.categoria === 'B' ? '#f59e0b22' : '#6b7280aa', color: r.categoria === 'A' ? '#00c2ff' : r.categoria === 'B' ? '#f59e0b' : '#d1d5db' }}>
-                          {r.categoria}
-                        </span>
-                      )}
-                    </div>
-                    {r.nit && <p className="text-xs text-muted">NIT {r.nit}</p>}
+                  <td>
+                    <span className="badge-gray capitalize">{c.tipoCliente}</span>
                   </td>
-                  <td className="px-4 py-3 text-muted">{r.contacto_nombre ?? '—'}</td>
-                  <td className="px-4 py-3 text-muted">{comercialNombre(r.comercial_id)}</td>
-                  <td className="px-4 py-3">
+                  <td className="text-sm">{c.comercial?.nombre || '—'}</td>
+                  <td>
+                    <span className={ESTADO_BADGE[c.estadoCliente ?? 'activo'] ?? 'badge-gray'}>
+                      {c.estadoCliente ?? 'activo'}
+                    </span>
+                  </td>
+                  <td>
                     <div className="flex flex-wrap gap-1">
-                      {r.servicios.slice(0, 3).map((s) => (
-                        <span
-                          key={s}
-                          className="text-xs px-1.5 py-0.5 rounded"
-                          style={{ background: SERVICIO_COLORS[s] + '22', color: SERVICIO_COLORS[s] }}
-                        >
-                          {s}
-                        </span>
+                      {(c.servicios as string[]).slice(0, 2).map((s) => (
+                        <span key={s} className="stag">{s}</span>
                       ))}
-                      {r.servicios.length > 3 && (
-                        <span className="text-xs text-muted">+{r.servicios.length - 3}</span>
+                      {(c.servicios as string[]).length > 2 && (
+                        <span className="stag">+{(c.servicios as string[]).length - 2}</span>
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3"><Badge value={r.visita_cliente} /></td>
-                  <td className="px-4 py-3">
-                    {r.nuevo_servicio === 'si'
-                      ? <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: '#a855f722', color: '#a855f7' }}>
-                          {r.servicio_nuevo || 'Sí'}
-                        </span>
-                      : <span className="text-xs text-muted">—</span>
+                  <td>
+                    <div className="font-mono text-sm text-success">{fmt(c.valor ?? 0)}</div>
+                    <div className="mt-0.5">
+                      <span className={FACTURADO_BADGE[c.facturado ?? 'no'] ?? 'badge-gray'}>
+                        {c.facturado ?? 'no'}
+                      </span>
+                    </div>
+                  </td>
+                  <td>
+                    {c.visitaCliente && c.visitaCliente !== 'no'
+                      ? <span className="badge-green">{c.visitaCliente}</span>
+                      : <span className="text-muted text-xs">—</span>
                     }
                   </td>
-                  <td className="px-4 py-3"><Badge value={r.estado_cliente} /></td>
-                  <td className="px-4 py-3"><Badge value={r.facturado} /></td>
-                  <td className="px-4 py-3 text-muted">{fmtCOP(r.valor)}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => navigate(`/clientes/${r.id}`)}
-                        className="text-muted hover:text-accent transition"
+                  <td>
+                    {c.categoria ? (
+                      <span
+                        className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
+                        style={{ background: `${CATEGORIA_COLOR[c.categoria]}20`, color: CATEGORIA_COLOR[c.categoria] }}
                       >
-                        <Eye size={16} />
-                      </button>
-                      <button
-                        onClick={() => setDeleteId(r.id)}
-                        className="text-muted hover:text-danger transition"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                        {c.categoria}
+                      </span>
+                    ) : <span className="text-muted text-xs">—</span>}
+                  </td>
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <div className="flex gap-1">
+                      <button className="btn-ghost btn-sm px-2 py-1 text-xs" onClick={() => navigate(`/detalle/${c.id}`)}>Ver</button>
+                      <button className="btn-danger btn-sm px-2 py-1 text-xs" onClick={() => setConfirmId(c.id)}>×</button>
                     </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        )}
       </div>
 
-      <ConfirmModal
-        open={!!deleteId}
-        message="¿Eliminar este cliente? Se eliminarán también sus contactos y actividades."
-        onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
-        onCancel={() => setDeleteId(null)}
-        loading={deleteMutation.isPending}
-      />
-    </PageContainer>
+      {/* Modal confirm delete */}
+      {confirmId && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setConfirmId(null)}>
+          <div className="card p-6 w-80 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-bold text-foreground">¿Eliminar cliente?</h3>
+            <p className="text-sm text-muted">Esta acción no se puede deshacer.</p>
+            <div className="flex gap-2 justify-end">
+              <button className="btn-secondary btn-sm" onClick={() => setConfirmId(null)}>Cancelar</button>
+              <button
+                className="btn-danger btn-sm"
+                disabled={deleteMut.isPending}
+                onClick={() => deleteMut.mutate(confirmId)}
+              >
+                {deleteMut.isPending ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

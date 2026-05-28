@@ -1,5 +1,4 @@
-# .gitignore
-# Python
+# ─── Python ──────────────────────────────────
 __pycache__/
 *.pyc
 *.pyo
@@ -7,29 +6,45 @@ __pycache__/
 *.db
 *.sqlite3
 *.egg-info/
+
+# ─── Secrets / Env ───────────────────────────
 .env
 .env.*
+!.env.example
 
-# VSCode
+# ─── VSCode / IDE ────────────────────────────
 .vscode/
+.idea/
 
-# Alembic
-backend/alembic/versions/__pycache__/
-
-# Node/Frontend
+# ─── Node / Frontend ─────────────────────────
 node_modules/
 dist/
 build/
+*.tsbuildinfo
 
-# System
+# Vite generated declaration files
+frontend/vite.config.js
+frontend/vite.config.d.ts
+
+# ─── System ──────────────────────────────────
 .DS_Store
 Thumbs.db
 
-# Others
+# ─── Logs & temp ─────────────────────────────
 *.log
 *.bak
 *.swp
 *.tmp
 
-# Ignore data folders
+# ─── Backend data ────────────────────────────
 backend/data/
+
+# ─── Claude Code (local settings) ───────────
+.claude/settings.local.json
+.claude/worktrees/
+
+# ─── Obsidian metadata (vault en grafo-obsidian, no en raíz) ─
+.obsidian/
+
+# ─── Referencia histórica — solo lectura local ─
+Ultima_versión/

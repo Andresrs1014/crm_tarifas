@@ -1,67 +1,68 @@
-import api from './client'
-import type { BibliotecaLinea, BibliotecaGrupo, BibliotecaItem, BibliotecaObservacion, BibliotecaColumna } from '../types'
+import client from './client'
+import type {
+  BibliotecaLinea,
+  BibliotecaGrupo,
+  BibliotecaItem,
+  BibliotecaObs,
+} from '../types'
 
-export async function getBibliotecaApi(): Promise<BibliotecaLinea[]> {
-  const { data } = await api.get<BibliotecaLinea[]>('/api/biblioteca')
-  return data
-}
+// Full tree
+export const getBiblioteca = () =>
+  client.get<BibliotecaLinea[]>('/api/biblioteca').then((r) => r.data)
 
-// ── Grupos ──
-export async function createGrupoApi(payload: { linea_id: string; nombre: string; orden?: number }): Promise<BibliotecaGrupo> {
-  const { data } = await api.post<BibliotecaGrupo>('/api/biblioteca/grupos', payload)
-  return data
-}
-export async function updateGrupoApi(id: string, payload: { nombre?: string; orden?: number }): Promise<BibliotecaGrupo> {
-  const { data } = await api.put<BibliotecaGrupo>(`/api/biblioteca/grupos/${id}`, payload)
-  return data
-}
-export async function deleteGrupoApi(id: string): Promise<void> {
-  await api.delete(`/api/biblioteca/grupos/${id}`)
-}
+// Líneas
+export const createLinea = (data: { nombre: string; orden?: number }) =>
+  client.post<BibliotecaLinea>('/api/biblioteca/lineas', data).then((r) => r.data)
 
-// ── Ítems ──
-export interface ItemPayload {
-  grupo_id: string
+export const updateLinea = (id: string, data: Partial<{ nombre: string; orden: number; columnas: string[] }>) =>
+  client.put<BibliotecaLinea>(`/api/biblioteca/lineas/${id}`, data).then((r) => r.data)
+
+export const deleteLinea = (id: string) =>
+  client.delete(`/api/biblioteca/lineas/${id}`).then((r) => r.data)
+
+// Grupos
+export const createGrupo = (lineaId: string, data: { nombre: string; orden?: number }) =>
+  client.post<BibliotecaGrupo>(`/api/biblioteca/lineas/${lineaId}/grupos`, data).then((r) => r.data)
+
+export const updateGrupo = (id: string, data: Partial<{ nombre: string; orden: number }>) =>
+  client.put<BibliotecaGrupo>(`/api/biblioteca/grupos/${id}`, data).then((r) => r.data)
+
+export const deleteGrupo = (id: string) =>
+  client.delete(`/api/biblioteca/grupos/${id}`).then((r) => r.data)
+
+// Items
+export const createItem = (grupoId: string, data: {
   nombre: string
   tarifa: string
-  tipo_tarifa: 'moneda' | 'porcentaje'
+  tipoTarifa?: string
   obs?: string
-  extra_cols?: Record<string, string>
+  extraCols?: Record<string, string>
   orden?: number
-}
-export async function createItemApi(payload: ItemPayload): Promise<BibliotecaItem> {
-  const { data } = await api.post<BibliotecaItem>('/api/biblioteca/items', payload)
-  return data
-}
-export async function updateItemApi(id: string, payload: Partial<ItemPayload>): Promise<BibliotecaItem> {
-  const { data } = await api.put<BibliotecaItem>(`/api/biblioteca/items/${id}`, payload)
-  return data
-}
-export async function deleteItemApi(id: string): Promise<void> {
-  await api.delete(`/api/biblioteca/items/${id}`)
-}
+}) =>
+  client.post<BibliotecaItem>(`/api/biblioteca/grupos/${grupoId}/items`, data).then((r) => r.data)
 
-// ── Observaciones ──
-export interface ObsPayload {
-  linea_id: string
+export const updateItem = (id: string, data: Partial<{
   nombre: string
-  html: string
-  orden?: number
-}
-export async function createObsApi(payload: ObsPayload): Promise<BibliotecaObservacion> {
-  const { data } = await api.post<BibliotecaObservacion>('/api/biblioteca/observaciones', payload)
-  return data
-}
-export async function updateObsApi(id: string, payload: { nombre?: string; html?: string; orden?: number }): Promise<BibliotecaObservacion> {
-  const { data } = await api.put<BibliotecaObservacion>(`/api/biblioteca/observaciones/${id}`, payload)
-  return data
-}
-export async function deleteObsApi(id: string): Promise<void> {
-  await api.delete(`/api/biblioteca/observaciones/${id}`)
-}
+  tarifa: string
+  tipoTarifa: string
+  obs: string
+  extraCols: Record<string, string>
+  orden: number
+}>) =>
+  client.put<BibliotecaItem>(`/api/biblioteca/items/${id}`, data).then((r) => r.data)
 
-// ── Columnas extra de línea (solo superadmin) ──
-export async function updateColumnasApi(lineaId: string, columnas: BibliotecaColumna[]): Promise<BibliotecaLinea> {
-  const { data } = await api.put<BibliotecaLinea>(`/api/biblioteca/lineas/${lineaId}/columnas`, { columnas })
-  return data
-}
+export const deleteItem = (id: string) =>
+  client.delete(`/api/biblioteca/items/${id}`).then((r) => r.data)
+
+// Observaciones
+export const getObs = (lineaId: string) =>
+  client.get<BibliotecaObs[]>(`/api/biblioteca/lineas/${lineaId}/obs`).then((r) => r.data)
+
+export const createObs = (lineaId: string, data: { nombre: string; html: string }) =>
+  client.post<BibliotecaObs>(`/api/biblioteca/lineas/${lineaId}/obs`, data).then((r) => r.data)
+
+export const updateObs = (id: string, data: Partial<{ nombre: string; html: string }>) =>
+  client.put<BibliotecaObs>(`/api/biblioteca/obs/${id}`, data).then((r) => r.data)
+
+export const deleteObs = (id: string) =>
+  client.delete(`/api/biblioteca/obs/${id}`).then((r) => r.data)
