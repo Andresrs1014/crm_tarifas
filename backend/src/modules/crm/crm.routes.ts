@@ -85,11 +85,11 @@ router.put('/:id/estado', async (req: Request, res: Response, next: NextFunction
     const now = new Date().toISOString();
 
     // Buscar o crear CrmMeta
-    let meta = await prisma.crmMeta.findUnique({ where: { recordId: req.params.id } });
+    let meta = await prisma.crmMeta.findUnique({ where: { recordId: String(req.params.id) } });
 
     if (!meta) {
       meta = await prisma.crmMeta.create({
-        data: { recordId: req.params.id, estadoPipeline: estado },
+        data: { recordId: String(req.params.id), estadoPipeline: estado },
       });
     }
 
@@ -106,7 +106,7 @@ router.put('/:id/estado', async (req: Request, res: Response, next: NextFunction
     tiempos[estado].entrada = now;
 
     const updated = await prisma.crmMeta.update({
-      where: { recordId: req.params.id },
+      where: { recordId: String(req.params.id) },
       data: { estadoPipeline: estado, tiempos },
     });
 
@@ -119,11 +119,11 @@ router.put('/:id/estado', async (req: Request, res: Response, next: NextFunction
 // GET /api/crm/:id/meta
 router.get('/:id/meta', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const meta = await prisma.crmMeta.findUnique({ where: { recordId: req.params.id } });
+    const meta = await prisma.crmMeta.findUnique({ where: { recordId: String(req.params.id) } });
     if (!meta) {
       // Auto-crear si no existe
       const created = await prisma.crmMeta.create({
-        data: { recordId: req.params.id, estadoPipeline: 'prospecto' },
+        data: { recordId: String(req.params.id), estadoPipeline: 'prospecto' },
       });
       res.json(created);
       return;
@@ -143,8 +143,8 @@ router.put('/:id/meta', async (req: Request, res: Response, next: NextFunction) 
     }).parse(req.body);
 
     const meta = await prisma.crmMeta.upsert({
-      where: { recordId: req.params.id },
-      create: { recordId: req.params.id, ...body },
+      where: { recordId: String(req.params.id) },
+      create: { recordId: String(req.params.id), ...body },
       update: body,
     });
 

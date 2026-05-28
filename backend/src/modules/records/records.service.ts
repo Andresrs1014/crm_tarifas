@@ -1,6 +1,7 @@
 import prisma from '../../database';
 
-type JsonInput = Record<string, unknown> | unknown[];
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type JsonInput = any;
 
 export interface RecordFilters {
   tipo?: string;
