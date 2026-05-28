@@ -1,0 +1,30 @@
+{
+  "collapse-filter": false,
+  "search": "",
+  "showTags": false,
+  "showAttachments": false,
+  "hideUnresolved": false,
+  "showOrphans": true,
+  "collapse-color-groups": false,
+  "colorGroups": [
+    { "query": "tag:#actor", "color": { "a": 1, "rgb": 14400720 } },
+    { "query": "tag:#alerta", "color": { "a": 1, "rgb": 16737075 } },
+    { "query": "tag:#estado", "color": { "a": 1, "rgb": 50918 } },
+    { "query": "tag:#motor", "color": { "a": 1, "rgb": 10973439 } },
+    { "query": "tag:#regla", "color": { "a": 1, "rgb": 16744192 } },
+    { "query": "tag:#agente", "color": { "a": 1, "rgb": 16711680 } },
+    { "query": "tag:#kpi", "color": { "a": 1, "rgb": 6750054 } }
+  ],
+  "collapse-display": false,
+  "showArrow": true,
+  "textFadeMultiplier": 0,
+  "nodeSizeMultiplier": 1.2,
+  "lineSizeMultiplier": 1,
+  "collapse-forces": false,
+  "centerStrength": 0.518,
+  "repelStrength": 10,
+  "linkStrength": 1,
+  "linkDistance": 100,
+  "scale": 0.6,
+  "close": false
+}
