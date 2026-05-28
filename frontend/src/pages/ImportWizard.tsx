@@ -1,326 +1,386 @@
-import { useState, useCallback } from 'react'
+import { useState, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import * as XLSX from 'xlsx'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Upload, ArrowLeft, ArrowRight, Check, AlertCircle, Inbox } from 'lucide-react'
-import PageContainer from '../components/PageContainer'
 import { importRecords } from '../api/records'
-import { useToastStore } from '../store/toastStore'
+import { toast } from '../store/toastStore'
 
-const FIELD_OPTIONS = [
-  { value: '', label: '— Ignorar —' },
-  { value: 'empresa', label: 'Empresa' },
-  { value: 'nit', label: 'NIT' },
-  { value: 'ciudad', label: 'Ciudad' },
-  { value: 'comercial', label: 'Comercial' },
-  { value: 'servicios', label: 'Servicios (separados por coma)' },
-  { value: 'estado', label: 'Estado' },
-  { value: 'tipo', label: 'Tipo (prospecto / cliente)' },
-  { value: 'observaciones', label: 'Observaciones' },
+// ─── Plantilla descargable ─────────────────────────────────────────────────────
+
+const TEMPLATE_COLS = [
+  'tipo', 'empresa', 'nit', 'ciudad', 'comercialNombre',
+  'estadoProspecto', 'estadoCliente', 'fecha', 'observaciones', 'servicios', 'valor',
 ]
 
-const AUTO_MAP: Record<string, string> = {
-  empresa: 'empresa', company: 'empresa', 'razon social': 'empresa',
-  razón: 'empresa', razon: 'empresa', nombre: 'empresa',
-  nit: 'nit', identificacion: 'nit', identificación: 'nit', ruc: 'nit',
-  ciudad: 'ciudad', city: 'ciudad',
-  comercial: 'comercial', asesor: 'comercial', vendedor: 'comercial',
-  representante: 'comercial', agente: 'comercial',
-  servicios: 'servicios', services: 'servicios',
-  interes: 'servicios', interés: 'servicios',
-  estado: 'estado', status: 'estado',
-  tipo: 'tipo', type: 'tipo',
-  observaciones: 'observaciones', notas: 'observaciones',
-  notes: 'observaciones', comentarios: 'observaciones',
+const TEMPLATE_EXAMPLE = [
+  ['prospecto', 'Empresa ABC', '900.123.456-7', 'Bogotá', 'Juan Pérez',
+   'propuesta', '', '2024-06-01', 'Cliente potencial zona franca', 'Zona Franca,Aduana', ''],
+  ['cliente', 'Empresa XYZ', '800.456.789-1', 'Medellín', 'María López',
+   '', 'activo', '2024-05-15', '', 'CEDI,Transporte', '5000000'],
+]
+
+function downloadTemplate() {
+  const wb = XLSX.utils.book_new()
+  const ws = XLSX.utils.aoa_to_sheet([TEMPLATE_COLS, ...TEMPLATE_EXAMPLE])
+
+  // Anchos de columna
+  ws['!cols'] = TEMPLATE_COLS.map((col) => ({
+    wch: col === 'observaciones' ? 30 : col === 'empresa' ? 25 : 18,
+  }))
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Registros')
+  XLSX.writeFile(wb, 'plantilla_importacion_crm.xlsx')
 }
 
-type Mapping = Record<number, string>
+// ─── Tipos ─────────────────────────────────────────────────────────────────────
+
+interface PreviewRow {
+  [key: string]: string | number | null
+}
 
 interface ImportResult {
-  created: number
-  errors: Array<{ empresa: string; error: string }>
+  imported: number
+  errors: string[]
 }
 
+// ─── Pasos ─────────────────────────────────────────────────────────────────────
+
+const STEPS = ['Plantilla', 'Subir archivo', 'Vista previa', 'Resultado']
+
+// ─── Componente ────────────────────────────────────────────────────────────────
+
 export default function ImportWizard() {
-  const [searchParams] = useSearchParams()
-  const tipoDefault = (searchParams.get('tipo') ?? 'prospecto') as 'prospecto' | 'cliente'
-
   const navigate = useNavigate()
-  const toast = useToastStore()
+  const qc = useQueryClient()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [step, setStep] = useState(0)
+  const [file, setFile] = useState<File | null>(null)
+  const [tipo, setTipo] = useState<'prospecto' | 'cliente'>('prospecto')
+  const [preview, setPreview] = useState<PreviewRow[]>([])
   const [headers, setHeaders] = useState<string[]>([])
-  const [rawRows, setRawRows] = useState<string[][]>([])
-  const [mapping, setMapping] = useState<Mapping>({})
   const [result, setResult] = useState<ImportResult | null>(null)
-  const [importing, setImporting] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
 
-  const handleFile = useCallback((file: File) => {
+  // Leer Excel en el frontend para preview
+  function handleFile(f: File) {
+    setFile(f)
     const reader = new FileReader()
     reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target!.result as ArrayBuffer)
-        const wb = XLSX.read(data, { type: 'array' })
-        const ws = wb.Sheets[wb.SheetNames[0]]
-        const allRows: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as string[][]
-        if (allRows.length < 2) {
-          toast.add('El archivo no tiene datos suficientes', 'error')
-          return
-        }
-        const hdrs = allRows[0].map(String)
-        const dataRows = allRows.slice(1).filter(r => r.some(cell => String(cell).trim()))
-        setHeaders(hdrs)
-        setRawRows(dataRows as string[][])
-        const auto: Mapping = {}
-        hdrs.forEach((h, i) => {
-          const key = String(h).trim().toLowerCase()
-          if (AUTO_MAP[key]) auto[i] = AUTO_MAP[key]
-        })
-        setMapping(auto)
-        setStep(2)
-      } catch {
-        toast.add('Error al leer el archivo. Verifica que sea un .xlsx válido.', 'error')
+      const data = e.target?.result
+      const wb = XLSX.read(data, { type: 'array' })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const rows = XLSX.utils.sheet_to_json<PreviewRow>(ws, { defval: '' })
+      if (rows.length > 0) {
+        setHeaders(Object.keys(rows[0]))
+        setPreview(rows.slice(0, 10))
       }
+      setStep(2)
     }
-    reader.readAsArrayBuffer(file)
-  }, [toast])
+    reader.readAsArrayBuffer(f)
+  }
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  function handleDrop(e: React.DragEvent) {
     e.preventDefault()
-    const file = e.dataTransfer.files[0]
-    if (file) handleFile(file)
-  }, [handleFile])
-
-  const buildRows = () => {
-    return rawRows.map(row => {
-      const obj: Record<string, unknown> = { tipo: tipoDefault }
-      Object.entries(mapping).forEach(([colIdx, field]) => {
-        if (!field) return
-        const val = String(row[Number(colIdx)] ?? '').trim()
-        if (!val) return
-        if (field === 'servicios') {
-          obj.servicios = val.split(',').map(s => s.trim()).filter(Boolean)
-        } else if (field === 'estado') {
-          if (tipoDefault === 'prospecto') obj.estado_prospecto = val.toLowerCase()
-          else obj.estado_cliente = val.toLowerCase()
-        } else if (field === 'tipo') {
-          obj.tipo = val.toLowerCase() === 'cliente' ? 'cliente' : 'prospecto'
-        } else if (field === 'comercial') {
-          obj.comercial_nombre = val
-        } else {
-          obj[field] = val
-        }
-      })
-      return obj
-    })
-  }
-
-  const handleImport = async () => {
-    setImporting(true)
-    try {
-      const rows = buildRows()
-      const res = await importRecords(rows)
-      setResult(res)
-      setStep(3)
-      if (res.created > 0) {
-        toast.add(`${res.created} registros importados correctamente`)
-      }
-    } catch {
-      toast.add('Error al conectar con el servidor', 'error')
-    } finally {
-      setImporting(false)
+    setDragOver(false)
+    const f = e.dataTransfer.files[0]
+    if (f && (f.name.endsWith('.xlsx') || f.name.endsWith('.xls'))) {
+      handleFile(f)
+    } else {
+      toast.error('Solo se aceptan archivos Excel (.xlsx, .xls)')
     }
   }
 
-  const hasEmpresaCol = Object.values(mapping).includes('empresa')
+  const importMut = useMutation({
+    mutationFn: () => {
+      if (!file) throw new Error('Sin archivo')
+      return importRecords(file, tipo)
+    },
+    onSuccess: (data: ImportResult) => {
+      qc.invalidateQueries({ queryKey: ['records'] })
+      setResult(data)
+      setStep(3)
+    },
+    onError: () => toast.error('Error al importar el archivo'),
+  })
+
+  // ─── Render por paso ─────────────────────────────────────────────────────────
 
   return (
-    <PageContainer>
-      <div className="flex items-center gap-3 mb-6">
-        <button
-          onClick={() => navigate(tipoDefault === 'prospecto' ? '/prospectos' : '/clientes')}
-          className="text-muted hover:text-white transition"
-        >
-          <ArrowLeft size={18} />
+    <div className="p-6 max-w-4xl mx-auto space-y-6">
+
+      {/* Header */}
+      <div>
+        <button onClick={() => navigate('/registro')} className="text-xs text-muted hover:text-foreground mb-2">
+          ← Volver
         </button>
-        <h1 className="font-condensed font-bold text-2xl" style={{ color: '#e8edf5' }}>
-          Carga masiva — {tipoDefault === 'prospecto' ? 'Prospectos' : 'Clientes'}
-        </h1>
+        <h1 className="text-2xl font-bold text-foreground">Importar registros</h1>
+        <p className="text-sm text-muted mt-0.5">Carga masiva desde Excel — prospectos o clientes</p>
       </div>
 
-      {/* Indicador de pasos */}
-      <div className="flex items-center gap-2 mb-8">
-        {['Subir archivo', 'Mapear columnas', 'Resultado'].map((label, i) => (
-          <div key={label} className="flex items-center gap-2">
-            <div
-              className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                step > i + 1
-                  ? 'bg-success text-white'
-                  : step === i + 1
-                  ? 'text-white'
-                  : 'bg-surface2 text-muted'
-              }`}
-              style={step === i + 1 ? { background: '#00c2ff', color: '#0a0e1a' } : undefined}
-            >
-              {step > i + 1 ? <Check size={12} /> : i + 1}
+      {/* Stepper */}
+      <div className="flex items-center gap-0">
+        {STEPS.map((label, i) => (
+          <div key={i} className="flex items-center flex-1 last:flex-none">
+            <div className={`flex items-center gap-2 text-xs font-semibold ${
+              i === step ? 'text-accent' : i < step ? 'text-success' : 'text-muted'
+            }`}>
+              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs border-2 flex-shrink-0 ${
+                i === step ? 'border-accent bg-accent/10 text-accent'
+                : i < step ? 'border-success bg-success/10 text-success'
+                : 'border-border text-muted'
+              }`}>
+                {i < step ? '✓' : i + 1}
+              </span>
+              <span className="hidden sm:block">{label}</span>
             </div>
-            <span className={`text-sm ${step === i + 1 ? 'text-white' : 'text-muted'}`}>{label}</span>
-            {i < 2 && <div className="w-8 h-px bg-border mx-1" />}
+            {i < STEPS.length - 1 && (
+              <div className={`flex-1 h-0.5 mx-2 ${i < step ? 'bg-success/40' : 'bg-border'}`} />
+            )}
           </div>
         ))}
       </div>
 
-      {/* Paso 1 — Subir archivo */}
+      {/* ── PASO 0: Plantilla ────────────────────────────────────────────── */}
+      {step === 0 && (
+        <div className="space-y-5">
+          <div className="card p-6 space-y-4">
+            <h3 className="text-sm font-bold text-foreground">Descarga la plantilla oficial</h3>
+            <p className="text-sm text-muted">
+              Usa la plantilla para asegurarte de que las columnas tengan los nombres correctos.
+              El sistema reconoce las siguientes columnas:
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {[
+                { col: 'tipo', req: true, desc: '"prospecto" o "cliente"' },
+                { col: 'empresa', req: true, desc: 'Razón social' },
+                { col: 'nit', req: false, desc: 'NIT de la empresa' },
+                { col: 'ciudad', req: false, desc: 'Ciudad de la empresa' },
+                { col: 'comercialNombre', req: false, desc: 'Nombre exacto del comercial' },
+                { col: 'estadoProspecto', req: false, desc: 'prospecto, propuesta, etc.' },
+                { col: 'estadoCliente', req: false, desc: 'activo, en-riesgo, inactivo' },
+                { col: 'fecha', req: false, desc: 'YYYY-MM-DD' },
+                { col: 'observaciones', req: false, desc: 'Texto libre' },
+                { col: 'servicios', req: false, desc: 'Separados por coma' },
+                { col: 'valor', req: false, desc: 'Número sin formato' },
+              ].map(({ col, req, desc }) => (
+                <div key={col} className="p-2.5 rounded-lg bg-surface2 border border-border">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <code className="text-xs font-mono text-accent">{col}</code>
+                    {req && <span className="text-2xs text-danger font-bold">*</span>}
+                  </div>
+                  <p className="text-2xs text-muted">{desc}</p>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button className="btn-primary btn-sm" onClick={downloadTemplate}>
+                ⬇ Descargar plantilla .xlsx
+              </button>
+              <button className="btn-secondary btn-sm" onClick={() => setStep(1)}>
+                Ya tengo la plantilla →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── PASO 1: Subir archivo ─────────────────────────────────────────── */}
       {step === 1 && (
-        <div
-          className="border-2 border-dashed border-border rounded-xl p-16 text-center hover:border-accent/50 transition cursor-pointer"
-          onDragOver={e => e.preventDefault()}
-          onDrop={handleDrop}
-        >
-          <Upload size={40} className="mx-auto mb-4 text-muted" />
-          <p className="text-white font-medium mb-2">Arrastra tu archivo Excel aquí</p>
-          <p className="text-muted text-sm mb-6">Formato soportado: .xlsx — La primera fila debe contener los encabezados</p>
-          <label
-            className="inline-block px-5 py-2.5 rounded-lg text-sm font-medium cursor-pointer transition"
-            style={{ background: '#00c2ff', color: '#0a0e1a' }}
+        <div className="space-y-4">
+          {/* Tipo */}
+          <div className="card p-5 space-y-3">
+            <label className="text-xs font-bold text-muted uppercase tracking-widest">Tipo de registro a importar</label>
+            <div className="flex gap-3">
+              {(['prospecto', 'cliente'] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTipo(t)}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all capitalize ${
+                    tipo === t
+                      ? 'bg-accent/15 border-accent text-accent'
+                      : 'border-border text-muted hover:border-muted'
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Drop zone */}
+          <div
+            className={`border-2 border-dashed rounded-xl p-12 text-center transition-colors cursor-pointer ${
+              dragOver ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/50'
+            }`}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
           >
-            Seleccionar archivo
+            <div className="text-5xl mb-3">📂</div>
+            <p className="font-semibold text-foreground mb-1">
+              {dragOver ? 'Suelta el archivo aquí' : 'Arrastra tu archivo Excel aquí'}
+            </p>
+            <p className="text-sm text-muted mb-4">o haz clic para seleccionar</p>
+            <p className="text-xs text-muted/60">.xlsx o .xls — máx. 20 MB</p>
             <input
+              ref={fileInputRef}
               type="file"
               accept=".xlsx,.xls"
               className="hidden"
-              onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }}
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) handleFile(f)
+              }}
             />
-          </label>
-        </div>
-      )}
-
-      {/* Paso 2 — Mapear columnas */}
-      {step === 2 && (
-        <div>
-          <p className="text-muted text-sm mb-5">
-            Archivo cargado con <span className="text-white font-medium">{rawRows.length} filas</span>.
-            Asigna cada columna al campo del sistema correspondiente.
-          </p>
-
-          <div className="bg-surface border border-border rounded-xl overflow-hidden mb-4">
-            <div className="overflow-x-auto">
-              <table className="text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                    {headers.map((h, i) => (
-                      <th key={i} className="px-4 py-3 text-left min-w-40 align-top">
-                        <p className="text-xs text-muted uppercase tracking-wider font-condensed mb-2 whitespace-nowrap">{h}</p>
-                        <select
-                          className="text-xs w-full"
-                          value={mapping[i] ?? ''}
-                          onChange={e => setMapping(m => ({ ...m, [i]: e.target.value }))}
-                        >
-                          {FIELD_OPTIONS.map(o => (
-                            <option key={o.value} value={o.value}>{o.label}</option>
-                          ))}
-                        </select>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rawRows.slice(0, 4).map((row, ri) => (
-                    <tr key={ri} className="border-b border-border last:border-0">
-                      {headers.map((_, ci) => (
-                        <td key={ci} className="px-4 py-2.5 text-muted text-xs truncate max-w-40">
-                          {String(row[ci] ?? '')}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
           </div>
-
-          {!hasEmpresaCol && (
-            <p className="text-xs text-gold mb-4 flex items-center gap-1.5">
-              <AlertCircle size={13} /> Debes mapear al menos la columna <strong>Empresa</strong> para continuar
-            </p>
-          )}
 
           <div className="flex justify-between">
-            <button
-              onClick={() => setStep(1)}
-              className="px-4 py-2 rounded-lg text-sm text-muted hover:text-white border border-border transition"
-            >
-              Atrás
-            </button>
-            <button
-              onClick={handleImport}
-              disabled={importing || !hasEmpresaCol}
-              className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition"
-              style={{ background: '#00c2ff', color: '#0a0e1a' }}
-            >
-              {importing
-                ? 'Importando...'
-                : <><ArrowRight size={15} /> Importar {rawRows.length} registros</>
-              }
-            </button>
+            <button className="btn-secondary btn-sm" onClick={() => setStep(0)}>← Atrás</button>
           </div>
         </div>
       )}
 
-      {/* Paso 3 — Resultado */}
-      {step === 3 && result && (
-        <div>
-          <div className="flex gap-4 mb-6">
-            <div className="bg-surface border border-border rounded-xl p-6 text-center w-36">
-              <p className="text-3xl font-bold font-condensed" style={{ color: '#00e676' }}>
-                {result.created}
-              </p>
-              <p className="text-xs text-muted uppercase tracking-wider font-condensed mt-1">Creados</p>
-            </div>
-            <div className="bg-surface border border-border rounded-xl p-6 text-center w-36">
-              <p
-                className="text-3xl font-bold font-condensed"
-                style={{ color: result.errors.length > 0 ? '#ff6b6b' : '#8899b4' }}
+      {/* ── PASO 2: Vista previa ──────────────────────────────────────────── */}
+      {step === 2 && (
+        <div className="space-y-4">
+          <div className="card p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-foreground">Vista previa</h3>
+                <p className="text-xs text-muted mt-0.5">
+                  Archivo: <span className="font-mono text-accent">{file?.name}</span> · Mostrando primeras {preview.length} filas
+                </p>
+              </div>
+              <button
+                className="btn-ghost btn-sm text-xs"
+                onClick={() => { setStep(1); setFile(null); setPreview([]); setHeaders([]) }}
               >
-                {result.errors.length}
-              </p>
-              <p className="text-xs text-muted uppercase tracking-wider font-condensed mt-1">Errores</p>
+                Cambiar archivo
+              </button>
             </div>
+
+            {preview.length === 0 ? (
+              <p className="text-sm text-danger">El archivo parece estar vacío o sin datos válidos.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-border">
+                <table className="text-xs w-full">
+                  <thead className="bg-surface2">
+                    <tr>
+                      {headers.map((h) => (
+                        <th key={h} className="px-3 py-2 text-left font-semibold text-muted whitespace-nowrap">
+                          {h}
+                          {(h === 'tipo' || h === 'empresa') && (
+                            <span className="ml-1 text-danger">*</span>
+                          )}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {preview.map((row, i) => (
+                      <tr key={i} className="border-t border-border">
+                        {headers.map((h) => (
+                          <td key={h} className="px-3 py-1.5 text-foreground whitespace-nowrap max-w-32 truncate"
+                            title={String(row[h] ?? '')}>
+                            {String(row[h] ?? '') || <span className="text-muted/40">—</span>}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Validación básica columnas requeridas */}
+            {preview.length > 0 && !headers.includes('tipo') && (
+              <div className="rounded-lg border border-danger/40 bg-danger/5 px-4 py-2 text-sm text-danger">
+                ⚠ Columna <code className="font-mono">tipo</code> no encontrada. Verifica que uses la plantilla oficial.
+              </div>
+            )}
+            {preview.length > 0 && !headers.includes('empresa') && (
+              <div className="rounded-lg border border-danger/40 bg-danger/5 px-4 py-2 text-sm text-danger">
+                ⚠ Columna <code className="font-mono">empresa</code> no encontrada. Verifica que uses la plantilla oficial.
+              </div>
+            )}
           </div>
 
-          {result.errors.length > 0 && (
-            <div className="bg-surface border border-border rounded-xl overflow-hidden mb-6 max-w-2xl">
-              <div className="px-4 py-3 border-b border-border">
-                <h3 className="font-condensed text-xs uppercase text-muted tracking-wider">
-                  Registros con error (omitidos)
-                </h3>
-              </div>
-              <div className="divide-y divide-border">
-                {result.errors.map((e, i) => (
-                  <div key={i} className="px-4 py-3 flex items-center justify-between text-sm gap-4">
-                    <span style={{ color: '#e8edf5' }}>{e.empresa}</span>
-                    <span className="text-danger text-xs shrink-0">{e.error}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {result.errors.length === 0 && result.created === 0 && (
-            <div className="flex flex-col items-center gap-3 py-10 text-muted">
-              <Inbox size={36} className="opacity-30" />
-              <p className="text-sm">No se importó ningún registro. Revisa el archivo y las columnas mapeadas.</p>
-            </div>
-          )}
-
-          <button
-            onClick={() => navigate(tipoDefault === 'prospecto' ? '/prospectos' : '/clientes')}
-            className="px-5 py-2 rounded-lg text-sm font-medium transition"
-            style={{ background: '#00c2ff', color: '#0a0e1a' }}
-          >
-            Volver a {tipoDefault === 'prospecto' ? 'Prospectos' : 'Clientes'}
-          </button>
+          <div className="flex justify-between">
+            <button className="btn-secondary btn-sm" onClick={() => setStep(1)}>← Atrás</button>
+            <button
+              className="btn-primary btn-sm"
+              disabled={preview.length === 0 || !headers.includes('tipo') || !headers.includes('empresa') || importMut.isPending}
+              onClick={() => importMut.mutate()}
+            >
+              {importMut.isPending
+                ? 'Importando...'
+                : `Importar como ${tipo}s`}
+            </button>
+          </div>
         </div>
       )}
-    </PageContainer>
+
+      {/* ── PASO 3: Resultado ─────────────────────────────────────────────── */}
+      {step === 3 && result && (
+        <div className="space-y-4">
+          <div className="card p-6 space-y-5">
+            {/* Resumen */}
+            <div className="flex gap-6">
+              <div className="text-center">
+                <p className="text-4xl font-bold text-success">{result.imported}</p>
+                <p className="text-xs text-muted mt-1">Registros importados</p>
+              </div>
+              {result.errors.length > 0 && (
+                <div className="text-center">
+                  <p className="text-4xl font-bold text-danger">{result.errors.length}</p>
+                  <p className="text-xs text-muted mt-1">Filas con errores</p>
+                </div>
+              )}
+            </div>
+
+            {result.imported > 0 && (
+              <div className="rounded-lg border border-success/40 bg-success/5 px-4 py-3 text-sm text-success">
+                ✓ {result.imported} {tipo}{result.imported !== 1 ? 's' : ''} importado{result.imported !== 1 ? 's' : ''} correctamente.
+              </div>
+            )}
+
+            {result.errors.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-danger uppercase tracking-widest">Errores encontrados</p>
+                <div className="rounded-lg border border-danger/30 bg-danger/5 p-3 space-y-1 max-h-48 overflow-y-auto">
+                  {result.errors.map((err, i) => (
+                    <p key={i} className="text-xs text-danger font-mono">{err}</p>
+                  ))}
+                </div>
+                <p className="text-xs text-muted">
+                  Corrige los errores en el archivo y vuelve a importar solo las filas con problemas.
+                </p>
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                className="btn-primary btn-sm"
+                onClick={() => navigate(tipo === 'prospecto' ? '/prospectos' : '/clientes')}
+              >
+                Ver {tipo}s →
+              </button>
+              <button
+                className="btn-secondary btn-sm"
+                onClick={() => {
+                  setStep(0); setFile(null); setPreview([])
+                  setHeaders([]); setResult(null)
+                }}
+              >
+                Importar otro archivo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

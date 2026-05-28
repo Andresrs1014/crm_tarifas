@@ -1,382 +1,388 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useForm, Controller } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createRecord } from '../api/records'
 import { getComercialesApi } from '../api/comerciales'
-import { getBibliotecaApi } from '../api/biblioteca'
-import ServiceChip from '../components/ServiceChip'
-import ContactosList from '../components/ContactosList'
-import BillingLines from '../components/BillingLines'
-import PageContainer from '../components/PageContainer'
-import { useToastStore } from '../store/toastStore'
+import { toast } from '../store/toastStore'
 import { SERVICIOS } from '../types'
-import type { ContactoCreate } from '../types'
-import { today } from '../utils/format'
+import type { TipoRecord, RecordCreate, ContactoCreate } from '../types'
 
-const schema = z.object({
-  tipo: z.enum(['prospecto', 'cliente']),
-  empresa: z.string().min(1, 'Requerido'),
-  nit: z.string().optional(),
-  ciudad: z.string().optional(),
-  direccion: z.string().optional(),
-  categoria: z.enum(['A', 'B', 'C', '']).optional(),
-  comercial_id: z.string().optional(),
-  tipo_cliente: z.enum(['directo', 'indirecto', 'referido']).default('directo'),
-  comision: z.string().optional(),
-  observaciones: z.string().optional(),
-  fecha: z.string(),
-  // prospecto fields
-  estado_prospecto: z.enum(['seguimiento', 'cerrado', 'perdido', 'frio', '']).optional(),
-  visita: z.enum(['no', 'si', 'virtual', 'llamada', '']).optional(),
-  fecha_visita: z.string().optional(),
-  facturado_p: z.enum(['no', 'si', 'parcial', '']).optional(),
-  proximo_seguimiento: z.string().optional(),
-  // cliente fields
-  estado_cliente: z.enum(['activo', 'en-riesgo', 'inactivo', '']).optional(),
-  visita_cliente: z.enum(['no', 'si', 'virtual', 'llamada', '']).optional(),
-  fecha_visita_cliente: z.string().optional(),
-  nuevo_servicio: z.enum(['si', 'no', '']).optional(),
-  servicio_nuevo: z.string().optional(),
-  facturado: z.enum(['no', 'si', 'parcial', '']).optional(),
+const ESTADOS_PROSPECTO = [
+  'prospecto', 'reconocimiento', 'propuesta',
+  'aceptacion_propuesta', 'creacion_sop', 'facturado',
+]
+
+const TIPOS_CONTACTO = [
+  'principal', 'comercial', 'gestion-documental', 'financiero', 'operativo',
+]
+
+const emptyContacto = (): ContactoCreate => ({
+  nombre: '', cargo: '', telefono: '', email: '',
+  orden: 0, cumpleanos: '', recibeRegalos: false,
 })
-type FormValues = z.infer<typeof schema>
 
 export default function Registro() {
   const navigate = useNavigate()
-  const toast = useToastStore()
-  const [servicios, setServicios] = useState<string[]>([])
-  const [contactos, setContactos] = useState<ContactoCreate[]>([])
-  const [facturacionLineas, setFacturacionLineas] = useState<Record<string, number>>({})
+  const qc = useQueryClient()
+  const [tipo, setTipo] = useState<TipoRecord>('prospecto')
+  const [contactos, setContactos] = useState<ContactoCreate[]>([emptyContacto()])
+
+  // Campos comunes
+  const [empresa, setEmpresa]           = useState('')
+  const [nit, setNit]                   = useState('')
+  const [ciudad, setCiudad]             = useState('')
+  const [direccion, setDireccion]       = useState('')
+  const [comercialId, setComercialId]   = useState('')
+  const [fecha, setFecha]               = useState(new Date().toISOString().split('T')[0])
+  const [categoria, setCategoria]       = useState<'A' | 'B' | 'C' | ''>('')
+  const [servicios, setServicios]       = useState<string[]>([])
+  const [observaciones, setObs]         = useState('')
+
+  // Campos prospecto
+  const [estadoProspecto, setEstadoP]   = useState('prospecto')
+  const [visita, setVisita]             = useState<'no' | 'si' | 'virtual' | 'llamada'>('no')
+  const [fechaVisita, setFechaVisita]   = useState('')
+  const [proxSeguimiento, setProxSeg]  = useState('')
+  const [ingresosEsperados, setIngresos] = useState('')
+
+  // Campos cliente
+  const [tipoCliente, setTipoCliente]   = useState<'directo' | 'intermediario' | 'referido'>('directo')
+  const [estadoCliente, setEstadoC]     = useState<'activo' | 'en-riesgo' | 'inactivo'>('activo')
+  const [visitaCliente, setVisitaC]     = useState<'no' | 'si' | 'virtual'>('no')
+  const [facturado, setFacturado]       = useState<'no' | 'si' | 'parcial'>('no')
+  const [valor, setValor]               = useState('')
 
   const { data: comerciales = [] } = useQuery({
     queryKey: ['comerciales'],
     queryFn: getComercialesApi,
   })
 
-  const { data: biblioteca = [] } = useQuery({
-    queryKey: ['biblioteca'],
-    queryFn: getBibliotecaApi,
-    staleTime: 1000 * 60 * 5,
-  })
-
-  // Líneas desde backend; mientras carga usa el array estático para no mostrar vacío
-  const lineasDisponibles = biblioteca.length > 0
-    ? biblioteca.map((l) => l.nombre)
-    : [...SERVICIOS]
-
-  const { register, handleSubmit, watch, control, formState: { errors } } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      tipo: 'prospecto',
-      tipo_cliente: 'directo',
-      fecha: today(),
-    },
-  })
-
-  const tipo = watch('tipo')
-  const tipoCliente = watch('tipo_cliente')
-  const facturadoP = watch('facturado_p')
-  const facturado = watch('facturado')
-
-  const mutation = useMutation({
+  const createMut = useMutation({
     mutationFn: createRecord,
     onSuccess: (data) => {
-      toast.add('Registro creado exitosamente')
-      const path = data.tipo === 'prospecto' ? `/prospectos/${data.id}` : `/clientes/${data.id}`
-      navigate(path)
+      qc.invalidateQueries({ queryKey: ['records'] })
+      toast.success(`${tipo === 'prospecto' ? 'Prospecto' : 'Cliente'} creado correctamente`)
+      navigate(`/detalle/${data.id}`)
     },
-    onError: () => toast.add('Error al crear el registro', 'error'),
+    onError: () => toast.error('Error al crear el registro'),
   })
 
-  const onSubmit = (values: FormValues) => {
-    const totalBilling = Object.values(facturacionLineas).reduce((a, b) => a + b, 0)
-    const payload: Record<string, unknown> = {
-      ...values,
-      servicios,
-      contactos,
-      ...(servicios.length > 0 ? { facturacion_lineas: facturacionLineas } : {}),
-      ...(values.tipo === 'prospecto' ? { valor_p: totalBilling } : { valor: totalBilling }),
+  function toggleServicio(s: string) {
+    setServicios((prev) =>
+      prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
+    )
+  }
+
+  function addContacto() {
+    setContactos((prev) => [...prev, { ...emptyContacto(), orden: prev.length }])
+  }
+
+  function removeContacto(i: number) {
+    setContactos((prev) => prev.filter((_, idx) => idx !== i))
+  }
+
+  function updateContacto(i: number, field: keyof ContactoCreate, value: string | boolean) {
+    setContactos((prev) => prev.map((c, idx) => idx === i ? { ...c, [field]: value } : c))
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!empresa.trim()) { toast.error('La empresa es requerida'); return }
+    if (!comercialId) { toast.error('Selecciona un comercial'); return }
+    if (servicios.length === 0) { toast.error('Selecciona al menos un servicio'); return }
+    if (contactos.length === 0 || !contactos[0].nombre.trim()) {
+      toast.error('Agrega al menos un contacto'); return
     }
-    // Clean empty strings
-    Object.keys(payload).forEach((k) => {
-      if (payload[k] === '' || payload[k] === undefined) delete payload[k]
-    })
-    mutation.mutate(payload)
+
+    const payload: RecordCreate = {
+      tipo,
+      empresa: empresa.trim(),
+      nit: nit || undefined,
+      ciudad: ciudad || undefined,
+      direccion: direccion || undefined,
+      comercialId,
+      fecha,
+      categoria: categoria || undefined,
+      servicios,
+      observaciones: observaciones || undefined,
+      contactos: contactos.filter((c) => c.nombre.trim()),
+      ...(tipo === 'prospecto' ? {
+        estadoProspecto: estadoProspecto as RecordCreate['estadoProspecto'],
+        visita,
+        fechaVisita: fechaVisita || undefined,
+        proximoSeguimiento: proxSeguimiento || undefined,
+        ingresosEsperados: ingresosEsperados ? parseInt(ingresosEsperados.replace(/\D/g, '')) : undefined,
+      } : {
+        tipoCliente,
+        estadoCliente,
+        visitaCliente,
+        facturado,
+        valor: valor ? parseInt(valor.replace(/\D/g, '')) : undefined,
+      }),
+    }
+
+    createMut.mutate(payload)
   }
 
   return (
-    <PageContainer>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="font-condensed font-bold text-2xl" style={{ color: '#e8edf5' }}>
-            Nuevo Registro
-          </h1>
-          <p className="text-muted text-sm mt-1">Prospecto o cliente nuevo</p>
-        </div>
+    <div className="p-6 max-w-3xl mx-auto">
 
-        {/* Tipo de registro en el header */}
-        <Controller
-          control={control}
-          name="tipo"
-          render={({ field }) => (
-            <div className="flex gap-2">
-              {(['prospecto', 'cliente'] as const).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => field.onChange(t)}
-                  className="px-5 py-2 rounded-lg text-sm font-medium capitalize transition"
-                  style={{
-                    background: field.value === t ? '#00c2ff' : 'transparent',
-                    color: field.value === t ? '#0a0e1a' : '#8899b4',
-                    border: `1px solid ${field.value === t ? '#00c2ff' : '#1e3050'}`,
-                  }}
-                >
-                  {t.charAt(0).toUpperCase() + t.slice(1)}
-                </button>
-              ))}
-            </div>
-          )}
-        />
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-foreground">Nuevo Registro</h1>
+        <p className="text-sm text-muted mt-1">Completa los campos para crear un prospecto o cliente.</p>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-6">
 
-        {/* Fila 1: Datos generales + Estado */}
-        <div className="grid grid-cols-3 gap-5">
+        {/* Toggle tipo */}
+        <div className="card p-1 flex gap-1 w-fit">
+          {(['prospecto', 'cliente'] as TipoRecord[]).map((t) => (
+            <button
+              key={t} type="button"
+              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all capitalize ${
+                tipo === t
+                  ? 'bg-accent text-bg shadow-accent'
+                  : 'text-muted hover:text-foreground'
+              }`}
+              onClick={() => setTipo(t)}
+            >
+              {t === 'prospecto' ? '🎯 Prospecto' : '🏢 Cliente'}
+            </button>
+          ))}
+        </div>
 
-          {/* Datos generales — 2 cols */}
-          <div className="col-span-2 bg-surface border border-border rounded-xl p-5">
-            <h2 className="font-condensed text-xs uppercase text-muted tracking-wider mb-4">Datos generales</h2>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-3">
-                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Empresa *</label>
-                <input {...register('empresa')} placeholder="Nombre de la empresa" />
-                {errors.empresa && <p className="text-danger text-xs mt-1">{errors.empresa.message}</p>}
-              </div>
+        {/* Datos generales */}
+        <div className="card p-5 space-y-4">
+          <h2 className="font-bold text-foreground text-sm uppercase tracking-widest">Datos generales</h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-muted mb-1">Empresa *</label>
+              <input className="input" placeholder="Nombre de la empresa" value={empresa} onChange={(e) => setEmpresa(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-xs text-muted mb-1">NIT</label>
+              <input className="input" placeholder="900.000.000-0" value={nit} onChange={(e) => setNit(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-xs text-muted mb-1">Ciudad</label>
+              <input className="input" placeholder="Bogotá, Medellín..." value={ciudad} onChange={(e) => setCiudad(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-xs text-muted mb-1">Dirección</label>
+              <input className="input" placeholder="Cra 1 # 2-3" value={direccion} onChange={(e) => setDireccion(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-xs text-muted mb-1">Comercial responsable *</label>
+              <select className="input" value={comercialId} onChange={(e) => setComercialId(e.target.value)}>
+                <option value="">Seleccionar...</option>
+                {comerciales.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-muted mb-1">Fecha</label>
+              <input type="date" className="input" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-xs text-muted mb-1">Categoría</label>
+              <select className="input" value={categoria} onChange={(e) => setCategoria(e.target.value as '' | 'A' | 'B' | 'C')}>
+                <option value="">Sin categoría</option>
+                <option value="A">A — Mayor a $50M/mes</option>
+                <option value="B">B — Entre $10M y $50M/mes</option>
+                <option value="C">C — Menor a $10M/mes</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Servicios */}
+        <div className="card p-5 space-y-3">
+          <h2 className="font-bold text-foreground text-sm uppercase tracking-widest">
+            Servicios logísticos *
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {SERVICIOS.map((s) => (
+              <button
+                key={s} type="button"
+                className={`px-3 py-1.5 rounded-lg text-sm font-semibold border transition-all ${
+                  servicios.includes(s)
+                    ? 'bg-accent/15 border-accent text-accent'
+                    : 'border-border text-muted hover:border-muted hover:text-foreground'
+                }`}
+                onClick={() => toggleServicio(s)}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Campos específicos por tipo */}
+        {tipo === 'prospecto' ? (
+          <div className="card p-5 space-y-4">
+            <h2 className="font-bold text-foreground text-sm uppercase tracking-widest">Datos del prospecto</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">NIT</label>
-                <input {...register('nit')} placeholder="900.123.456-7" />
-              </div>
-              <div>
-                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Ciudad</label>
-                <input {...register('ciudad')} placeholder="Ciudad" />
-              </div>
-              <div>
-                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Categoría</label>
-                <select {...register('categoria')}>
-                  <option value="">— Sin categoría —</option>
-                  <option value="A">A — +16 operaciones/mes</option>
-                  <option value="B">B — 6 a 15 operaciones/mes</option>
-                  <option value="C">C — Menos de 5 operaciones/mes</option>
+                <label className="block text-xs text-muted mb-1">Estado pipeline</label>
+                <select className="input" value={estadoProspecto} onChange={(e) => setEstadoP(e.target.value)}>
+                  {ESTADOS_PROSPECTO.map((e) => <option key={e} value={e}>{e}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Fecha de Registro</label>
-                <input type="date" {...register('fecha')} />
-              </div>
-              <div>
-                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Comercial</label>
-                <select {...register('comercial_id')}>
-                  <option value="">Sin asignar</option>
-                  {comerciales.map((c) => (
-                    <option key={c.id} value={c.id}>{c.nombre}</option>
-                  ))}
+                <label className="block text-xs text-muted mb-1">Visita</label>
+                <select className="input" value={visita} onChange={(e) => setVisita(e.target.value as typeof visita)}>
+                  <option value="no">No</option>
+                  <option value="si">Sí (presencial)</option>
+                  <option value="virtual">Virtual</option>
+                  <option value="llamada">Llamada</option>
                 </select>
               </div>
+              {visita !== 'no' && (
+                <div>
+                  <label className="block text-xs text-muted mb-1">Fecha de visita</label>
+                  <input type="date" className="input" value={fechaVisita} onChange={(e) => setFechaVisita(e.target.value)} />
+                </div>
+              )}
               <div>
-                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Tipo cliente</label>
-                <select {...register('tipo_cliente')}>
+                <label className="block text-xs text-muted mb-1">Próximo seguimiento</label>
+                <input type="date" className="input" value={proxSeguimiento} onChange={(e) => setProxSeg(e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-xs text-muted mb-1">Ingresos esperados/mes</label>
+                <input className="input" placeholder="$5.000.000" value={ingresosEsperados}
+                  onChange={(e) => setIngresos(e.target.value)} />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="card p-5 space-y-4">
+            <h2 className="font-bold text-foreground text-sm uppercase tracking-widest">Datos del cliente</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-muted mb-1">Tipo de cliente</label>
+                <select className="input" value={tipoCliente} onChange={(e) => setTipoCliente(e.target.value as typeof tipoCliente)}>
                   <option value="directo">Directo</option>
-                  <option value="indirecto">Indirecto</option>
+                  <option value="intermediario">Intermediario</option>
                   <option value="referido">Referido</option>
                 </select>
               </div>
-              {tipoCliente !== 'directo' && (
+              <div>
+                <label className="block text-xs text-muted mb-1">Estado</label>
+                <select className="input" value={estadoCliente} onChange={(e) => setEstadoC(e.target.value as typeof estadoCliente)}>
+                  <option value="activo">Activo</option>
+                  <option value="en-riesgo">En riesgo</option>
+                  <option value="inactivo">Inactivo</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-muted mb-1">Visita</label>
+                <select className="input" value={visitaCliente} onChange={(e) => setVisitaC(e.target.value as typeof visitaCliente)}>
+                  <option value="no">No</option>
+                  <option value="si">Sí (presencial)</option>
+                  <option value="virtual">Virtual</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-muted mb-1">Facturado</label>
+                <select className="input" value={facturado} onChange={(e) => setFacturado(e.target.value as typeof facturado)}>
+                  <option value="no">No</option>
+                  <option value="si">Sí</option>
+                  <option value="parcial">Parcial</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-muted mb-1">Valor facturado/mes</label>
+                <input className="input" placeholder="$10.000.000" value={valor}
+                  onChange={(e) => setValor(e.target.value)} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Contactos */}
+        <div className="card p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-bold text-foreground text-sm uppercase tracking-widest">Contactos *</h2>
+            <button type="button" className="btn-secondary btn-sm" onClick={addContacto}>
+              + Contacto
+            </button>
+          </div>
+
+          {contactos.map((c, i) => (
+            <div key={i} className="bg-surface2 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold text-muted uppercase tracking-wide">
+                  Contacto {i + 1}
+                </span>
+                {contactos.length > 1 && (
+                  <button type="button" className="text-danger text-xs hover:underline"
+                    onClick={() => removeContacto(i)}>
+                    Quitar
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Comisión</label>
-                  <input {...register('comision')} placeholder="%" />
+                  <label className="block text-xs text-muted mb-1">Nombre *</label>
+                  <input className="input" placeholder="Nombre completo" value={c.nombre}
+                    onChange={(e) => updateContacto(i, 'nombre', e.target.value)} />
                 </div>
-              )}
-              <div className="col-span-2">
-                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Dirección</label>
-                <input {...register('direccion')} placeholder="Dirección física" />
-              </div>
-              <div className="col-span-3">
-                <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Observaciones</label>
-                <textarea
-                  {...register('observaciones')}
-                  placeholder="Notas adicionales..."
-                  className="h-20 resize-none"
-                />
+                <div>
+                  <label className="block text-xs text-muted mb-1">Cargo</label>
+                  <input className="input" placeholder="Gerente, Jefe de logística..." value={c.cargo ?? ''}
+                    onChange={(e) => updateContacto(i, 'cargo', e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted mb-1">Teléfono</label>
+                  <input className="input" placeholder="300 000 0000" value={c.telefono ?? ''}
+                    onChange={(e) => updateContacto(i, 'telefono', e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted mb-1">Email</label>
+                  <input type="email" className="input" placeholder="correo@empresa.com" value={c.email ?? ''}
+                    onChange={(e) => updateContacto(i, 'email', e.target.value)} />
+                </div>
+                {tipo === 'cliente' && (
+                  <>
+                    <div>
+                      <label className="block text-xs text-muted mb-1">Cumpleaños</label>
+                      <input type="date" className="input" value={c.cumpleanos ?? ''}
+                        onChange={(e) => updateContacto(i, 'cumpleanos', e.target.value)} />
+                    </div>
+                    <div className="flex items-center gap-2 pt-4">
+                      <input type="checkbox" id={`regalo-${i}`} checked={c.recibeRegalos ?? false}
+                        onChange={(e) => updateContacto(i, 'recibeRegalos', e.target.checked)}
+                        className="w-4 h-4 accent-accent" />
+                      <label htmlFor={`regalo-${i}`} className="text-sm text-muted cursor-pointer">
+                        Recibe regalo de cumpleaños
+                      </label>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
-          </div>
-
-          {/* Estado prospecto/cliente — 1 col */}
-          <div className="bg-surface border border-border rounded-xl p-5">
-            {tipo === 'prospecto' ? (
-              <>
-                <h2 className="font-condensed text-xs uppercase text-muted tracking-wider mb-4">Estado prospecto</h2>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Estado</label>
-                    <select {...register('estado_prospecto')}>
-                      <option value="">—</option>
-                      <option value="seguimiento">Seguimiento</option>
-                      <option value="cerrado">Cerrado</option>
-                      <option value="perdido">Perdido</option>
-                      <option value="frio">Frío</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Visita</label>
-                    <select {...register('visita')}>
-                      <option value="">—</option>
-                      <option value="no">No</option>
-                      <option value="si">Sí — Presencial</option>
-                      <option value="virtual">Sí — Virtual</option>
-                      <option value="llamada">Sí — Llamada Comercial</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Fecha de Visita</label>
-                    <input type="date" {...register('fecha_visita')} />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Próx. Seguimiento</label>
-                    <input type="date" {...register('proximo_seguimiento')} />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">¿Se facturó?</label>
-                    <select {...register('facturado_p')}>
-                      <option value="">—</option>
-                      <option value="no">No</option>
-                      <option value="si">Sí</option>
-                      <option value="parcial">Parcial</option>
-                    </select>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                <h2 className="font-condensed text-xs uppercase text-muted tracking-wider mb-4">Estado cliente</h2>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Estado</label>
-                    <select {...register('estado_cliente')}>
-                      <option value="">—</option>
-                      <option value="activo">Activo</option>
-                      <option value="en-riesgo">En riesgo</option>
-                      <option value="inactivo">Inactivo</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Visita</label>
-                    <select {...register('visita_cliente')}>
-                      <option value="">—</option>
-                      <option value="no">No</option>
-                      <option value="si">Sí — Presencial</option>
-                      <option value="virtual">Sí — Virtual</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Fecha de Visita / Gestión</label>
-                    <input type="date" {...register('fecha_visita_cliente')} />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">¿Nuevo servicio?</label>
-                    <select {...register('nuevo_servicio')}>
-                      <option value="">—</option>
-                      <option value="si">Sí</option>
-                      <option value="no">No</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Servicio cerrado</label>
-                    <select {...register('servicio_nuevo')}>
-                      <option value="">—</option>
-                      {lineasDisponibles.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-muted mb-1 uppercase tracking-wider font-condensed">Facturado</label>
-                    <select {...register('facturado')}>
-                      <option value="">—</option>
-                      <option value="no">No</option>
-                      <option value="si">Sí</option>
-                      <option value="parcial">Parcial</option>
-                    </select>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
+          ))}
         </div>
 
-        {/* Fila 2: Servicios + Contactos */}
-        <div className="grid grid-cols-2 gap-5">
-
-          {/* Servicios de interés */}
-          <div className="bg-surface border border-border rounded-xl p-5">
-            <h2 className="font-condensed text-xs uppercase text-muted tracking-wider mb-4">Servicios de interés</h2>
-            <div className="flex flex-wrap gap-2 mb-4">
-              {lineasDisponibles.map((s) => (
-                <ServiceChip
-                  key={s}
-                  label={s}
-                  selected={servicios.includes(s)}
-                  onToggle={() =>
-                    setServicios((prev) =>
-                      prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
-                    )
-                  }
-                />
-              ))}
-            </div>
-            {servicios.length > 0 && (tipo === 'prospecto' ? facturadoP && facturadoP !== 'no' : facturado && facturado !== 'no') && (
-              <>
-                <p className="text-xs text-muted mb-3 uppercase tracking-wider font-condensed">Facturación por línea</p>
-                <BillingLines
-                  servicios={servicios}
-                  value={facturacionLineas}
-                  onChange={setFacturacionLineas}
-                />
-              </>
-            )}
-          </div>
-
-          {/* Contactos */}
-          <div className="bg-surface border border-border rounded-xl p-5">
-            <h2 className="font-condensed text-xs uppercase text-muted tracking-wider mb-4">Contactos</h2>
-            <ContactosList value={contactos} onChange={setContactos} />
-          </div>
+        {/* Observaciones */}
+        <div className="card p-5">
+          <label className="block text-xs text-muted mb-2">Observaciones</label>
+          <textarea className="input min-h-24 resize-none" placeholder="Notas adicionales..."
+            value={observaciones} onChange={(e) => setObs(e.target.value)} />
         </div>
 
-        {/* Submit */}
-        <div className="flex gap-3 justify-end">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="px-5 py-2.5 rounded-lg text-sm text-muted hover:text-white transition border border-border"
-          >
+        {/* Acciones */}
+        <div className="flex gap-3 justify-end pb-6">
+          <button type="button" className="btn-secondary" onClick={() => navigate(-1)}>
             Cancelar
           </button>
-          <button
-            type="submit"
-            disabled={mutation.isPending}
-            className="px-6 py-2.5 rounded-lg text-sm font-medium transition disabled:opacity-50"
-            style={{ background: '#00c2ff', color: '#0a0e1a' }}
-          >
-            {mutation.isPending ? 'Guardando...' : 'Crear registro'}
+          <button type="submit" className="btn-primary" disabled={createMut.isPending}>
+            {createMut.isPending ? 'Guardando...' : `Crear ${tipo}`}
           </button>
         </div>
+
       </form>
-    </PageContainer>
+    </div>
   )
 }

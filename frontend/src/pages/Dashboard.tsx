@@ -1,387 +1,382 @@
-import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
-import PageContainer from '../components/PageContainer'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, LineChart, Line, Legend,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  LineChart, Line, PieChart, Pie, Cell, Legend,
 } from 'recharts'
-import { getDashboardStats, getDashboardCharts, getRankingApi, getRecientesApi } from '../api/dashboard'
-import { getComercialesApi } from '../api/comerciales'
-import { getRecords } from '../api/records'
-import StatCard from '../components/StatCard'
-import { fmtCOP } from '../utils/format'
-import { exportTodos } from '../utils/exportExcel'
+import { getDashboard, getRanking, getRecientes } from '../api/dashboard'
+import { useAuthStore } from '../store/authStore'
 
-const PIE_COLORS = ['#00c2ff', '#a855f7', '#00e676', '#f5a623', '#ff6b6b', '#00ffcc']
+const COLORS = {
+  accent:  '#00c2ff',
+  accent2: '#0077ff',
+  gold:    '#f5a623',
+  success: '#00e676',
+  danger:  '#ff4444',
+  purple:  '#a855f7',
+  muted:   '#8899b4',
+}
 
-function EmptyChart({ msg = 'Sin datos aún' }: { msg?: string }) {
+const ESTADO_PIPELINE_LABELS: Record<string, string> = {
+  prospecto:            'Prosp.',
+  reconocimiento:       'Recono.',
+  propuesta:            'Prop.',
+  aceptacion_propuesta: 'Acept.',
+  creacion_sop:         'SOP',
+  facturado:            'Facturado',
+}
+
+const COT_ESTADO_COLORS: Record<string, string> = {
+  borrador:    COLORS.muted,
+  enviada:     COLORS.accent,
+  negociacion: COLORS.gold,
+  aprobada:    COLORS.success,
+  rechazada:   COLORS.danger,
+}
+
+function fmt(n: number) {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`
+  return `$${n}`
+}
+
+function KpiCard({ label, value, sub, color = '#00c2ff', icon }: {
+  label: string; value: string | number; sub?: string; color?: string; icon: string
+}) {
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-2 text-muted" style={{ minHeight: 160 }}>
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" opacity={0.4}>
-        <path d="M3 3v18h18" /><path d="M7 16l4-4 4 4 4-7" />
-      </svg>
-      <p className="text-xs">{msg}</p>
+    <div className="card p-5 flex items-start gap-4 hover:border-accent/40 transition-colors">
+      <div
+        className="w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+        style={{ background: `${color}18`, color }}
+      >
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs text-muted uppercase tracking-widest font-semibold mb-1">{label}</p>
+        <p className="text-2xl font-bold text-foreground leading-none">{value}</p>
+        {sub && <p className="text-xs text-muted mt-1">{sub}</p>}
+      </div>
     </div>
   )
 }
-const GESTION_COLORS = ['#00e676', '#f5a623', '#8899b4', '#00c2ff', '#a855f7', '#f5a623']
 
-const TOOLTIP_STYLE = {
-  contentStyle: { background: '#1a2235', border: '1px solid #1e3050', borderRadius: 8 },
-  labelStyle: { color: '#e8edf5' },
-}
-
-const ESTADO_BADGE: Record<string, { label: string; color: string }> = {
-  borrador:    { label: 'Borrador',    color: '#8899b4' },
-  enviada:     { label: 'Enviada',     color: '#00c2ff' },
-  negociacion: { label: 'Negociación', color: '#f5a623' },
-  aprobada:    { label: 'Aprobada',    color: '#00e676' },
-  rechazada:   { label: 'Rechazada',   color: '#ff4444' },
+const CustomTooltip = ({ active, payload, label }: {
+  active?: boolean; payload?: { color: string; name: string; value: number }[]; label?: string
+}) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-surface2 border border-border rounded-lg px-3 py-2 text-xs shadow-card">
+        {label && <p className="text-muted mb-1">{label}</p>}
+        {payload.map((p) => (
+          <p key={p.name} style={{ color: p.color }} className="font-semibold">
+            {p.name}: {p.value}
+          </p>
+        ))}
+      </div>
+    )
+  }
+  return null
 }
 
 export default function Dashboard() {
-  const navigate = useNavigate()
-  const [comercialId, setComercialId] = useState('')
-  const [mes, setMes] = useState('')
-  const [tipoFiltro, setTipoFiltro] = useState('')
+  const user = useAuthStore((s) => s.user)
 
-  const filters = {
-    ...(comercialId ? { comercial_id: comercialId } : {}),
-    ...(mes ? { mes } : {}),
+  const { data: stats, isLoading: loadingStats } = useQuery({
+    queryKey: ['dashboard'],
+    queryFn: () => getDashboard(),
+  })
+
+  const { data: ranking, isLoading: loadingRanking } = useQuery({
+    queryKey: ['dashboard-ranking'],
+    queryFn: getRanking,
+  })
+
+  const { data: recientes } = useQuery({
+    queryKey: ['dashboard-recientes'],
+    queryFn: getRecientes,
+  })
+
+  const hora = new Date().getHours()
+  const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches'
+
+  if (loadingStats) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="card p-5 h-24 animate-pulse bg-surface2" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="card p-5 h-64 animate-pulse bg-surface2" />
+          ))}
+        </div>
+      </div>
+    )
   }
 
-  const { data: stats } = useQuery({
-    queryKey: ['dashboard', 'stats', filters],
-    queryFn: () => getDashboardStats(filters),
-  })
-  const { data: charts } = useQuery({
-    queryKey: ['dashboard', 'charts', filters],
-    queryFn: () => getDashboardCharts(filters),
-  })
-  const { data: comerciales } = useQuery({
-    queryKey: ['comerciales'],
-    queryFn: getComercialesApi,
-  })
-  const { data: ranking } = useQuery({
-    queryKey: ['dashboard', 'ranking'],
-    queryFn: getRankingApi,
-  })
-  const { data: recientes } = useQuery({
-    queryKey: ['dashboard', 'recientes'],
-    queryFn: getRecientesApi,
-  })
+  if (!stats) return null
 
-  const { data: allRecords = [] } = useQuery({
-    queryKey: ['records', 'all-export', tipoFiltro],
-    queryFn: () => getRecords(tipoFiltro ? { tipo: tipoFiltro } : {}),
-    staleTime: 1000 * 60,
-  })
+  const pipelineData = Object.entries(stats.prospectos_por_estado).map(([estado, count]) => ({
+    estado: ESTADO_PIPELINE_LABELS[estado] ?? estado,
+    count,
+  }))
+
+  const serviciosData = stats.servicios_frecuentes.slice(0, 6)
+  const donutColors = Object.values(COLORS)
+
+  const cotData = Object.entries(stats.cotizaciones_por_estado).map(([estado, count]) => ({
+    name: estado,
+    value: count,
+    color: COT_ESTADO_COLORS[estado] ?? COLORS.muted,
+  }))
+
+  const facturacionLineas = Object.entries(stats.facturacion_por_linea)
+    .map(([linea, valor]) => ({ linea, valor }))
+    .sort((a, b) => b.valor - a.valor)
+    .slice(0, 6)
 
   return (
-    <PageContainer>
-      {/* Header + Filtros */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="font-condensed font-bold text-2xl" style={{ color: '#e8edf5' }}>Dashboard</h1>
-        <div className="flex gap-3 items-center">
-          <select className="w-44" value={comercialId} onChange={(e) => setComercialId(e.target.value)}>
-            <option value="">Todos los comerciales</option>
-            {comerciales?.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-          </select>
-          <select className="w-40" value={tipoFiltro} onChange={(e) => setTipoFiltro(e.target.value)}>
-            <option value="">Todos los tipos</option>
-            <option value="prospecto">Prospectos</option>
-            <option value="cliente">Clientes</option>
-          </select>
-          <input type="month" className="w-36" value={mes} onChange={(e) => setMes(e.target.value)} />
-          <button
-            onClick={() => exportTodos(allRecords, comerciales ?? [])}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted hover:text-white border border-border transition whitespace-nowrap"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-            Exportar Excel
-          </button>
-        </div>
+    <div className="p-6 space-y-6">
+
+      {/* Saludo */}
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">
+          {saludo}, {user?.username} 👋
+        </h1>
+        <p className="text-sm text-muted mt-1">
+          {new Date().toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+        </p>
       </div>
 
-      {/* Stat Cards — Records */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
-        <StatCard label="Total Records"  value={stats?.total_records ?? 0}    accent="#00c2ff" />
-        <StatCard label="Prospectos"     value={stats?.total_prospectos ?? 0}  accent="#a855f7" />
-        <StatCard label="Clientes"       value={stats?.total_clientes ?? 0}    accent="#00e676" />
-        <StatCard label="Facturación"    value={fmtCOP(stats?.total_facturado)} accent="#f5a623" />
-        <StatCard label="Cotizaciones"   value={stats?.total_cotizaciones ?? 0} accent="#00c2ff" />
-        <StatCard label="Aprobadas"      value={stats?.cotizaciones_por_estado?.aprobada ?? 0} accent="#00e676" />
+      {/* KPI Cards principales */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard label="Prospectos activos" value={stats.total_prospectos} icon="🎯"
+          color={COLORS.accent} sub="En pipeline" />
+        <KpiCard label="Clientes" value={stats.total_clientes} icon="🏢"
+          color={COLORS.gold} sub="Activos en CRM" />
+        <KpiCard label="Facturación total" value={fmt(stats.facturacion_total)} icon="💰"
+          color={COLORS.success} sub="Período seleccionado" />
+        <KpiCard label="Cotizaciones" value={stats.total_cotizaciones} icon="📋"
+          color={COLORS.purple} sub={`${stats.cotizaciones_aprobadas} aprobadas`} />
       </div>
 
-      {/* Stat Cards — Cotizaciones extra */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard label="En Curso"       value={stats?.cotizaciones_en_curso ?? 0}  accent="#f5a623" sub="Borrador · Enviada · Neg." />
-        <StatCard label="Vencidas"       value={stats?.cotizaciones_vencidas ?? 0}  accent="#ff4444" sub="Sin respuesta" />
-        <StatCard label="Rechazadas"     value={stats?.cotizaciones_por_estado?.rechazada ?? 0} accent="#8899b4" />
-        <StatCard label="Negociación"    value={stats?.cotizaciones_por_estado?.negociacion ?? 0} accent="#a855f7" />
+      {/* KPI Cotizaciones */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard label="Enviadas" value={stats.cotizaciones_en_curso} icon="📤" color={COLORS.accent} />
+        <KpiCard label="Negociación" value={stats.cotizaciones_negociacion} icon="🤝" color={COLORS.gold} />
+        <KpiCard label="Aprobadas" value={stats.cotizaciones_aprobadas} icon="✅" color={COLORS.success} />
+        <KpiCard label="Rechazadas" value={stats.cotizaciones_rechazadas} icon="❌" color={COLORS.danger} />
       </div>
 
-      {/* Fila 1 — Pipeline */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className="bg-surface rounded-xl border border-border p-5">
-          <h3 className="font-condensed text-sm uppercase text-muted tracking-wider mb-4">Prospectos vs Clientes</h3>
+      {/* Gráficas fila 1 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {/* Pipeline por estado */}
+        <div className="card p-5">
+          <h3 className="text-sm font-bold text-foreground uppercase tracking-widest mb-4">
+            Pipeline por estado
+          </h3>
           <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <Pie data={charts?.prospectos_vs_clientes ?? []} cx="50%" cy="45%" outerRadius={65} dataKey="value"
-                label={false} labelLine={false}>
-                {charts?.prospectos_vs_clientes.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-              </Pie>
-              <Tooltip {...TOOLTIP_STYLE} formatter={(v, name) => [v, name]} />
-              <Legend wrapperStyle={{ fontSize: 11, color: '#8899b4' }} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="bg-surface rounded-xl border border-border p-5">
-          <h3 className="font-condensed text-sm uppercase text-muted tracking-wider mb-4">Pipeline por Estado</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={charts?.pipeline_estados ?? []}>
-              <XAxis dataKey="name" tick={{ fill: '#8899b4', fontSize: 11 }} />
-              <YAxis tick={{ fill: '#8899b4', fontSize: 11 }} />
-              <Tooltip {...TOOLTIP_STYLE} />
-              <Bar dataKey="value" fill="#00c2ff" radius={[4, 4, 0, 0]} />
+            <BarChart data={pipelineData} barSize={28}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1e3050" vertical={false} />
+              <XAxis dataKey="estado" tick={{ fill: '#8899b4', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: '#8899b4', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <Tooltip content={<CustomTooltip />} cursor={{ fill: '#00c2ff08' }} />
+              <Bar dataKey="count" name="Registros" fill={COLORS.accent} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        <div className="bg-surface rounded-xl border border-border p-5">
-          <h3 className="font-condensed text-sm uppercase text-muted tracking-wider mb-4">Servicios Solicitados</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={charts?.servicios_solicitados ?? []} layout="vertical">
-              <XAxis type="number" tick={{ fill: '#8899b4', fontSize: 11 }} />
-              <YAxis dataKey="name" type="category" tick={{ fill: '#8899b4', fontSize: 10 }} width={110} />
-              <Tooltip {...TOOLTIP_STYLE} />
-              <Bar dataKey="value" fill="#a855f7" radius={[0, 4, 4, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="bg-surface rounded-xl border border-border p-5">
-          <h3 className="font-condensed text-sm uppercase text-muted tracking-wider mb-4">Actividad por Comercial</h3>
-          {(charts?.actividad_por_comercial ?? []).length === 0 ? (
-            <EmptyChart msg="Registra actividades en prospectos y clientes para ver datos aquí" />
-          ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={charts!.actividad_por_comercial.map(c => ({ name: c.name, value: c.total }))}>
-                <XAxis dataKey="name" tick={{ fill: '#8899b4', fontSize: 10 }} />
-                <YAxis tick={{ fill: '#8899b4', fontSize: 11 }} />
-                <Tooltip {...TOOLTIP_STYLE} />
-                <Bar dataKey="value" fill="#00e676" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-      </div>
-
-      {/* Fila 2 — Línea de tiempo + Gestión clientes */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <div className="bg-surface rounded-xl border border-border p-5 lg:col-span-2">
-          <h3 className="font-condensed text-sm uppercase text-muted tracking-wider mb-4">Registros por Mes</h3>
-          <ResponsiveContainer width="100%" height={240}>
-            <LineChart data={charts?.registros_por_mes ?? []}>
-              <XAxis dataKey="name" tick={{ fill: '#8899b4', fontSize: 11 }} />
-              <YAxis tick={{ fill: '#8899b4', fontSize: 11 }} allowDecimals={false} />
-              <Tooltip {...TOOLTIP_STYLE} />
+        {/* Tendencia mensual */}
+        <div className="card p-5">
+          <h3 className="text-sm font-bold text-foreground uppercase tracking-widest mb-4">
+            Tendencia mensual (12 meses)
+          </h3>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={stats.registros_por_mes}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1e3050" vertical={false} />
+              <XAxis dataKey="mes" tick={{ fill: '#8899b4', fontSize: 10 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: '#8899b4', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <Tooltip content={<CustomTooltip />} />
+              <Line type="monotone" dataKey="prospectos" name="Prospectos"
+                stroke={COLORS.accent} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+              <Line type="monotone" dataKey="clientes" name="Clientes"
+                stroke={COLORS.gold} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
               <Legend wrapperStyle={{ fontSize: 12, color: '#8899b4' }} />
-              <Line type="monotone" dataKey="prospectos" stroke="#00c2ff" strokeWidth={2} dot={{ r: 3, fill: '#00c2ff' }} name="Prospectos" />
-              <Line type="monotone" dataKey="clientes" stroke="#00e676" strokeWidth={2} dot={{ r: 3, fill: '#00e676' }} name="Clientes" />
             </LineChart>
           </ResponsiveContainer>
         </div>
-
-        <div className="bg-surface rounded-xl border border-border p-5">
-          <h3 className="font-condensed text-sm uppercase text-muted tracking-wider mb-4">Gestión Clientes</h3>
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={charts?.gestion_clientes ?? []} layout="vertical" margin={{ left: 4, right: 12 }}>
-              <XAxis type="number" tick={{ fill: '#8899b4', fontSize: 11 }} allowDecimals={false} />
-              <YAxis dataKey="name" type="category" tick={{ fill: '#8899b4', fontSize: 10 }} width={90} />
-              <Tooltip {...TOOLTIP_STYLE} />
-              <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                {charts?.gestion_clientes.map((_, i) => (
-                  <Cell key={i} fill={GESTION_COLORS[i % GESTION_COLORS.length]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
       </div>
 
-      {/* Fila 3 — Cotizaciones charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <div className="bg-surface rounded-xl border border-border p-5">
-          <h3 className="font-condensed text-sm uppercase text-muted tracking-wider mb-4">Pipeline Cotizaciones</h3>
-          {(charts?.pipeline_cotizaciones ?? []).length === 0 ? (
-            <EmptyChart msg="Crea cotizaciones para ver el pipeline aquí" />
+      {/* Gráficas fila 2 */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {/* Servicios — donut */}
+        <div className="card p-5">
+          <h3 className="text-sm font-bold text-foreground uppercase tracking-widest mb-4">
+            Servicios solicitados
+          </h3>
+          {serviciosData.length === 0 ? (
+            <div className="empty-state text-sm">Sin datos</div>
           ) : (
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={200}>
               <PieChart>
-                <Pie data={charts!.pipeline_cotizaciones} cx="50%" cy="45%" outerRadius={65} dataKey="value"
-                  label={false} labelLine={false}>
-                  {charts!.pipeline_cotizaciones.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                <Pie data={serviciosData} dataKey="count" nameKey="servicio"
+                  cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3}>
+                  {serviciosData.map((_, i) => (
+                    <Cell key={i} fill={donutColors[i % donutColors.length]} />
+                  ))}
                 </Pie>
-                <Tooltip {...TOOLTIP_STYLE} formatter={(v, name) => [v, name]} />
+                <Tooltip
+                  contentStyle={{ background: '#111827', border: '1px solid #1e3050', borderRadius: 8, fontSize: 12 }}
+                />
                 <Legend wrapperStyle={{ fontSize: 11, color: '#8899b4' }} />
               </PieChart>
             </ResponsiveContainer>
           )}
         </div>
 
-        <div className="bg-surface rounded-xl border border-border p-5">
-          <h3 className="font-condensed text-sm uppercase text-muted tracking-wider mb-4">Líneas más Cotizadas</h3>
-          {(charts?.lineas_cotizadas ?? []).length === 0 ? (
-            <EmptyChart msg="Crea cotizaciones con líneas de servicio para ver datos aquí" />
+        {/* Cotizaciones — donut */}
+        <div className="card p-5">
+          <h3 className="text-sm font-bold text-foreground uppercase tracking-widest mb-4">
+            Cotizaciones por estado
+          </h3>
+          {cotData.length === 0 ? (
+            <div className="empty-state text-sm">Sin datos</div>
           ) : (
             <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={charts!.lineas_cotizadas} layout="vertical">
-                <XAxis type="number" tick={{ fill: '#8899b4', fontSize: 11 }} />
-                <YAxis dataKey="name" type="category" tick={{ fill: '#8899b4', fontSize: 10 }} width={100} />
-                <Tooltip {...TOOLTIP_STYLE} />
-                <Bar dataKey="value" fill="#f5a623" radius={[0, 4, 4, 0]} />
-              </BarChart>
+              <PieChart>
+                <Pie data={cotData} dataKey="value" nameKey="name"
+                  cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3}>
+                  {cotData.map((entry, i) => (
+                    <Cell key={i} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{ background: '#111827', border: '1px solid #1e3050', borderRadius: 8, fontSize: 12 }}
+                />
+                <Legend wrapperStyle={{ fontSize: 11, color: '#8899b4' }} />
+              </PieChart>
             </ResponsiveContainer>
           )}
         </div>
 
-        <div className="bg-surface rounded-xl border border-border p-5">
-          <h3 className="font-condensed text-sm uppercase text-muted tracking-wider mb-4">Facturación por Línea</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={charts?.billing_por_linea ?? []} layout="vertical">
-              <XAxis type="number" tick={{ fill: '#8899b4', fontSize: 11 }} />
-              <YAxis dataKey="name" type="category" tick={{ fill: '#8899b4', fontSize: 10 }} width={100} />
-              <Tooltip {...TOOLTIP_STYLE} formatter={(v: number) => fmtCOP(v)} />
-              <Bar dataKey="value" fill="#00ffcc" radius={[0, 4, 4, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+        {/* Facturación por línea — barras horizontales */}
+        <div className="card p-5">
+          <h3 className="text-sm font-bold text-foreground uppercase tracking-widest mb-4">
+            Facturación por línea
+          </h3>
+          {facturacionLineas.length === 0 ? (
+            <div className="empty-state text-sm">Sin datos</div>
+          ) : (
+            <div className="space-y-3 mt-2">
+              {facturacionLineas.map((item, i) => {
+                const max = facturacionLineas[0].valor || 1
+                const pct = Math.round((item.valor / max) * 100)
+                const color = donutColors[i % donutColors.length]
+                return (
+                  <div key={item.linea}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-muted truncate mr-2">{item.linea}</span>
+                      <span className="text-foreground font-semibold flex-shrink-0">{fmt(item.valor)}</span>
+                    </div>
+                    <div className="h-1.5 bg-surface2 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Tablas recientes */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Últimos Registros */}
-        <div className="bg-surface rounded-xl border border-border p-5">
-          <h3 className="font-condensed text-sm uppercase text-muted tracking-wider mb-4">Últimos Registros</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-muted text-xs uppercase tracking-wider border-b border-border">
-                  <th className="text-left pb-2 font-condensed">Empresa</th>
-                  <th className="text-left pb-2 font-condensed">Tipo</th>
-                  <th className="text-left pb-2 font-condensed">Comercial</th>
-                  <th className="text-left pb-2 font-condensed">Estado</th>
-                  <th className="text-left pb-2 font-condensed">Fecha</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(recientes?.registros ?? []).map((r) => (
-                  <tr key={r.id}
-                    className="border-b border-border/40 hover:bg-white/5 cursor-pointer transition"
-                    onClick={() => navigate(`/${r.tipo === 'prospecto' ? 'prospectos' : 'clientes'}/${r.id}`)}
-                  >
-                    <td className="py-2 font-medium" style={{ color: '#e8edf5' }}>{r.empresa}</td>
-                    <td className="py-2">
-                      <span className="text-xs px-2 py-0.5 rounded-full font-condensed"
-                        style={{ background: r.tipo === 'prospecto' ? 'rgba(168,85,247,0.2)' : 'rgba(0,230,118,0.2)', color: r.tipo === 'prospecto' ? '#a855f7' : '#00e676' }}>
-                        {r.tipo === 'prospecto' ? 'Prospecto' : 'Cliente'}
-                      </span>
-                    </td>
-                    <td className="py-2 text-muted text-xs">{r.comercial_nombre ?? '—'}</td>
-                    <td className="py-2 text-xs text-muted">{r.estado || '—'}</td>
-                    <td className="py-2 text-xs text-muted">{r.fecha}</td>
-                  </tr>
-                ))}
-                {!recientes?.registros.length && (
-                  <tr><td colSpan={5} className="py-6 text-center text-muted text-sm">Sin registros recientes</td></tr>
-                )}
-              </tbody>
-            </table>
+      {/* Ranking comerciales */}
+      {!loadingRanking && ranking && ranking.length > 0 && (
+        <div className="table-card">
+          <div className="table-header">
+            <span className="table-title">Ranking Comerciales</span>
           </div>
-        </div>
-
-        {/* Cotizaciones Recientes */}
-        <div className="bg-surface rounded-xl border border-border p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-condensed text-sm uppercase text-muted tracking-wider">Cotizaciones Recientes</h3>
-            <button className="text-xs text-muted hover:text-white transition" onClick={() => navigate('/cotizaciones')}>
-              Ver todas →
-            </button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-muted text-xs uppercase tracking-wider border-b border-border">
-                  <th className="text-left pb-2 font-condensed">N°</th>
-                  <th className="text-left pb-2 font-condensed">Empresa</th>
-                  <th className="text-left pb-2 font-condensed">Estado</th>
-                  <th className="text-left pb-2 font-condensed">Fecha</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(recientes?.cotizaciones ?? []).map((c) => {
-                  const badge = c.vencida
-                    ? { label: 'Vencida', color: '#ff4444' }
-                    : (ESTADO_BADGE[c.estado] ?? { label: c.estado, color: '#8899b4' })
-                  return (
-                    <tr key={c.id} className="border-b border-border/40 hover:bg-white/5 transition">
-                      <td className="py-2 font-condensed font-bold" style={{ color: '#e8edf5' }}>{c.numero}</td>
-                      <td className="py-2 text-xs" style={{ color: '#e8edf5' }}>{c.empresa}</td>
-                      <td className="py-2">
-                        <span className="text-xs px-2 py-0.5 rounded-full font-condensed"
-                          style={{ background: `${badge.color}22`, color: badge.color }}>
-                          {badge.label}
-                        </span>
-                      </td>
-                      <td className="py-2 text-xs text-muted">{c.fecha}</td>
-                    </tr>
-                  )
-                })}
-                {!recientes?.cotizaciones.length && (
-                  <tr><td colSpan={4} className="py-6 text-center text-muted text-sm">Sin cotizaciones recientes</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      {/* Ranking por Comercial */}
-      <div className="bg-surface rounded-xl border border-border p-5">
-        <h3 className="font-condensed text-sm uppercase text-muted tracking-wider mb-4">Ranking por Comercial</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table>
             <thead>
-              <tr className="text-muted text-xs uppercase tracking-wider border-b border-border">
-                <th className="text-left pb-3 font-condensed">#</th>
-                <th className="text-left pb-3 font-condensed">Comercial</th>
-                <th className="text-right pb-3 font-condensed">Prospectos</th>
-                <th className="text-right pb-3 font-condensed">Clientes</th>
-                <th className="text-right pb-3 font-condensed">Visitas</th>
-                <th className="text-right pb-3 font-condensed">Facturado</th>
+              <tr>
+                <th>#</th>
+                <th>Nombre</th>
+                <th>Cargo</th>
+                <th>Prospectos</th>
+                <th>Clientes</th>
+                <th>Visitas</th>
+                <th>Facturado</th>
               </tr>
             </thead>
             <tbody>
-              {(ranking ?? []).map((r, i) => (
-                <tr key={r.comercial_id} className="border-b border-border/50 hover:bg-white/5 transition">
-                  <td className="py-3 pr-4 text-muted font-condensed">{i + 1}</td>
-                  <td className="py-3 font-medium" style={{ color: '#e8edf5' }}>{r.nombre}</td>
-                  <td className="py-3 text-right" style={{ color: '#a855f7' }}>{r.prospectos}</td>
-                  <td className="py-3 text-right" style={{ color: '#00e676' }}>{r.clientes}</td>
-                  <td className="py-3 text-right" style={{ color: '#00c2ff' }}>{r.visitas}</td>
-                  <td className="py-3 text-right font-condensed" style={{ color: '#f5a623' }}>{fmtCOP(r.valor_facturado)}</td>
+              {ranking.map((c, i) => (
+                <tr key={c.id}>
+                  <td>
+                    <span className="font-bold text-foreground">
+                      {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
+                    </span>
+                  </td>
+                  <td className="font-semibold text-foreground">{c.nombre}</td>
+                  <td className="text-muted text-xs">{c.cargo || '—'}</td>
+                  <td><span className="badge-blue">{c.prospectos}</span></td>
+                  <td><span className="badge-gold">{c.clientes}</span></td>
+                  <td className="text-foreground">{c.visitas}</td>
+                  <td className="font-mono text-success text-sm">{fmt(c.facturado)}</td>
                 </tr>
               ))}
-              {!ranking?.length && (
-                <tr><td colSpan={6} className="py-6 text-center text-muted text-sm">Sin datos de comerciales</td></tr>
-              )}
             </tbody>
           </table>
         </div>
-      </div>
-    </PageContainer>
+      )}
+
+      {/* Últimos registros */}
+      {recientes && recientes.records.length > 0 && (
+        <div className="table-card">
+          <div className="table-header">
+            <span className="table-title">Últimos registros</span>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Empresa</th>
+                <th>Tipo</th>
+                <th>Comercial</th>
+                <th>Servicios</th>
+                <th>Fecha</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recientes.records.slice(0, 8).map((r) => (
+                <tr key={r.id}>
+                  <td className="font-semibold text-foreground">{r.empresa}</td>
+                  <td>
+                    <span className={r.tipo === 'cliente' ? 'badge-gold' : 'badge-blue'}>
+                      {r.tipo}
+                    </span>
+                  </td>
+                  <td className="text-muted text-sm">{r.comercial?.nombre || '—'}</td>
+                  <td>
+                    <div className="flex flex-wrap gap-1">
+                      {(r.servicios as string[]).slice(0, 2).map((s) => (
+                        <span key={s} className="stag">{s}</span>
+                      ))}
+                      {(r.servicios as string[]).length > 2 && (
+                        <span className="stag">+{(r.servicios as string[]).length - 2}</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="text-muted text-xs">
+                    {new Date(r.createdAt).toLocaleDateString('es-CO')}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+    </div>
   )
 }

@@ -1,34 +1,48 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import PageContainer from '../components/PageContainer'
-import { useNavigate } from 'react-router-dom'
-import { Eye, Trash2, Upload, Download, Users as UsersIcon } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
 import { getRecords, deleteRecord } from '../api/records'
 import { getComercialesApi } from '../api/comerciales'
-import Badge from '../components/Badge'
-import ConfirmModal from '../components/ConfirmModal'
-import { useToastStore } from '../store/toastStore'
-import { fmtCOP, fmtDate } from '../utils/format'
-import { SERVICIO_COLORS } from '../types'
-import { exportProspectos } from '../utils/exportExcel'
+import { toast } from '../store/toastStore'
+
+const ESTADOS: { value: string; label: string; badge: string }[] = [
+  { value: '',                   label: 'Todos los estados',     badge: '' },
+  { value: 'prospecto',          label: 'Prospecto',             badge: 'badge-blue' },
+  { value: 'reconocimiento',     label: 'Reconocimiento',        badge: 'badge-purple' },
+  { value: 'propuesta',          label: 'Propuesta',             badge: 'badge-gold' },
+  { value: 'aceptacion_propuesta', label: 'Aceptación',         badge: 'badge-green' },
+  { value: 'creacion_sop',       label: 'Creación SOP',          badge: 'badge-gold' },
+  { value: 'facturado',          label: 'Facturado',             badge: 'badge-green' },
+]
+
+const ESTADO_BADGE: Record<string, string> = {
+  prospecto:            'badge-blue',
+  reconocimiento:       'badge-purple',
+  propuesta:            'badge-gold',
+  aceptacion_propuesta: 'badge-green',
+  creacion_sop:         'badge-gold',
+  facturado:            'badge-green',
+  frio:                 'badge-gray',
+  perdido:              'badge-red',
+}
+
+function fmt(n: number) {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`
+  return `$${n}`
+}
 
 export default function Prospectos() {
-  const [search, setSearch] = useState('')
-  const [estado, setEstado] = useState('')
-  const [comercialId, setComercialId] = useState('')
-  const [deleteId, setDeleteId] = useState<string | null>(null)
-  const toast = useToastStore()
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const [search, setSearch]         = useState('')
+  const [estado, setEstado]         = useState('')
+  const [comercialId, setComercialId] = useState('')
+  const [confirmId, setConfirmId]   = useState<string | null>(null)
 
-  const { data: records = [], isLoading } = useQuery({
-    queryKey: ['records', 'prospecto', search, estado, comercialId],
-    queryFn: () => getRecords({
-      tipo: 'prospecto',
-      ...(search ? { search } : {}),
-      ...(estado ? { estado_prospecto: estado } : {}),
-      ...(comercialId ? { comercial_id: comercialId } : {}),
-    }),
+  const { data: prospectos = [], isLoading } = useQuery({
+    queryKey: ['records', 'prospecto', estado, comercialId, search],
+    queryFn: () => getRecords({ tipo: 'prospecto', estado: estado || undefined, comercialId: comercialId || undefined, search: search || undefined }),
   })
 
   const { data: comerciales = [] } = useQuery({
@@ -36,152 +50,165 @@ export default function Prospectos() {
     queryFn: getComercialesApi,
   })
 
-  const deleteMutation = useMutation({
+  const deleteMut = useMutation({
     mutationFn: deleteRecord,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['records', 'prospecto'] })
-      toast.add('Prospecto eliminado')
-      setDeleteId(null)
+      qc.invalidateQueries({ queryKey: ['records'] })
+      toast.success('Prospecto eliminado')
+      setConfirmId(null)
     },
-    onError: () => toast.add('Error al eliminar', 'error'),
+    onError: () => toast.error('Error al eliminar'),
   })
 
-  const comercialNombre = (id: string | null) =>
-    comerciales.find((c) => c.id === id)?.nombre ?? '—'
+  // Pipeline visual: conteo por estado
+  const pipelineCount: Record<string, number> = {}
+  prospectos.forEach((p) => {
+    const e = p.estadoProspecto ?? 'prospecto'
+    pipelineCount[e] = (pipelineCount[e] ?? 0) + 1
+  })
+  const total = prospectos.length || 1
 
   return (
-    <PageContainer>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="font-condensed font-bold text-2xl" style={{ color: '#e8edf5' }}>
-          Prospectos
-        </h1>
-        <div className="flex items-center gap-3">
-          <span className="text-muted text-sm">{records.length} registros</span>
-          <button
-            onClick={() => exportProspectos(records, comerciales)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted hover:text-white border border-border transition"
-          >
-            <Download size={14} /> Exportar Excel
-          </button>
-          <button
-            onClick={() => navigate('/registro/importar?tipo=prospecto')}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted hover:text-white border border-border transition"
-          >
-            <Upload size={14} /> Importar
-          </button>
+    <div className="p-6 space-y-5">
+
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Prospectos</h1>
+          <p className="text-sm text-muted mt-0.5">{prospectos.length} registros</p>
+        </div>
+        <Link to="/registro" className="btn-primary btn-sm">
+          + Nuevo prospecto
+        </Link>
+      </div>
+
+      {/* Pipeline visual */}
+      <div className="card p-4">
+        <div className="flex gap-1 h-2 rounded-full overflow-hidden mb-3">
+          {ESTADOS.slice(1).map(({ value, badge }) => {
+            const count = pipelineCount[value] ?? 0
+            const pct = Math.round((count / total) * 100)
+            const colorMap: Record<string, string> = {
+              'badge-blue': '#00c2ff', 'badge-purple': '#a855f7',
+              'badge-gold': '#f5a623', 'badge-green': '#00e676',
+              'badge-gray': '#8899b4', 'badge-red': '#ff4444',
+            }
+            return pct > 0 ? (
+              <div key={value} style={{ width: `${pct}%`, background: colorMap[badge] ?? '#8899b4' }} />
+            ) : null
+          })}
+        </div>
+        <div className="flex flex-wrap gap-3">
+          {ESTADOS.slice(1).map(({ value, label }) => (
+            <div key={value} className="flex items-center gap-1.5 text-xs text-muted">
+              <span className={`inline-block w-2 h-2 rounded-full`}
+                style={{ background: ESTADO_BADGE[value]?.includes('blue') ? '#00c2ff'
+                  : ESTADO_BADGE[value]?.includes('gold') ? '#f5a623'
+                  : ESTADO_BADGE[value]?.includes('green') ? '#00e676'
+                  : ESTADO_BADGE[value]?.includes('purple') ? '#a855f7'
+                  : '#8899b4' }} />
+              <span>{label}</span>
+              <span className="font-bold text-foreground">{pipelineCount[value] ?? 0}</span>
+            </div>
+          ))}
         </div>
       </div>
 
       {/* Filtros */}
-      <div className="flex gap-3 mb-5">
+      <div className="flex flex-wrap gap-3">
         <input
-          className="flex-1"
-          placeholder="Buscar por empresa o NIT..."
+          className="filter-input flex-1 min-w-48"
+          placeholder="Buscar empresa..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <select className="w-44" value={estado} onChange={(e) => setEstado(e.target.value)}>
-          <option value="">Todos los estados</option>
-          <option value="seguimiento">Seguimiento</option>
-          <option value="cerrado">Cerrado</option>
-          <option value="perdido">Perdido</option>
-          <option value="frio">Frío</option>
+        <select className="filter-select" value={estado} onChange={(e) => setEstado(e.target.value)}>
+          {ESTADOS.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
         </select>
-        <select className="w-44" value={comercialId} onChange={(e) => setComercialId(e.target.value)}>
+        <select className="filter-select" value={comercialId} onChange={(e) => setComercialId(e.target.value)}>
           <option value="">Todos los comerciales</option>
-          {comerciales.map((c) => (
-            <option key={c.id} value={c.id}>{c.nombre}</option>
-          ))}
+          {comerciales.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
       </div>
 
       {/* Tabla */}
-      <div className="bg-surface border border-border rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+      <div className="table-card">
+        {isLoading ? (
+          <div className="p-8 space-y-3">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-10 bg-surface2 rounded animate-pulse" />
+            ))}
+          </div>
+        ) : prospectos.length === 0 ? (
+          <div className="empty-state">
+            <div className="text-4xl mb-3">🎯</div>
+            <p className="font-semibold text-foreground mb-1">Sin prospectos</p>
+            <p className="text-sm">Cambia los filtros o crea un nuevo prospecto.</p>
+          </div>
+        ) : (
+          <table>
             <thead>
-              <tr className="border-b border-border">
-                {['Empresa', 'Contacto', 'Comercial', 'Servicios', 'Visita', 'Estado', 'Facturado', 'Valor', 'Próx. Seguimiento', ''].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-condensed uppercase text-muted tracking-wider whitespace-nowrap">
-                    {h}
-                  </th>
-                ))}
+              <tr>
+                <th>Empresa</th>
+                <th>Ciudad</th>
+                <th>Comercial</th>
+                <th>Estado</th>
+                <th>Servicios</th>
+                <th>Visita</th>
+                <th>Ingresos esp.</th>
+                <th>Fecha</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
-              {isLoading && Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i} className="border-b border-border">
-                  {['70%', '45%', '55%', '80%', '40%', '50%', '45%', '55%', '60%', '20%'].map((w, j) => (
-                    <td key={j} className="px-4 py-3">
-                      <div className="h-4 bg-surface2 rounded animate-pulse" style={{ width: w }} />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-              {!isLoading && records.length === 0 && (
-                <tr>
-                  <td colSpan={10} className="py-16 text-center">
-                    <div className="flex flex-col items-center gap-3 text-muted">
-                      <UsersIcon size={36} className="opacity-30" />
-                      <p className="text-sm">No hay prospectos que mostrar</p>
-                    </div>
+              {prospectos.map((p) => (
+                <tr key={p.id} className="cursor-pointer" onClick={() => navigate(`/detalle/${p.id}`)}>
+                  <td>
+                    <div className="font-semibold text-foreground">{p.empresa}</div>
+                    {p.nit && <div className="text-xs text-muted">NIT: {p.nit}</div>}
                   </td>
-                </tr>
-              )}
-              {records.map((r) => (
-                <tr
-                  key={r.id}
-                  className="border-b border-border hover:bg-surface2 transition cursor-pointer"
-                  onClick={() => navigate(`/prospectos/${r.id}`)}
-                >
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium" style={{ color: '#e8edf5' }}>{r.empresa}</p>
-                      {r.categoria && (
-                        <span className="text-xs px-1.5 py-0.5 rounded font-condensed font-bold"
-                          style={{ background: r.categoria === 'A' ? '#00c2ff22' : r.categoria === 'B' ? '#f59e0b22' : '#6b7280aa', color: r.categoria === 'A' ? '#00c2ff' : r.categoria === 'B' ? '#f59e0b' : '#d1d5db' }}>
-                          {r.categoria}
-                        </span>
-                      )}
-                    </div>
-                    {r.nit && <p className="text-xs text-muted">NIT {r.nit}</p>}
+                  <td className="text-muted text-sm">{p.ciudad || '—'}</td>
+                  <td className="text-sm">{p.comercial?.nombre || '—'}</td>
+                  <td>
+                    <span className={ESTADO_BADGE[p.estadoProspecto ?? 'prospecto'] ?? 'badge-gray'}>
+                      {p.estadoProspecto ?? 'prospecto'}
+                    </span>
                   </td>
-                  <td className="px-4 py-3 text-muted">{r.contacto_nombre ?? '—'}</td>
-                  <td className="px-4 py-3 text-muted">{comercialNombre(r.comercial_id)}</td>
-                  <td className="px-4 py-3">
+                  <td>
                     <div className="flex flex-wrap gap-1">
-                      {r.servicios.slice(0, 3).map((s) => (
-                        <span
-                          key={s}
-                          className="text-xs px-1.5 py-0.5 rounded"
-                          style={{ background: SERVICIO_COLORS[s] + '22', color: SERVICIO_COLORS[s] }}
-                        >
-                          {s}
-                        </span>
+                      {(p.servicios as string[]).slice(0, 2).map((s) => (
+                        <span key={s} className="stag">{s}</span>
                       ))}
-                      {r.servicios.length > 3 && (
-                        <span className="text-xs text-muted">+{r.servicios.length - 3}</span>
+                      {(p.servicios as string[]).length > 2 && (
+                        <span className="stag">+{(p.servicios as string[]).length - 2}</span>
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3"><Badge value={r.visita} /></td>
-                  <td className="px-4 py-3"><Badge value={r.estado_prospecto} /></td>
-                  <td className="px-4 py-3"><Badge value={r.facturado_p} /></td>
-                  <td className="px-4 py-3 text-muted">{fmtCOP(r.valor_p)}</td>
-                  <td className="px-4 py-3 text-muted whitespace-nowrap">{fmtDate(r.proximo_seguimiento)}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                  <td>
+                    {p.visita && p.visita !== 'no'
+                      ? <span className="badge-green">{p.visita}</span>
+                      : <span className="text-muted text-xs">—</span>
+                    }
+                  </td>
+                  <td className="font-mono text-sm text-success">
+                    {p.ingresosEsperados ? fmt(p.ingresosEsperados) : '—'}
+                  </td>
+                  <td className="text-muted text-xs whitespace-nowrap">
+                    {new Date(p.fecha).toLocaleDateString('es-CO')}
+                  </td>
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <div className="flex gap-1">
                       <button
-                        onClick={() => navigate(`/prospectos/${r.id}`)}
-                        className="text-muted hover:text-accent transition"
+                        className="btn-ghost btn-sm px-2 py-1 text-xs"
+                        onClick={() => navigate(`/detalle/${p.id}`)}
                       >
-                        <Eye size={16} />
+                        Ver
                       </button>
                       <button
-                        onClick={() => setDeleteId(r.id)}
-                        className="text-muted hover:text-danger transition"
+                        className="btn-danger btn-sm px-2 py-1 text-xs"
+                        onClick={() => setConfirmId(p.id)}
                       >
-                        <Trash2 size={16} />
+                        ×
                       </button>
                     </div>
                   </td>
@@ -189,16 +216,28 @@ export default function Prospectos() {
               ))}
             </tbody>
           </table>
-        </div>
+        )}
       </div>
 
-      <ConfirmModal
-        open={!!deleteId}
-        message="¿Eliminar este prospecto? Se eliminarán también sus contactos y actividades."
-        onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
-        onCancel={() => setDeleteId(null)}
-        loading={deleteMutation.isPending}
-      />
-    </PageContainer>
+      {/* Modal confirm delete */}
+      {confirmId && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setConfirmId(null)}>
+          <div className="card p-6 w-80 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-bold text-foreground">¿Eliminar prospecto?</h3>
+            <p className="text-sm text-muted">Esta acción no se puede deshacer.</p>
+            <div className="flex gap-2 justify-end">
+              <button className="btn-secondary btn-sm" onClick={() => setConfirmId(null)}>Cancelar</button>
+              <button
+                className="btn-danger btn-sm"
+                disabled={deleteMut.isPending}
+                onClick={() => deleteMut.mutate(confirmId)}
+              >
+                {deleteMut.isPending ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
