@@ -26,7 +26,7 @@ router.post(
       const body = ActividadSchema.parse(req.body);
       const actividad = await prisma.actividad.create({
         data: {
-          recordId: req.params.recordId,
+          recordId: String(req.params.recordId),
           tipo: body.tipo,
           descripcion: body.descripcion,
           fecha: new Date(body.fecha),
@@ -57,7 +57,7 @@ router.put('/actividades/:id', async (req: Request, res: Response, next: NextFun
     if (body.hecho !== undefined) updateData.hecho = body.hecho;
 
     const actividad = await prisma.actividad.update({
-      where: { id: req.params.id },
+      where: { id: String(req.params.id) },
       data: updateData,
     });
     res.json(actividad);
@@ -69,7 +69,7 @@ router.put('/actividades/:id', async (req: Request, res: Response, next: NextFun
 // DELETE /api/actividades/:id
 router.delete('/actividades/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await prisma.actividad.delete({ where: { id: req.params.id } });
+    await prisma.actividad.delete({ where: { id: String(req.params.id) } });
     res.status(204).send();
   } catch (err) {
     next(err);

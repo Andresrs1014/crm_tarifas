@@ -51,7 +51,7 @@ router.patch('/contactos/:id/fotos', async (req: Request, res: Response, next: N
     };
 
     const updated = await prisma.contacto.update({
-      where: { id: req.params.id },
+      where: { id: String(req.params.id) },
       data: {
         ...(fotos !== undefined && { fotosEntrega: fotos }),
         ...(fdaEntregado !== undefined && { fdaEntregado }),
