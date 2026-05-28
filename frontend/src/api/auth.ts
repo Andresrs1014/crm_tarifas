@@ -1,17 +1,16 @@
-import api from './client'
-import type { Token, UserRead } from '../types'
+import client from './client'
+import type { User } from '../types'
 
-export async function loginApi(username: string, password: string): Promise<Token> {
-  const form = new URLSearchParams()
-  form.append('username', username)
-  form.append('password', password)
-  const { data } = await api.post<Token>('/api/auth/token', form, {
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-  })
-  return data
+export interface LoginResponse {
+  access_token: string
+  user: User
 }
 
-export async function getMeApi(): Promise<UserRead> {
-  const { data } = await api.get<UserRead>('/api/auth/me')
-  return data
-}
+export const loginApi = (username: string, password: string) =>
+  client.post<LoginResponse>('/api/auth/login', { username, password }).then((r) => r.data)
+
+export const ssoApi = (ssoToken: string) =>
+  client.post<LoginResponse>('/api/auth/sso', { token: ssoToken }).then((r) => r.data)
+
+export const getMeApi = () =>
+  client.get<User>('/api/auth/me').then((r) => r.data)

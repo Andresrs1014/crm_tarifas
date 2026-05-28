@@ -1,3 +1,4 @@
+// ─── Servicios logísticos (constantes del sistema) ───────────────────────────
 export const SERVICIOS = [
   'Zona Franca',
   'Depósito Aduanero',
@@ -7,7 +8,9 @@ export const SERVICIOS = [
   'Aduana',
 ] as const
 
-export const SERVICIO_COLORS: Record<string, string> = {
+export type Servicio = (typeof SERVICIOS)[number]
+
+export const SERVICIO_COLORS: { [k: string]: string } = {
   'Zona Franca':       '#00c2ff',
   'Depósito Aduanero': '#f5a623',
   'CEDI':              '#f5a623',
@@ -16,149 +19,23 @@ export const SERVICIO_COLORS: Record<string, string> = {
   'Aduana':            '#ff4444',
 }
 
-// ---------- Biblioteca ----------
-
-export interface BibliotecaColumna {
-  id: string     // slug único, ej: 'kg', 'm3'
-  nombre: string // label visible, ej: 'Kilogramos'
-}
-
-export interface BibliotecaItem {
-  id: string
-  grupo_id: string
-  nombre: string
-  tarifa: string                      // '559.900' | '0,36%'
-  tipo_tarifa: 'moneda' | 'porcentaje'
-  obs: string | null
-  extra_cols: Record<string, string>  // { col_id: valor }
-  orden: number
-}
-
-export interface BibliotecaObservacion {
-  id: string
-  linea_id: string
-  nombre: string
-  html: string
-  orden: number
-}
-
-export interface BibliotecaGrupo {
-  id: string
-  linea_id: string
-  nombre: string
-  orden: number
-  items: BibliotecaItem[]
-}
-
-export interface BibliotecaLinea {
-  id: string
-  nombre: string
-  columnas: BibliotecaColumna[]       // columnas extra de esta línea
-  orden: number
-  grupos: BibliotecaGrupo[]
-  observaciones: BibliotecaObservacion[]
-}
-
-// ---------- Cotizaciones ----------
-
-export type EstadoCotizacion =
-  | 'borrador'
-  | 'enviada'
-  | 'negociacion'
-  | 'aprobada'
-  | 'rechazada'
-
-// WizardItem: copia editable en memoria de un BibliotecaItem
-export interface WizardItem {
-  sel: boolean
-  nombre: string
-  tarifa: string
-  tipo_tarifa: 'moneda' | 'porcentaje'
-  obs: string
-  extra_cols: Record<string, string>
-}
-
-// WizardGrupo: grupo con nombre + lista de WizardItems
-export interface WizardGrupo {
-  sel: boolean    // true = todos sus items seleccionados
-  nombre: string  // guardamos nombre para display sin re-consultar biblioteca
-  items: WizardItem[]
-}
-
-// ItemsMap = { [servicio]: { [grupo_id]: WizardGrupo } }
-// Esto es exactamente la forma del items_snapshot en el backend
-export type ItemsMap = Record<string, Record<string, WizardGrupo>>
-
-export interface CotizacionRead {
-  id: string
-  numero: string
-  empresa: string
-  nit: string | null
-  record_id: string | null
-  contacto: string | null
-  cargo: string | null
-  email: string | null
-  telefono: string | null
-  comercial_id: string | null
-  fecha: string
-  vigencia: string
-  estado: EstadoCotizacion
-  asunto: string | null
-  lineas: string[]
-  items_snapshot: ItemsMap
-  obs_plantillas: Record<string, string[]>
-  obs_libre: string | null
-  paqueteadora: string | null
-  tarifa_tipo: Record<string, string> | null   // {linea: "biblioteca"|"especial"}
-  tarifa_especial_id: Record<string, string> | null  // {linea: uuid_str}
-  created_at: string
-  updated_at: string
-}
-
-// ---------- Tarifas Especiales ----------
-
-export interface TarifaEspecial {
-  id: string
-  nombre: string
-  servicio: string
-  grupos: unknown[]     // misma estructura que grupos en BibliotecaLinea
-  created_at: string
-  updated_at: string
-}
-
-// ---------- SAC ----------
-
-export interface SACContacto extends Contacto {
-  empresa: string
-  record_id: string
-}
-
-// ---------- Auth ----------
-
-export interface UserRead {
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+export interface User {
   id: string
   username: string
-  email: string
-  is_active: boolean
-  is_superadmin: boolean
-  created_at: string
+  role: 'superadmin' | 'usuario'
+  createdAt: string
 }
 
-export interface Token {
-  access_token: string
-  token_type: string
-}
-
-// ---------- Comerciales ----------
-
+// ─── Comerciales ──────────────────────────────────────────────────────────────
 export interface Comercial {
   id: string
   nombre: string
-  cargo: string | null
-  email: string | null
-  tel: string | null
+  cargo?: string
+  email?: string
+  tel?: string
   activo: boolean
-  created_at: string
+  createdAt: string
 }
 
 export interface ComercialCreate {
@@ -168,22 +45,19 @@ export interface ComercialCreate {
   tel?: string
 }
 
-// ---------- Contactos ----------
-
+// ─── Contactos ────────────────────────────────────────────────────────────────
 export interface Contacto {
   id: string
-  record_id: string
+  recordId: string
   nombre: string
-  cargo: string | null
-  telefono: string | null
-  email: string | null
+  cargo?: string
+  telefono?: string
+  email?: string
   orden: number
-  cumpleanos: string | null       // YYYY-MM-DD
-  recibe_regalos: string | null   // si|no|tal_vez
-  fotos_entrega: string[]
-  fotos_fda: string[]
-  fda_entregado: boolean | null
-  direccion: string | null
+  cumpleanos?: string
+  recibeRegalos: boolean
+  fotosEntrega: string[]
+  fdaEntregado: boolean
 }
 
 export interface ContactoCreate {
@@ -191,23 +65,22 @@ export interface ContactoCreate {
   cargo?: string
   telefono?: string
   email?: string
-  orden: number
-  cumpleanos?: string | null
-  recibe_regalos?: string | null
-  direccion?: string | null
+  orden?: number
+  cumpleanos?: string
+  recibeRegalos?: boolean
 }
 
-// ---------- Actividades ----------
-
-export type ActividadTipo = 'visit' | 'service' | 'invoice' | 'note'
+// ─── Actividades ──────────────────────────────────────────────────────────────
+export type ActividadTipo = 'llamada' | 'reunion' | 'email' | 'visita' | 'tarea' | 'seguimiento'
 
 export interface Actividad {
   id: string
-  record_id: string
+  recordId: string
   tipo: ActividadTipo
   descripcion: string
   fecha: string
-  created_at: string
+  hecho: boolean
+  createdAt: string
 }
 
 export interface ActividadCreate {
@@ -216,120 +89,203 @@ export interface ActividadCreate {
   fecha: string
 }
 
-// ---------- Records ----------
-
+// ─── CRM Records ──────────────────────────────────────────────────────────────
 export type TipoRecord = 'prospecto' | 'cliente'
-export type EstadoProspecto = 'seguimiento' | 'cerrado' | 'perdido' | 'frio'
+export type EstadoProspecto =
+  | 'prospecto' | 'reconocimiento' | 'propuesta' | 'resolucion'
+  | 'aceptacion_alcance' | 'aceptacion_propuesta' | 'firma_contrato'
+  | 'creacion_sop' | 'facturado' | 'frio' | 'perdido'
 export type EstadoCliente = 'activo' | 'en-riesgo' | 'inactivo'
+export type TipoCliente = 'directo' | 'intermediario' | 'referido'
+export type TipoVisita = 'no' | 'si' | 'virtual' | 'llamada'
+export type TipoFacturado = 'no' | 'si' | 'parcial'
 
-export interface RecordRead {
+/** CRMRecord — named to avoid conflict with TypeScript's built-in Record<K,V> utility type */
+export interface CRMRecord {
   id: string
   tipo: TipoRecord
   empresa: string
-  nit: string | null
-  ciudad: string | null
-  contacto_nombre: string | null   // primer contacto del record
-  direccion: string | null
-  categoria: string | null         // A|B|C
-  comercial_id: string | null
-  tipo_cliente: 'directo' | 'indirecto' | 'referido'
-  cliente_indirecto_id: string | null
-  comision: string | null
-  servicios: string[]
-  observaciones: string | null
+  nit?: string
+  ciudad?: string
+  direccion?: string
+  categoria?: 'A' | 'B' | 'C'
+  comercialId: string
+  comercial: Comercial
+  tipoCliente: TipoCliente
+  clienteIndirectoId?: string
+  comision?: string
   fecha: string
-  proximo_seguimiento: string | null
-  estado_prospecto: EstadoProspecto | null
-  visita: 'no' | 'si' | 'virtual' | 'llamada' | null
-  fecha_visita: string | null
-  facturado_p: 'no' | 'si' | 'parcial' | null
-  valor_p: number | null
-  estado_cliente: EstadoCliente | null
-  visita_cliente: 'no' | 'si' | 'virtual' | 'llamada' | null
-  fecha_visita_cliente: string | null
-  nuevo_servicio: 'si' | 'no' | null
-  servicio_nuevo: string | null
-  facturado: 'no' | 'si' | 'parcial' | null
-  valor: number | null
-  facturacion_lineas: Record<string, number>
-  created_at: string
-  updated_at: string
-}
-
-export interface RecordDetalle extends RecordRead {
+  proximoSeguimiento?: string
+  observaciones?: string
+  estadoProspecto?: EstadoProspecto
+  estadoCliente?: EstadoCliente
+  visita?: TipoVisita
+  visitaCliente?: TipoVisita
+  fechaVisita?: string
+  fechaVisitaCliente?: string
+  facturadoP?: TipoFacturado
+  facturado?: TipoFacturado
+  valorP?: number
+  valor?: number
+  nuevoServicio?: string
+  servicioNuevo?: string
+  ingresosEsperados?: number
+  servicios: string[]
+  facturacionLineas: { [linea: string]: number }
   contactos: Contacto[]
   actividades: Actividad[]
+  createdAt: string
+  updatedAt: string
 }
 
-// ---------- Dashboard ----------
+export interface RecordCreate {
+  tipo: TipoRecord
+  empresa: string
+  nit?: string
+  ciudad?: string
+  direccion?: string
+  categoria?: string
+  comercialId: string
+  tipoCliente?: TipoCliente
+  clienteIndirectoId?: string
+  comision?: string
+  fecha: string
+  proximoSeguimiento?: string
+  observaciones?: string
+  estadoProspecto?: EstadoProspecto
+  estadoCliente?: EstadoCliente
+  visita?: TipoVisita
+  visitaCliente?: TipoVisita
+  fechaVisita?: string
+  fechaVisitaCliente?: string
+  facturadoP?: TipoFacturado
+  facturado?: TipoFacturado
+  valorP?: number
+  valor?: number
+  nuevoServicio?: string
+  servicioNuevo?: string
+  ingresosEsperados?: number
+  servicios?: string[]
+  facturacionLineas?: { [linea: string]: number }
+  contactos?: ContactoCreate[]
+}
 
+// ─── Dashboard ────────────────────────────────────────────────────────────────
 export interface DashboardStats {
-  total_records: number
   total_prospectos: number
   total_clientes: number
-  prospectos_por_estado: Record<string, number>
-  clientes_por_estado: Record<string, number>
-  total_facturado: number
-  facturacion_por_linea: Record<string, number>
-  cotizaciones_por_estado: Record<string, number>
   total_cotizaciones: number
-  cotizaciones_en_curso?: number
-  cotizaciones_vencidas?: number
+  facturacion_total: number
+  cotizaciones_en_curso: number
+  cotizaciones_aprobadas: number
+  cotizaciones_rechazadas: number
+  cotizaciones_negociacion: number
+  prospectos_por_estado: { [estado: string]: number }
+  registros_por_mes: Array<{ mes: string; prospectos: number; clientes: number }>
+  servicios_frecuentes: Array<{ servicio: string; count: number }>
+  actividad_por_comercial: Array<{
+    nombre: string
+    prospectos: number
+    clientes: number
+    visitas: number
+    facturado: number
+  }>
+  facturacion_por_linea: { [linea: string]: number }
+  cotizaciones_por_estado: { [estado: string]: number }
+  lineas_mas_cotizadas: Array<{ linea: string; count: number }>
 }
 
-export interface ChartPoint {
-  name: string
-  value: number
-}
-
-export interface MonthPoint {
-  name: string
-  prospectos: number
-  clientes: number
-}
-
-export interface DashboardCharts {
-  prospectos_vs_clientes: ChartPoint[]
-  pipeline_estados: ChartPoint[]
-  servicios_solicitados: ChartPoint[]
-  actividad_por_comercial: { name: string; total: number }[]
-  billing_por_linea: ChartPoint[]
-  pipeline_cotizaciones: ChartPoint[]
-  lineas_cotizadas: ChartPoint[]
-  registros_por_mes: MonthPoint[]
-  gestion_clientes: ChartPoint[]
-}
-
-export interface RankingEntry {
-  comercial_id: string
+export interface RankingComercial {
+  id: string
   nombre: string
+  cargo?: string
   prospectos: number
   clientes: number
   visitas: number
-  valor_facturado: number
+  facturado: number
 }
 
-export interface RecordReciente {
+// ─── Biblioteca ───────────────────────────────────────────────────────────────
+export interface BibliotecaItem {
   id: string
-  empresa: string
-  tipo: string
-  comercial_nombre: string | null
-  servicios: string[]
-  estado: string
-  fecha: string
+  grupoId: string
+  nombre: string
+  tarifa: string // NEVER number — "$559.900" or "0,36%"
+  tipoTarifa: 'moneda' | 'porcentaje'
+  obs?: string
+  extraCols: { [k: string]: string }
+  orden: number
 }
 
-export interface CotizacionReciente {
+export interface BibliotecaGrupo {
+  id: string
+  lineaId: string
+  nombre: string
+  orden: number
+  items: BibliotecaItem[]
+}
+
+export interface BibliotecaObs {
+  id: string
+  lineaId: string
+  nombre: string
+  html: string
+}
+
+export interface BibliotecaLinea {
+  id: string
+  nombre: string
+  orden: number
+  columnas: string[]
+  grupos: BibliotecaGrupo[]
+  obs: BibliotecaObs[]
+}
+
+// ─── Cotizaciones ─────────────────────────────────────────────────────────────
+export type EstadoCotizacion = 'borrador' | 'enviada' | 'negociacion' | 'aprobada' | 'rechazada'
+
+export interface Cotizacion {
   id: string
   numero: string
+  recordId?: string
   empresa: string
+  nit?: string
+  ciudad?: string
+  contacto?: string
+  email?: string
+  comercial: string
+  paqueteadora?: string
+  tarifaTipo: 'biblioteca' | 'especial'
+  estado: EstadoCotizacion
   lineas: string[]
-  estado: string
-  fecha: string
-  vencida: boolean
+  itemsSnapshot: { [k: string]: unknown }
+  obsHtml: { [k: string]: string }
+  obsLibre?: string
+  htmlPreview?: string
+  createdAt: string
+  updatedAt: string
 }
 
-export interface DashboardRecientes {
-  registros: RecordReciente[]
-  cotizaciones: CotizacionReciente[]
+export interface CotizacionCreate {
+  recordId?: string
+  empresa: string
+  nit?: string
+  ciudad?: string
+  contacto?: string
+  email?: string
+  comercial: string
+  paqueteadora?: string
+  tarifaTipo: string
+  estado: EstadoCotizacion
+  lineas: string[]
+  itemsSnapshot: { [k: string]: unknown }
+  obsHtml: { [k: string]: string }
+  obsLibre?: string
+  htmlPreview?: string
+}
+
+// ─── SAC ──────────────────────────────────────────────────────────────────────
+export interface ContactoSAC extends Contacto {
+  empresa: string
+  comercial: string
 }
