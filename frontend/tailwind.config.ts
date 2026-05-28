@@ -1,28 +1,29 @@
-/** @type {import('tailwindcss').Config} */
+import type { Config } from 'tailwindcss'
+
 export default {
-  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        // ZYMO Dark Design System
-        bg:         '#0a0e1a',
-        surface:    '#111827',
-        surface2:   '#1a2235',
-        surface3:   '#1e2d45',
-        accent:     '#00c2ff',
-        accent2:    '#0077ff',
-        gold:       '#f5a623',
-        success:    '#00e676',
-        danger:     '#ff4444',
-        purple:     '#a855f7',
-        muted:      '#8899b4',
-        border:     '#1e3050',
+        // ZYMO Dark Design System — exact colors from prototype HTML
+        bg:       '#0a0e1a',
+        surface:  '#111827',
+        surface2: '#1a2235',
+        surface3: '#1e2d45',
+        accent:   '#00c2ff',
+        accent2:  '#0077ff',
+        gold:     '#f5a623',
+        success:  '#00e676',
+        danger:   '#ff4444',
+        purple:   '#a855f7',
+        muted:    '#8899b4',
+        border:   '#1e3050',
         foreground: '#e8edf5',
       },
       fontFamily: {
         sans:      ['DM Sans', 'sans-serif'],
         mono:      ['DM Mono', 'monospace'],
-        condensed: ['DM Sans', 'sans-serif'],
+        condensed: ['DM Sans', 'sans-serif'], // used for headings/labels
       },
       fontSize: {
         '2xs': '0.625rem',
@@ -44,4 +45,4 @@ export default {
     },
   },
   plugins: [],
-}
+} satisfies Config
