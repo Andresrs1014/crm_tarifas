@@ -18,6 +18,38 @@ const ActividadSchema = z.object({
 
 const ActividadUpdateSchema = ActividadSchema.partial();
 
+// GET /api/actividades?tipo=visita&mes=2025-05&comercialId=xxx
+router.get('/actividades', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tipo, mes, comercialId } = req.query;
+    const where: Record<string, unknown> = {};
+    if (tipo) where.tipo = tipo;
+
+    if (typeof mes === 'string' && mes) {
+      const [y, m] = mes.split('-').map(Number);
+      const start = new Date(y, m - 1, 1);
+      const end   = new Date(y, m, 0, 23, 59, 59, 999);
+      where.fecha = { gte: start, lte: end };
+    }
+
+    if (typeof comercialId === 'string' && comercialId) {
+      where.record = { comercialId };
+    }
+
+    const actividades = await prisma.actividad.findMany({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      where: where as any,
+      include: {
+        record: { select: { id: true, empresa: true, comercialId: true, comercial: { select: { nombre: true } } } },
+      },
+      orderBy: [{ fecha: 'asc' }, { hora: 'asc' }],
+    });
+    res.json(actividades);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/records/:recordId/actividades
 router.post(
   '/records/:recordId/actividades',

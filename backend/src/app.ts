@@ -12,6 +12,8 @@ import dashboardRoutes from './modules/dashboard/dashboard.routes';
 import sacRoutes from './modules/sac/sac.routes';
 import usuariosRoutes from './modules/usuarios/usuarios.routes';
 import crmRoutes from './modules/crm/crm.routes';
+import matrizRiesgosRoutes from './modules/matriz-riesgos/matriz-riesgos.routes';
+import gestionDocumentalRoutes from './modules/gestion-documental/gestion-documental.routes';
 
 const app = express();
 
@@ -40,6 +42,8 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/sac', sacRoutes);
 app.use('/api/admin/usuarios', usuariosRoutes);
 app.use('/api/crm', crmRoutes);
+app.use('/api/matriz-riesgos', matrizRiesgosRoutes);
+app.use('/api/gestion-documental', gestionDocumentalRoutes);
 
 // Public cotizacion by numero
 app.get('/api/cot/:numero', async (req, res, next) => {

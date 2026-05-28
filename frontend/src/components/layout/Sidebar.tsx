@@ -10,6 +10,10 @@ import {
   Library,
   Cake,
   ShieldCheck,
+  ShieldAlert,
+  FolderOpen,
+  Calculator,
+  CalendarDays,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 
@@ -29,9 +33,13 @@ const NAV_PRINCIPAL: NavItem[] = [
 ]
 
 const NAV_COMERCIAL: NavItem[] = [
-  { to: '/cotizaciones', icon: <FileText size={16} />, label: 'Cotizaciones' },
-  { to: '/biblioteca',   icon: <Library  size={16} />, label: 'Servicios' },
-  { to: '/sac',          icon: <Cake     size={16} />, label: 'SAC' },
+  { to: '/cotizaciones',    icon: <FileText    size={16} />, label: 'Cotizaciones' },
+  { to: '/biblioteca',      icon: <Library     size={16} />, label: 'Servicios' },
+  { to: '/sac',             icon: <Cake        size={16} />, label: 'SAC' },
+  { to: '/matriz-riesgos',      icon: <ShieldAlert size={16} />, label: 'Matriz de Riesgos'   },
+  { to: '/gestion-documental',  icon: <FolderOpen   size={16} />, label: 'Gestión Documental' },
+  { to: '/preliquidador',       icon: <Calculator   size={16} />, label: 'Preliquidador'       },
+  { to: '/calendario',          icon: <CalendarDays size={16} />, label: 'Calendario Visitas'   },
 ]
 
 export default function Sidebar() {
