@@ -1,25 +1,37 @@
 import { NavLink } from 'react-router-dom'
+import {
+  LayoutDashboard,
+  PlusCircle,
+  Target,
+  Kanban,
+  Building2,
+  Users,
+  FileText,
+  Library,
+  Cake,
+  ShieldCheck,
+} from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 
 interface NavItem {
   to: string
-  icon: string
+  icon: React.ReactNode
   label: string
 }
 
 const NAV_PRINCIPAL: NavItem[] = [
-  { to: '/dashboard', icon: '📊', label: 'Dashboard' },
-  { to: '/registro', icon: '➕', label: 'Nuevo Registro' },
-  { to: '/prospectos', icon: '🎯', label: 'Prospectos' },
-  { to: '/crm', icon: '🗂️', label: 'CRM Pipeline' },
-  { to: '/clientes', icon: '🏢', label: 'Clientes Activos' },
-  { to: '/equipo', icon: '👥', label: 'Equipo Comercial' },
+  { to: '/dashboard',  icon: <LayoutDashboard size={16} />, label: 'Dashboard' },
+  { to: '/registro',   icon: <PlusCircle      size={16} />, label: 'Nuevo Registro' },
+  { to: '/prospectos', icon: <Target          size={16} />, label: 'Prospectos' },
+  { to: '/crm',        icon: <Kanban          size={16} />, label: 'CRM Pipeline' },
+  { to: '/clientes',   icon: <Building2       size={16} />, label: 'Clientes Activos' },
+  { to: '/equipo',     icon: <Users           size={16} />, label: 'Equipo Comercial' },
 ]
 
 const NAV_COMERCIAL: NavItem[] = [
-  { to: '/cotizaciones', icon: '📄', label: 'Cotizaciones' },
-  { to: '/biblioteca', icon: '⚙️', label: 'Servicios' },
-  { to: '/sac', icon: '🎂', label: 'SAC' },
+  { to: '/cotizaciones', icon: <FileText size={16} />, label: 'Cotizaciones' },
+  { to: '/biblioteca',   icon: <Library  size={16} />, label: 'Servicios' },
+  { to: '/sac',          icon: <Cake     size={16} />, label: 'SAC' },
 ]
 
 export default function Sidebar() {
@@ -42,7 +54,7 @@ export default function Sidebar() {
       {user?.role === 'superadmin' && (
         <NavSection
           label="Administración"
-          items={[{ to: '/admin/usuarios', icon: '🔐', label: 'Usuarios' }]}
+          items={[{ to: '/admin/usuarios', icon: <ShieldCheck size={16} />, label: 'Usuarios' }]}
         />
       )}
     </aside>
@@ -62,15 +74,16 @@ function NavSection({ label, items }: { label: string; items: NavItem[] }) {
           className={({ isActive }) =>
             [
               'flex items-center gap-2.5 px-5 py-2.5 text-sm font-medium',
-              'border-l-[3px] transition-all duration-150 hover:bg-white/[0.04]',
+              'border-l-[3px] transition-[color,background,border-color] duration-150',
+              'hover:bg-white/[0.04]',
               isActive
                 ? 'border-accent text-accent bg-accent/[0.07]'
                 : 'border-transparent text-muted hover:text-foreground',
             ].join(' ')
           }
         >
-          <span className="text-base leading-none">{item.icon}</span>
-          <span className="tracking-[0.5px]">{item.label}</span>
+          <span className="flex-shrink-0 opacity-80">{item.icon}</span>
+          <span className="tracking-[0.3px]">{item.label}</span>
         </NavLink>
       ))}
     </>

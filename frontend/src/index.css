@@ -5,95 +5,108 @@
 @layer base {
   html {
     font-family: 'DM Sans', sans-serif;
+    color-scheme: dark;
   }
 
   body {
     @apply bg-bg text-foreground;
     min-height: 100vh;
     overflow-x: hidden;
+    /* Subtle grid texture */
+    background-image:
+      linear-gradient(rgba(0,194,255,0.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,194,255,0.015) 1px, transparent 1px);
+    background-size: 40px 40px;
+    background-attachment: fixed;
   }
 
-  * {
-    box-sizing: border-box;
+  * { box-sizing: border-box; }
+
+  /* Focus visible — visible for keyboard, hidden for mouse */
+  :focus-visible {
+    outline: 2px solid #00c2ff;
+    outline-offset: 2px;
   }
 
   /* Custom scrollbar */
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  ::-webkit-scrollbar-track {
-    background: #0a0e1a;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: #1e3050;
-    border-radius: 3px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: #8899b4;
-  }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #0a0e1a; }
+  ::-webkit-scrollbar-thumb { background: #1e3050; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #8899b4; }
+
+  /* Numbers always tabular */
+  .tabular { font-variant-numeric: tabular-nums; }
 }
 
 @layer components {
-  /* ─── Inputs ─────────────────────────────────────────── */
+
+  /* ─── Inputs ─────────────────────────────────────────────── */
   .input {
     @apply w-full bg-surface2 border border-border rounded-lg px-3 py-2.5
            text-foreground text-sm placeholder:text-muted
            focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20
-           transition-all duration-200;
+           transition-[color,background-color,border-color,box-shadow] duration-150;
   }
 
-  .input-sm {
-    @apply input py-1.5 text-xs;
-  }
+  .input-sm { @apply input py-1.5 text-xs; }
 
-  /* ─── Buttons ────────────────────────────────────────── */
+  /* ─── Buttons ────────────────────────────────────────────── */
   .btn {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2.5
            font-semibold text-sm rounded-lg border border-transparent
-           transition-all duration-200 cursor-pointer disabled:opacity-50
-           disabled:cursor-not-allowed select-none;
+           transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-150
+           cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed select-none;
+    touch-action: manipulation;
   }
 
   .btn-primary {
-    @apply btn bg-accent text-bg hover:bg-accent/90
-           shadow-[0_4px_15px_rgba(0,194,255,0.3)]
-           hover:shadow-[0_6px_20px_rgba(0,194,255,0.4)]
-           hover:-translate-y-px active:translate-y-0;
+    @apply btn bg-accent text-bg
+           shadow-[0_2px_12px_rgba(0,194,255,0.25)]
+           hover:shadow-[0_4px_20px_rgba(0,194,255,0.4)]
+           hover:-translate-y-px active:translate-y-0 active:shadow-none
+           hover:bg-accent/90;
   }
 
   .btn-secondary {
     @apply btn bg-surface2 text-muted border-border
-           hover:text-foreground hover:border-muted;
+           hover:text-foreground hover:border-muted/60;
   }
 
   .btn-danger {
     @apply btn bg-danger/10 text-danger border-danger/30
-           hover:bg-danger/20;
+           hover:bg-danger/20 hover:border-danger/50;
   }
 
   .btn-ghost {
     @apply btn bg-transparent text-muted hover:text-foreground hover:bg-surface2;
   }
 
-  .btn-sm {
-    @apply px-3 py-1.5 text-xs;
-  }
+  .btn-sm  { @apply px-3 py-1.5 text-xs; }
+  .btn-icon { @apply btn p-2; }
 
-  .btn-icon {
-    @apply btn p-2;
-  }
-
-  /* ─── Cards ──────────────────────────────────────────── */
+  /* ─── Cards ──────────────────────────────────────────────── */
   .card {
-    @apply bg-surface border border-border rounded-xl;
+    @apply bg-surface border border-border rounded-xl
+           transition-[border-color] duration-150;
   }
 
-  .card-padded {
-    @apply card p-6;
+  .card-padded { @apply card p-6; }
+
+  /* Glass variant — for hero/KPI cards */
+  .card-glass {
+    @apply rounded-xl border border-white/[0.06]
+           transition-[border-color,box-shadow] duration-200;
+    background: linear-gradient(135deg, rgba(26,34,53,0.8) 0%, rgba(17,24,39,0.6) 100%);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
   }
 
-  /* ─── Badges ─────────────────────────────────────────── */
+  .card-glass:hover {
+    border-color: rgba(0,194,255,0.2);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(0,194,255,0.1), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  /* ─── Badges ─────────────────────────────────────────────── */
   .badge {
     @apply inline-flex items-center px-2 py-0.5 rounded-full
            text-2xs font-semibold uppercase tracking-wide;
@@ -106,12 +119,17 @@
   .badge-purple { @apply badge bg-purple/15 text-purple; }
   .badge-gray   { @apply badge bg-muted/15 text-muted; }
 
-  /* ─── Section titles ─────────────────────────────────── */
+  /* ─── Status dot ─────────────────────────────────────────── */
+  .status-dot {
+    @apply w-2 h-2 rounded-full flex-shrink-0;
+  }
+
+  /* ─── Section titles ─────────────────────────────────────── */
   .section-title {
     @apply font-bold text-2xl tracking-wide text-foreground mb-5 flex items-center gap-3;
   }
 
-  /* ─── Table ──────────────────────────────────────────── */
+  /* ─── Table ──────────────────────────────────────────────── */
   .table-card {
     @apply bg-surface border border-border rounded-xl overflow-hidden mb-7;
   }
@@ -122,17 +140,18 @@
   }
 
   .table-title {
-    @apply font-bold text-base tracking-wide text-foreground uppercase text-sm;
+    @apply font-bold text-sm tracking-widest text-foreground uppercase;
   }
 
   .filter-input {
     @apply bg-surface border border-border rounded-lg px-3 py-1.5 text-sm text-foreground
-           placeholder:text-muted focus:outline-none focus:border-accent transition-colors;
+           placeholder:text-muted focus:outline-none focus:border-accent
+           transition-[border-color] duration-150;
   }
 
   .filter-select {
     @apply bg-surface border border-border rounded-lg px-3 py-1.5 text-sm text-foreground
-           focus:outline-none focus:border-accent transition-colors cursor-pointer;
+           focus:outline-none focus:border-accent transition-[border-color] duration-150 cursor-pointer;
   }
 
   table { @apply w-full border-collapse; }
@@ -143,48 +162,68 @@
   }
 
   tbody tr {
-    @apply border-b border-border/50 transition-colors duration-150 hover:bg-accent/[0.03];
+    @apply border-b border-border/40 transition-colors duration-100 hover:bg-accent/[0.025];
   }
 
   tbody td {
     @apply px-4 py-3 text-sm;
   }
 
-  /* ─── Service tags ───────────────────────────────────── */
+  /* ─── Service tags ───────────────────────────────────────── */
   .stag {
     @apply inline-block bg-accent/10 text-accent rounded
            px-2 py-0.5 text-2xs font-semibold tracking-wide;
   }
 
-  /* ─── Step bar (wizard) ──────────────────────────────── */
-  .step-dot {
-    @apply w-8 h-8 rounded-full flex items-center justify-center
-           text-sm font-bold border-2 flex-shrink-0 z-10 transition-all duration-300;
-  }
-
+  /* ─── Wizard step dots ───────────────────────────────────── */
+  .step-dot { @apply w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 flex-shrink-0 z-10 transition-[color,background-color,border-color,box-shadow] duration-300; }
   .step-dot-pending { @apply step-dot bg-surface2 border-border text-muted; }
   .step-dot-active  { @apply step-dot bg-accent border-accent text-bg shadow-accent; }
   .step-dot-done    { @apply step-dot bg-accent2 border-accent2 text-white; }
 
-  /* ─── Empty state ────────────────────────────────────── */
+  /* ─── Empty state ────────────────────────────────────────── */
   .empty-state {
-    @apply flex flex-col items-center justify-center py-16 text-muted;
+    @apply flex flex-col items-center justify-center py-16 text-muted gap-3;
+  }
+  .empty-state svg { @apply opacity-30; }
+  .empty-state p   { @apply text-sm opacity-70; }
+
+  /* ─── Cotizacion estado tags ─────────────────────────────── */
+  .tag-borrador    { @apply badge-gray; }
+  .tag-enviada     { @apply badge-blue; }
+  .tag-negociacion { @apply badge-gold; }
+  .tag-aprobada    { @apply badge-green; }
+  .tag-rechazada   { @apply badge-red; }
+
+  /* ─── Skeleton loader ────────────────────────────────────── */
+  .skeleton {
+    @apply bg-surface2 rounded animate-pulse;
   }
 
-  /* ─── Cotizacion estado tags ─────────────────────────── */
-  .tag-borrador     { @apply badge-gray; }
-  .tag-enviada      { @apply badge-blue; }
-  .tag-negociacion  { @apply badge-gold; }
-  .tag-aprobada     { @apply badge-green; }
-  .tag-rechazada    { @apply badge-red; }
+  /* ─── Divider ────────────────────────────────────────────── */
+  .divider {
+    @apply border-t border-border my-4;
+  }
 
-  /* ─── Print (cotizaciones) ───────────────────────────── */
+  /* ─── Stat highlight (big numbers) ──────────────────────── */
+  .stat-value {
+    @apply text-2xl font-bold tabular leading-none;
+  }
+
+  /* ─── Inline form row ────────────────────────────────────── */
+  .form-row { @apply flex items-center gap-3 flex-wrap; }
+  .form-col { @apply flex flex-col gap-1.5; }
+  .form-label { @apply text-xs text-muted font-medium; }
+
+  /* ─── Print ──────────────────────────────────────────────── */
   @media print {
     @page { size: A4 portrait; margin: 0 !important; }
-
     header, nav, aside, .no-print { display: none !important; }
-    body { background: #fff !important; color: #1a1a2e !important; }
-
+    body {
+      background: #fff !important;
+      color: #1a1a2e !important;
+      background-image: none !important;
+    }
     .cot-preview {
       background: #fff !important;
       color: #1a1a2e !important;
@@ -192,5 +231,27 @@
       padding: 16mm 14mm !important;
       max-width: 100% !important;
     }
+  }
+}
+
+/* ─── Animations ─────────────────────────────────────────────── */
+@keyframes fadeIn  { from { opacity: 0 } to { opacity: 1 } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: translateY(0) } }
+@keyframes shimmer { from { background-position: -200% 0 } to { background-position: 200% 0 } }
+
+.animate-fade-in  { animation: fadeIn  0.2s ease-out both; }
+.animate-slide-up { animation: slideUp 0.25s ease-out both; }
+
+/* Staggered page load */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.10s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.20s; }
+
+/* Disable all animations for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }

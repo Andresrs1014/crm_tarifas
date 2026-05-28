@@ -1,8 +1,10 @@
+import React from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, PieChart, Pie, Cell, Legend,
 } from 'recharts'
+import { Target, Building2, DollarSign, ClipboardList, Send, Handshake, CheckCircle, XCircle } from 'lucide-react'
 import { getDashboard, getRanking, getRecientes } from '../api/dashboard'
 import { useAuthStore } from '../store/authStore'
 
@@ -40,20 +42,21 @@ function fmt(n: number) {
 }
 
 function KpiCard({ label, value, sub, color = '#00c2ff', icon }: {
-  label: string; value: string | number; sub?: string; color?: string; icon: string
+  label: string; value: string | number; sub?: string; color?: string; icon: React.ReactNode
 }) {
   return (
-    <div className="card p-5 flex items-start gap-4 hover:border-accent/40 transition-colors">
+    <div className="card-glass p-5 flex items-start gap-4">
       <div
-        className="w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+        className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
         style={{ background: `${color}18`, color }}
+        aria-hidden="true"
       >
         {icon}
       </div>
       <div className="min-w-0">
-        <p className="text-xs text-muted uppercase tracking-widest font-semibold mb-1">{label}</p>
-        <p className="text-2xl font-bold text-foreground leading-none">{value}</p>
-        {sub && <p className="text-xs text-muted mt-1">{sub}</p>}
+        <p className="text-2xs text-muted uppercase tracking-widest font-semibold mb-1.5">{label}</p>
+        <p className="font-display text-2xl font-bold text-foreground leading-none tabular">{value}</p>
+        {sub && <p className="text-2xs text-muted mt-1.5">{sub}</p>}
       </div>
     </div>
   )
@@ -150,23 +153,23 @@ export default function Dashboard() {
       </div>
 
       {/* KPI Cards principales */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Prospectos activos" value={stats.total_prospectos} icon="🎯"
-          color={COLORS.accent} sub="En pipeline" />
-        <KpiCard label="Clientes" value={stats.total_clientes} icon="🏢"
-          color={COLORS.gold} sub="Activos en CRM" />
-        <KpiCard label="Facturación total" value={fmt(stats.facturacion_total)} icon="💰"
-          color={COLORS.success} sub="Período seleccionado" />
-        <KpiCard label="Cotizaciones" value={stats.total_cotizaciones} icon="📋"
-          color={COLORS.purple} sub={`${stats.cotizaciones_aprobadas} aprobadas`} />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-slide-up stagger-1">
+        <KpiCard label="Prospectos activos" value={stats.total_prospectos}
+          icon={<Target size={18} />} color={COLORS.accent} sub="En pipeline" />
+        <KpiCard label="Clientes" value={stats.total_clientes}
+          icon={<Building2 size={18} />} color={COLORS.gold} sub="Activos en CRM" />
+        <KpiCard label="Facturación total" value={fmt(stats.facturacion_total)}
+          icon={<DollarSign size={18} />} color={COLORS.success} sub="Período seleccionado" />
+        <KpiCard label="Cotizaciones" value={stats.total_cotizaciones}
+          icon={<ClipboardList size={18} />} color={COLORS.purple} sub={`${stats.cotizaciones_aprobadas} aprobadas`} />
       </div>
 
       {/* KPI Cotizaciones */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Enviadas" value={stats.cotizaciones_en_curso} icon="📤" color={COLORS.accent} />
-        <KpiCard label="Negociación" value={stats.cotizaciones_negociacion} icon="🤝" color={COLORS.gold} />
-        <KpiCard label="Aprobadas" value={stats.cotizaciones_aprobadas} icon="✅" color={COLORS.success} />
-        <KpiCard label="Rechazadas" value={stats.cotizaciones_rechazadas} icon="❌" color={COLORS.danger} />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-slide-up stagger-2">
+        <KpiCard label="Enviadas"     value={stats.cotizaciones_en_curso}     icon={<Send       size={18} />} color={COLORS.accent} />
+        <KpiCard label="Negociación"  value={stats.cotizaciones_negociacion}  icon={<Handshake  size={18} />} color={COLORS.gold} />
+        <KpiCard label="Aprobadas"    value={stats.cotizaciones_aprobadas}    icon={<CheckCircle size={18} />} color={COLORS.success} />
+        <KpiCard label="Rechazadas"   value={stats.cotizaciones_rechazadas}   icon={<XCircle    size={18} />} color={COLORS.danger} />
       </div>
 
       {/* Gráficas fila 1 */}

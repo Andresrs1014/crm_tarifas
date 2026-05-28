@@ -21,9 +21,9 @@ export default {
         foreground: '#e8edf5',
       },
       fontFamily: {
-        sans:      ['DM Sans', 'sans-serif'],
-        mono:      ['DM Mono', 'monospace'],
-        condensed: ['DM Sans', 'sans-serif'], // used for headings/labels
+        sans:    ['DM Sans', 'sans-serif'],
+        mono:    ['DM Mono', 'monospace'],
+        display: ['Outfit', 'DM Sans', 'sans-serif'], // headings & big numbers
       },
       fontSize: {
         '2xs': '0.625rem',
