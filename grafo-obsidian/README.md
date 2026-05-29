@@ -41,7 +41,12 @@ lightrag-index \
 | [[Biblioteca_Tarifas]] | #motor | Árbol de tarifas |
 | [[SAC_Cumpleanos]] | #alerta | Cumpleaños y FDA |
 | [[SSO_Flow]] | #motor | Autenticación federada |
+| [[Matriz_de_Riesgos]] | #modulo | Scoring BASC ponderado |
+| [[Gestion_Documental_BASC]] | #modulo | 18 docs BASC, cumplimiento y vencimiento |
+| [[Preliquidador]] | #herramienta | Simulador de tarifas client-side |
+| [[Calendario_Visitas]] | #seguimiento | Calendario mensual de visitas comerciales |
 
 ---
 
 *Creado: 2026-05-28 — Área de Desarrollo e Innovación, Grupo ZYMO*
+*Actualizado: 2026-05-28 — Módulos BASC + Herramientas comerciales*

@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  getCotizaciones, deleteCotizacion, duplicarCotizacion, updateCotizacion,
+  getCotizaciones, deleteCotizacion, duplicarCotizacion, updateCotizacion, getCotizacion,
 } from '../api/cotizaciones'
 import { toast } from '../store/toastStore'
 import type { EstadoCotizacion } from '../types'
+import { exportCotizacionPDF } from '../utils/exportPDF'
+import { exportCotizacionesExcel } from '../utils/exportExcel'
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
 
@@ -48,6 +50,7 @@ export default function Cotizaciones() {
   const [estado, setEstado] = useState('')
   const [search, setSearch] = useState('')
   const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [pdfLoading, setPdfLoading] = useState<string | null>(null)
 
   const { data: cotizaciones = [], isLoading } = useQuery({
     queryKey: ['cotizaciones', estado, search],
@@ -93,6 +96,19 @@ export default function Cotizaciones() {
     onError: () => toast.error('Error al actualizar'),
   })
 
+  async function handlePDF(cotId: string, numero: string) {
+    setPdfLoading(cotId)
+    try {
+      const cot = await getCotizacion(cotId)
+      const html = cot.htmlPreview || `<h2>${cot.numero}</h2><p>${cot.empresa}</p>`
+      await exportCotizacionPDF(html, `cotizacion-${numero}.pdf`)
+    } catch {
+      toast.error('Error generando PDF')
+    } finally {
+      setPdfLoading(null)
+    }
+  }
+
   // KPIs rápidos
   const aprobadas   = cotizaciones.filter((c) => c.estado === 'aprobada').length
   const enviadas    = cotizaciones.filter((c) => c.estado === 'enviada').length
@@ -112,9 +128,19 @@ export default function Cotizaciones() {
             {rechazadas > 0 && <span className="text-danger"> · {rechazadas} rechazadas</span>}
           </p>
         </div>
-        <Link to="/cotizaciones/nueva" className="btn-primary btn-sm">
-          + Nueva cotización
-        </Link>
+        <div className="flex gap-2">
+          <button
+            className="btn-secondary btn-sm"
+            onClick={() => exportCotizacionesExcel(cotizaciones, 'cotizaciones.xlsx')}
+            disabled={cotizaciones.length === 0}
+            title="Exportar a Excel"
+          >
+            ↓ Excel
+          </button>
+          <Link to="/cotizaciones/nueva" className="btn-primary btn-sm">
+            + Nueva cotización
+          </Link>
+        </div>
       </div>
 
       {/* Filtros */}
@@ -212,6 +238,16 @@ export default function Cotizaciones() {
                             Ver
                           </a>
                         )}
+
+                        {/* PDF */}
+                        <button
+                          className="btn-ghost btn-sm px-2 py-1 text-xs"
+                          disabled={pdfLoading === cot.id}
+                          onClick={() => handlePDF(cot.id, cot.numero)}
+                          title="Descargar PDF"
+                        >
+                          {pdfLoading === cot.id ? '...' : '↓ PDF'}
+                        </button>
 
                         {/* Avanzar estado */}
                         {nextEstado && (

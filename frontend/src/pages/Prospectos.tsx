@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { getRecords, deleteRecord } from '../api/records'
 import { getComercialesApi } from '../api/comerciales'
 import { toast } from '../store/toastStore'
+import { exportRecordsExcel } from '../utils/exportExcel'
 
 const ESTADOS: { value: string; label: string; badge: string }[] = [
   { value: '',                   label: 'Todos los estados',     badge: '' },
@@ -77,9 +78,19 @@ export default function Prospectos() {
           <h1 className="text-2xl font-bold text-foreground">Prospectos</h1>
           <p className="text-sm text-muted mt-0.5">{prospectos.length} registros</p>
         </div>
-        <Link to="/registro" className="btn-primary btn-sm">
-          + Nuevo prospecto
-        </Link>
+        <div className="flex gap-2">
+          <button
+            className="btn-secondary btn-sm"
+            onClick={() => exportRecordsExcel(prospectos, 'prospectos.xlsx')}
+            disabled={prospectos.length === 0}
+            title="Exportar a Excel"
+          >
+            ↓ Excel
+          </button>
+          <Link to="/registro" className="btn-primary btn-sm">
+            + Nuevo prospecto
+          </Link>
+        </div>
       </div>
 
       {/* Pipeline visual */}

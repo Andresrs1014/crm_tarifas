@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { getRecords, deleteRecord } from '../api/records'
 import { getComercialesApi } from '../api/comerciales'
 import { toast } from '../store/toastStore'
+import { exportRecordsExcel } from '../utils/exportExcel'
 
 const ESTADOS_CLIENTE: { value: string; label: string }[] = [
   { value: '',          label: 'Todos los estados' },
@@ -80,9 +81,19 @@ export default function Clientes() {
             {enRiesgo > 0 && <span className="ml-2 text-danger font-semibold">⚠ {enRiesgo} en riesgo</span>}
           </p>
         </div>
-        <Link to="/registro" className="btn-primary btn-sm">
-          + Nuevo cliente
-        </Link>
+        <div className="flex gap-2">
+          <button
+            className="btn-secondary btn-sm"
+            onClick={() => exportRecordsExcel(clientes, 'clientes.xlsx')}
+            disabled={clientes.length === 0}
+            title="Exportar a Excel"
+          >
+            ↓ Excel
+          </button>
+          <Link to="/registro" className="btn-primary btn-sm">
+            + Nuevo cliente
+          </Link>
+        </div>
       </div>
 
       {/* Filtros */}
