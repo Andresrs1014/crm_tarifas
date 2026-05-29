@@ -27,11 +27,22 @@ export default function CotPublica() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-8"
+      className="min-h-screen flex flex-col items-center justify-start p-8 gap-4"
       style={{ background: '#0a0e1a' }}
     >
+      {/* Toolbar — hidden on print */}
+      <div className="w-full max-w-4xl flex justify-end gap-2 print:hidden">
+        <button
+          className="btn-secondary btn-sm"
+          onClick={() => window.print()}
+        >
+          🖨 Imprimir / PDF
+        </button>
+      </div>
+
       <div
-        className="w-full max-w-4xl rounded-2xl border border-border p-10"
+        id="cot-print-area"
+        className="w-full max-w-4xl rounded-2xl border border-border p-10 print:border-0 print:p-0 print:rounded-none"
         style={{ background: '#111827' }}
         dangerouslySetInnerHTML={{ __html: data.htmlPreview || `<h1>${data.numero}</h1><p>${data.empresa}</p>` }}
       />

@@ -16,7 +16,7 @@ Tablas principales:
 |-------|-----------|
 | `Record` | Prospectos y clientes (unificados) |
 | `Contacto` | Contactos por registro |
-| `Actividad` | Log de llamadas, visitas, emails |
+| `Actividad` | Log de llamadas, visitas, emails, visitas |
 | `Comercial` | Equipo comercial |
 | `Cotizacion` | Cotizaciones con snapshot de tarifas |
 | `CotNumeroCounter` | Secuencia atómica COT-001, COT-002... |
@@ -26,6 +26,8 @@ Tablas principales:
 | `BibliotecaObs` | Observaciones predefinidas por línea |
 | `CrmMeta` | Metadata del pipeline: timestamps por etapa |
 | `User` | Usuarios del sistema con roles |
+| `MatrizRiesgo` | Scoring BASC por record (puntaje, riesgo, companias) |
+| `GestionDocumental` | Documentos BASC por record (18 docs, ciclo, cumplimiento) |
 
 ---
 
@@ -50,8 +52,9 @@ Tablas principales:
 - `GET /api/cot/:numero` — vista pública (sin auth)
 
 ### Actividades
+- `GET /api/actividades` — lista con filtros (tipo, mes YYYY-MM, comercialId) — incluye record
 - `POST /api/records/:recordId/actividades` — registrar actividad
-- `PUT /api/actividades/:id` — actualizar (incluye marcar hecho)
+- `PUT /api/actividades/:id` — actualizar (incluye marcar hecho, hora, lugar)
 - `DELETE /api/actividades/:id` — eliminar
 
 ### Dashboard
@@ -78,6 +81,24 @@ Tablas principales:
 - `PUT /api/comerciales/:id` — actualizar
 - `DELETE /api/comerciales/:id` — eliminar
 
+### Matriz de Riesgos BASC
+- `GET /api/matriz-riesgos` — lista con filtros (search, riesgo, completa)
+- `GET /api/matriz-riesgos/:recordId` — getOrCreate (score automático)
+- `PUT /api/matriz-riesgos/:recordId` — upsert scoring
+
+Scoring: Mercancía 45% · Frecuencia 15% · Facturación 25% · TipoPersona 5% · Tiempo 5% · Capital 5%
+Niveles: PENDIENTE → BAJO (>0) → MEDIO (≥3) → ALTO (≥4) → CRÍTICO (≥5)
+
+### Gestión Documental BASC
+- `GET /api/gestion-documental` — lista con filtros (search, completa, vencida)
+- `GET /api/gestion-documental/:recordId` — getOrCreate con 18 documentos
+- `PUT /api/gestion-documental/:recordId` — upsert docs y ciclo
+
+18 documentos: pond_di (directo) y pond_ref (referido) — vencimiento basado en FR-001-GC + 1 año
+
+### Preliquidador
+Frontend only — sin endpoint propio. Lee cotizaciones y calcula MAX(calculado, mínima) por ítem seleccionado.
+
 ---
 
 ## Motor de autenticación
@@ -96,6 +117,12 @@ Tablas principales:
 - Formato: `.xlsx` — primera hoja, primera fila = headers
 - Columnas reconocidas: tipo, empresa, nit, ciudad, comercialNombre, estadoProspecto, estadoCliente, fecha, observaciones, servicios, valor
 - Respuesta: `{ imported: N, errors: ["Fila X: ..."] }`
+
+## Motor de exportación
+
+- **Excel**: `xlsx` (frontend) — exportación client-side en Prospectos, Clientes y Cotizaciones
+- **PDF Cotizaciones**: `jsPDF` + `html2canvas` (frontend) — captura `htmlPreview` y genera PDF
+- **Imprimir CotPublica**: `window.print()` con print CSS — modo blanco para cotización pública
 
 ---
 

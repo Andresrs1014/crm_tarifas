@@ -1,0 +1,1330 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KPIs Gerenciales — Grupo ZYMO (Bloque para integrar)</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/*
+  ================================================================
+  BLOQUE KPIs GERENCIALES — GRUPO ZYMO
+  ================================================================
+  INSTRUCCIONES DE INTEGRACIÓN:
+  
+  PASO 1 — Agrega el botón en la barra de navegación lateral (sidebar), 
+           después del botón de Dashboard existente:
+  
+    <button class="nav-tab" onclick="showPage('kpis-gerenciales')">
+      <span>📈</span><span class="nav-label">KPIs Gerenciales</span>
+    </button>
+  
+  PASO 2 — Copia el bloque HTML del <div id="page-kpis-gerenciales"> 
+           y pégalo ANTES del comentario <!-- ========== CALENDARIO ========== -->
+           (aprox. línea 1107 del archivo original)
+  
+  PASO 3 — Copia el bloque <style> del #kpi-ger-* dentro del <style> global
+           del documento original.
+  
+  PASO 4 — Copia el bloque <script> completo de esta sección y pégalo
+           ANTES del </script> de cierre (aprox. línea 13389).
+           Luego agrega la llamada a renderKPIsGerenciales() dentro de 
+           la función showPage() existente, en el case 'kpis-gerenciales':
+  
+           function showPage(page) {
+             ...
+             if(page === 'kpis-gerenciales') renderKPIsGerenciales();
+             ...
+           }
+  ================================================================
+*/
+
+/* Variables del sistema ZYMO (ya existen en el archivo original) */
+:root {
+  --bg: #080c14;
+  --surface: #0e1320;
+  --surface2: #131a28;
+  --surface3: #18212f;
+  --accent: #38bdf8;
+  --accent2: #0ea5e9;
+  --gold: #f59e0b;
+  --green: #34d399;
+  --red: #f87171;
+  --purple: #a78bfa;
+  --text: #e2e8f0;
+  --text2: #64748b;
+  --border: #1e293b;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--text); }
+
+/* ── DEMO WRAPPER (solo para vista previa) ── */
+.demo-wrap { margin-left: 0; padding: 24px 28px; }
+
+/* ================================================================
+   ESTILOS KPIs GERENCIALES — pegar dentro del <style> global
+   ================================================================ */
+
+/* Encabezado de sección con línea de acento y fecha de corte */
+.kpi-ger-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.kpi-ger-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 800;
+  font-size: 26px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.kpi-ger-title span { color: var(--accent); }
+.kpi-ger-badge {
+  font-size: 11px;
+  color: var(--text2);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 14px;
+}
+
+/* Fila de tarjetas KPI numéricas */
+.kpi-ger-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
+  margin-bottom: 28px;
+}
+.kpi-ger-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 20px 16px;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.kpi-ger-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+.kpi-ger-card::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  border-radius: 14px 14px 0 0;
+}
+.kpi-ger-card.blue::after  { background: var(--accent); }
+.kpi-ger-card.green::after { background: var(--green); }
+.kpi-ger-card.gold::after  { background: var(--gold); }
+.kpi-ger-card.red::after   { background: var(--red); }
+.kpi-ger-card.purple::after{ background: var(--purple); }
+.kpi-ger-card.cyan::after  { background: #00ffcc; }
+
+.kpi-ger-card-icon {
+  font-size: 22px;
+  margin-bottom: 10px;
+  display: block;
+}
+.kpi-ger-card-label {
+  font-size: 10px;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  color: var(--text2);
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+.kpi-ger-card-val {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 42px;
+  font-weight: 800;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.kpi-ger-card.blue  .kpi-ger-card-val { color: var(--accent); }
+.kpi-ger-card.green .kpi-ger-card-val { color: var(--green); }
+.kpi-ger-card.gold  .kpi-ger-card-val { color: var(--gold); }
+.kpi-ger-card.red   .kpi-ger-card-val { color: var(--red); }
+.kpi-ger-card.purple .kpi-ger-card-val { color: var(--purple); }
+.kpi-ger-card.cyan  .kpi-ger-card-val { color: #00ffcc; }
+
+.kpi-ger-card-sub {
+  font-size: 11px;
+  color: var(--text2);
+  line-height: 1.4;
+}
+/* Tendencia micro */
+.kpi-ger-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  margin-top: 6px;
+}
+.kpi-ger-trend.up   { background: rgba(52,211,153,0.12); color: var(--green); }
+.kpi-ger-trend.down { background: rgba(248,113,113,0.12); color: var(--red); }
+.kpi-ger-trend.warn { background: rgba(245,158,11,0.12);  color: var(--gold); }
+
+/* Grid de gráficas */
+.kpi-ger-charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+.kpi-ger-charts.three { grid-template-columns: 1fr 1fr 1fr; }
+.kpi-ger-chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px 24px;
+  position: relative;
+}
+.kpi-ger-chart-card.full { grid-column: 1 / -1; }
+
+.kpi-ger-chart-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text2);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.kpi-ger-chart-title::before {
+  content: '';
+  width: 4px;
+  height: 16px;
+  background: var(--accent);
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.kpi-ger-chart-subtitle {
+  font-size: 11px;
+  color: var(--text2);
+  margin-bottom: 18px;
+}
+.kpi-ger-chart-wrap { position: relative; height: 230px; }
+.kpi-ger-chart-wrap.tall { height: 280px; }
+
+/* Tabla de prospectos vencidos */
+.kpi-ger-table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 22px;
+}
+.kpi-ger-table-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface3);
+}
+.kpi-ger-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.kpi-ger-table th {
+  padding: 10px 16px;
+  text-align: left;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text2);
+  font-weight: 700;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+}
+.kpi-ger-table td {
+  padding: 11px 16px;
+  border-bottom: 1px solid rgba(30,41,59,0.6);
+  color: var(--text);
+  vertical-align: middle;
+}
+.kpi-ger-table tr:last-child td { border-bottom: none; }
+.kpi-ger-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+/* Badges urgencia */
+.kpi-urgencia {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.kpi-urgencia.critico { background: rgba(248,113,113,0.15); color: var(--red);    border: 1px solid rgba(248,113,113,0.3); }
+.kpi-urgencia.alto    { background: rgba(245,158,11,0.15);  color: var(--gold);   border: 1px solid rgba(245,158,11,0.3); }
+.kpi-urgencia.normal  { background: rgba(56,189,248,0.12);  color: var(--accent); border: 1px solid rgba(56,189,248,0.25); }
+
+/* Gauge semicircular — CSS + SVG */
+.kpi-ger-gauge-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 0 4px;
+}
+.kpi-ger-gauge-val {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 48px;
+  font-weight: 800;
+  line-height: 1;
+  margin-top: -8px;
+}
+.kpi-ger-gauge-label {
+  font-size: 11px;
+  color: var(--text2);
+  text-align: center;
+  margin-top: 4px;
+  letter-spacing: 1px;
+}
+
+/* Barra de embudo */
+.kpi-funnel-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.kpi-funnel-label {
+  width: 160px;
+  font-size: 12px;
+  color: var(--text2);
+  text-align: right;
+  flex-shrink: 0;
+}
+.kpi-funnel-track {
+  flex: 1;
+  height: 28px;
+  background: var(--surface2);
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+}
+.kpi-funnel-fill {
+  height: 100%;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  padding-left: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #000;
+  transition: width 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+  min-width: 0;
+  position: relative;
+}
+.kpi-funnel-pct {
+  width: 48px;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: right;
+  flex-shrink: 0;
+  color: var(--text);
+}
+
+/* Ingresos comparativo */
+.kpi-ingresos-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.kpi-ingresos-label {
+  width: 90px;
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text2);
+  flex-shrink: 0;
+}
+.kpi-ingresos-bar-wrap {
+  flex: 1;
+  height: 22px;
+  background: var(--surface2);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.kpi-ingresos-bar {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.kpi-ingresos-amount {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  width: 130px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* Separador de subsección */
+.kpi-ger-sep {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--text2);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+  margin: 28px 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.kpi-ger-sep::before {
+  content: '';
+  width: 3px;
+  height: 14px;
+  background: var(--gold);
+  border-radius: 2px;
+}
+
+/* Empty state para tablas */
+.kpi-ger-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text2);
+  font-size: 13px;
+}
+</style>
+</head>
+<body>
+
+<!-- ================================================================
+     BLOQUE HTML — Pegar antes del comentario CALENDARIO (~línea 1107)
+     ================================================================ -->
+
+<div id="page-kpis-gerenciales" class="page" style="display:block">
+<div class="main demo-wrap">
+
+  <!-- Encabezado gerencial -->
+  <div class="kpi-ger-header">
+    <div class="kpi-ger-title">📈 KPIs <span>Gerenciales</span></div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div class="kpi-ger-badge" id="kpig-fecha-corte">Cargando...</div>
+      <button class="btn btn-secondary btn-sm" onclick="renderKPIsGerenciales()"
+        style="font-size:12px;border-color:var(--accent);color:var(--accent)">
+        ↺ Actualizar
+      </button>
+    </div>
+  </div>
+
+  <!-- ── FILA 1: 6 Tarjetas KPI numéricas ── -->
+  <div class="kpi-ger-cards" id="kpig-cards"></div>
+
+  <!-- ── FILA 2: Tasa de conversión + Tiempo promedio de cierre ── -->
+  <div class="kpi-ger-charts">
+
+    <!-- Gauge: Tasa de conversión -->
+    <div class="kpi-ger-chart-card">
+      <div class="kpi-ger-chart-title">Tasa de Conversión de Prospectos</div>
+      <div class="kpi-ger-chart-subtitle">Prospectos que alcanzaron estado "Facturado" sobre el total</div>
+      <div class="kpi-ger-gauge-wrap" id="kpig-conv-gauge"></div>
+      <div id="kpig-conv-detail" style="margin-top:16px"></div>
+    </div>
+
+    <!-- Gráfica barras: Tiempo promedio por etapa -->
+    <div class="kpi-ger-chart-card">
+      <div class="kpi-ger-chart-title">Tiempo Promedio de Cierre por Etapa</div>
+      <div class="kpi-ger-chart-subtitle">Días promedio que permanece un prospecto en cada estado del pipeline</div>
+      <div class="kpi-ger-chart-wrap">
+        <canvas id="kpig-chart-tiempo"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── FILA 3: Ingresos Esperados vs Realizados (full) ── -->
+  <div class="kpi-ger-chart-card full" style="margin-bottom:18px">
+    <div class="kpi-ger-chart-title">Ingresos Esperados vs. Realizados por Comercial</div>
+    <div class="kpi-ger-chart-subtitle">Comparación entre el potencial proyectado en prospectos activos y la facturación efectiva registrada (COP)</div>
+    <div class="kpi-ger-chart-wrap tall">
+      <canvas id="kpig-chart-ingresos"></canvas>
+    </div>
+    <div id="kpig-ingresos-legend" style="display:flex;gap:24px;margin-top:14px;flex-wrap:wrap;justify-content:center"></div>
+  </div>
+
+  <!-- ── FILA 4: % Clientes en riesgo + Tasa de abandono por etapa ── -->
+  <div class="kpi-ger-charts">
+
+    <!-- Donut: % clientes en riesgo -->
+    <div class="kpi-ger-chart-card">
+      <div class="kpi-ger-chart-title">% Clientes por Estado de Relación</div>
+      <div class="kpi-ger-chart-subtitle">Distribución del portafolio de clientes activos según su estado de riesgo</div>
+      <div class="kpi-ger-chart-wrap">
+        <canvas id="kpig-chart-riesgo"></canvas>
+      </div>
+      <div id="kpig-riesgo-legend" style="display:flex;flex-direction:column;gap:8px;margin-top:14px"></div>
+    </div>
+
+    <!-- Funnel: Tasa de abandono por etapa -->
+    <div class="kpi-ger-chart-card">
+      <div class="kpi-ger-chart-title">Tasa de Abandono por Etapa del Pipeline</div>
+      <div class="kpi-ger-chart-subtitle">% de prospectos que no avanzan desde cada estado. Mientras más rojo, mayor pérdida en esa etapa.</div>
+      <div id="kpig-funnel" style="margin-top:8px"></div>
+    </div>
+
+  </div>
+
+  <!-- ── TABLA: Prospectos próximos a vencer seguimiento ── -->
+  <div class="kpi-ger-table-wrap">
+    <div class="kpi-ger-table-head">
+      <div class="kpi-ger-chart-title" style="margin:0">⏰ Prospectos con Seguimiento Vencido o Por Vencer</div>
+      <div id="kpig-vencer-badge" style="font-size:12px;color:var(--text2)"></div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="kpi-ger-table">
+        <thead>
+          <tr>
+            <th>Empresa</th>
+            <th>Comercial</th>
+            <th>Estado</th>
+            <th>Ingresos Esperados</th>
+            <th>Fecha Seguimiento</th>
+            <th>Días de Retraso</th>
+            <th>Urgencia</th>
+          </tr>
+        </thead>
+        <tbody id="kpig-vencer-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+</div><!-- /#page-kpis-gerenciales -->
+
+<!-- ================================================================
+     BLOQUE SCRIPT — Pegar antes del </script> de cierre (~línea 13389)
+     ================================================================ -->
+<script>
+
+/* ──────────────────────────────────────────────────────────
+   MÓDULO KPIs GERENCIALES — GRUPO ZYMO CRM
+   Indicadores:
+   1. Tasa de conversión de prospectos
+   2. Tiempo promedio de cierre
+   3. Ingresos esperados vs. realizados
+   4. % Clientes en riesgo
+   5. Tasa de abandono por etapa
+   6. Prospectos próximos a vencer seguimiento
+   ────────────────────────────────────────────────────────── */
+
+/* Cache de instancias Chart.js para destruirlas antes de recrear */
+const _kpigCharts = {};
+
+/* Mapa de etapas en el mismo orden del pipeline */
+const KPIG_ETAPAS = [
+  { key: 'prospecto',           label: 'Prospecto' },
+  { key: 'reconocimiento',      label: 'Visita' },
+  { key: 'propuesta',           label: 'Propuesta' },
+  { key: 'aceptacion_propuesta',label: 'Aceptación' },
+  { key: 'creacion_sop',        label: 'Ficha Cliente' },
+  { key: 'facturado',           label: 'Facturado' }
+];
+
+/* Paleta de colores para comerciales (máximo 10) */
+const KPIG_COLORES = [
+  '#38bdf8','#34d399','#f59e0b','#a78bfa','#f87171',
+  '#22d3ee','#fb923c','#4ade80','#e879f9','#facc15'
+];
+
+/* ── Función principal ── */
+function renderKPIsGerenciales() {
+  const hoy = new Date();
+  const hoyStr = hoy.toISOString().slice(0, 10);
+
+  // Fecha de corte en el badge
+  const elFecha = document.getElementById('kpig-fecha-corte');
+  if (elFecha) {
+    elFecha.textContent = 'Corte: ' + hoy.toLocaleDateString('es-CO', {
+      day: '2-digit', month: 'long', year: 'numeric'
+    });
+  }
+
+  // Obtener todos los registros (db es la variable global del CRM)
+  const prospectos = (db.records || []).filter(r => r.tipo === 'prospecto');
+  const clientes   = (db.records || []).filter(r => r.tipo === 'cliente');
+  const todos      = db.records || [];
+
+  /* ── 1. Calcular métricas base ── */
+
+  // Tasa de conversión: prospectos en estado "facturado" / total prospectos
+  const totalProspectos = prospectos.length;
+  const convertidos     = prospectos.filter(r => r.estadoProspecto === 'facturado').length;
+  const tasaConversion  = totalProspectos > 0
+    ? Math.round((convertidos / totalProspectos) * 100)
+    : 0;
+
+  // Prospectos próximos a vencer (seguimiento atrasado o en 7 días)
+  const UMBRAL_CRITICO  = 0;   // ya vencido
+  const UMBRAL_ALTO     = 3;   // vence en ≤3 días
+  const UMBRAL_NORMAL   = 7;   // vence en ≤7 días
+  const vencerProspectos = prospectos.filter(r => {
+    if (!r.proximoSeguimiento) return false;
+    const diff = Math.ceil((new Date(r.proximoSeguimiento + 'T12:00') - hoy) / 86400000);
+    return diff <= UMBRAL_NORMAL;
+  }).sort((a, b) => {
+    const da = new Date(a.proximoSeguimiento + 'T12:00') - hoy;
+    const db2 = new Date(b.proximoSeguimiento + 'T12:00') - hoy;
+    return da - db2;
+  });
+
+  // % Clientes en riesgo
+  const totalClientes = clientes.length;
+  const enRiesgo = clientes.filter(r => r.estadoCliente === 'en-riesgo').length;
+  const inactivos = clientes.filter(r => r.estadoCliente === 'inactivo').length;
+  const activos  = clientes.filter(r => r.estadoCliente === 'activo' || !r.estadoCliente).length;
+  const pctRiesgo = totalClientes > 0 ? Math.round((enRiesgo / totalClientes) * 100) : 0;
+
+  // Ingresos esperados (prospectos activos) vs realizados (clientes facturados)
+  const ingresosEsperados = prospectos
+    .filter(r => r.estadoProspecto !== 'facturado')
+    .reduce((s, r) => s + (Number(r.ingresosEsperados) || 0), 0);
+  const ingresosRealizados = todos
+    .reduce((s, r) => {
+      const lineas = r.facturacionLineas || {};
+      return s + Object.values(lineas).reduce((a, b) => a + (Number(b) || 0), 0);
+    }, 0);
+
+  // Tiempo promedio de cierre (días entre fecha de registro y facturación)
+  // Aproximación: prospectos en estado facturado con fecha de registro
+  const cierresConFecha = prospectos.filter(r =>
+    r.estadoProspecto === 'facturado' && r.fecha
+  );
+  const diasCierre = cierresConFecha.length > 0
+    ? Math.round(cierresConFecha.reduce((s, r) => {
+        const fechaReg  = new Date(r.fecha + 'T12:00');
+        const ref = r.fechaVisita
+          ? new Date(r.fechaVisita + 'T12:00')
+          : hoy;
+        return s + Math.max(0, Math.ceil((ref - fechaReg) / 86400000));
+      }, 0) / cierresConFecha.length)
+    : 0;
+
+  /* ── 2. Tarjetas KPI numéricas ── */
+  kpigRenderCards({
+    tasaConversion, convertidos, totalProspectos,
+    diasCierre, cierresConFecha: cierresConFecha.length,
+    ingresosEsperados, ingresosRealizados,
+    pctRiesgo, enRiesgo, totalClientes,
+    vencidos: vencerProspectos.filter(r => {
+      const diff = Math.ceil((new Date(r.proximoSeguimiento + 'T12:00') - hoy) / 86400000);
+      return diff <= 0;
+    }).length,
+    totalVencer: vencerProspectos.length
+  });
+
+  /* ── 3. Gauge: tasa de conversión ── */
+  kpigRenderGauge(tasaConversion, convertidos, totalProspectos);
+
+  /* ── 4. Gráfica: tiempo promedio por etapa ── */
+  kpigRenderTiempoEtapa(prospectos);
+
+  /* ── 5. Gráfica: ingresos esperados vs realizados ── */
+  kpigRenderIngresos(todos);
+
+  /* ── 6. Donut: clientes en riesgo ── */
+  kpigRenderRiesgo(activos, enRiesgo, inactivos);
+
+  /* ── 7. Funnel: tasa de abandono por etapa ── */
+  kpigRenderFunnel(prospectos);
+
+  /* ── 8. Tabla: prospectos por vencer ── */
+  kpigRenderVencer(vencerProspectos, hoy);
+}
+
+/* ── Tarjetas KPI numéricas ── */
+function kpigRenderCards(m) {
+  const el = document.getElementById('kpig-cards');
+  if (!el) return;
+
+  const fmt = n => {
+    if (n >= 1000000000) return '$' + (n / 1000000000).toFixed(1) + 'B';
+    if (n >= 1000000)    return '$' + (n / 1000000).toFixed(1) + 'M';
+    if (n >= 1000)       return '$' + (n / 1000).toFixed(0) + 'K';
+    return '$' + Math.round(n).toLocaleString('es-CO');
+  };
+
+  const tasaTrend = m.tasaConversion >= 30
+    ? `<div class="kpi-ger-trend up">▲ Meta ≥30%</div>`
+    : `<div class="kpi-ger-trend down">▼ Bajo meta 30%</div>`;
+
+  const diasTrend = m.diasCierre <= 30
+    ? `<div class="kpi-ger-trend up">▲ Eficiente ≤30d</div>`
+    : `<div class="kpi-ger-trend warn">⚠ Supera 30 días</div>`;
+
+  const riesgoTrend = m.pctRiesgo <= 10
+    ? `<div class="kpi-ger-trend up">▲ Riesgo bajo</div>`
+    : m.pctRiesgo <= 25
+      ? `<div class="kpi-ger-trend warn">⚠ Riesgo moderado</div>`
+      : `<div class="kpi-ger-trend down">▼ Riesgo alto</div>`;
+
+  const gap = m.ingresosEsperados > 0
+    ? Math.round((m.ingresosRealizados / m.ingresosEsperados) * 100)
+    : 0;
+  const ingresosTrend = gap >= 80
+    ? `<div class="kpi-ger-trend up">▲ ${gap}% de meta</div>`
+    : gap >= 50
+      ? `<div class="kpi-ger-trend warn">⚠ ${gap}% de meta</div>`
+      : `<div class="kpi-ger-trend down">▼ ${gap}% de meta</div>`;
+
+  el.innerHTML = `
+    <div class="kpi-ger-card blue">
+      <span class="kpi-ger-card-icon">🎯</span>
+      <div class="kpi-ger-card-label">Tasa Conversión</div>
+      <div class="kpi-ger-card-val">${m.tasaConversion}%</div>
+      <div class="kpi-ger-card-sub">${m.convertidos} de ${m.totalProspectos} prospectos</div>
+      ${tasaTrend}
+    </div>
+    <div class="kpi-ger-card gold">
+      <span class="kpi-ger-card-icon">⏱</span>
+      <div class="kpi-ger-card-label">Tiempo de Cierre</div>
+      <div class="kpi-ger-card-val">${m.diasCierre}<span style="font-size:22px;font-weight:400"> d</span></div>
+      <div class="kpi-ger-card-sub">Promedio por negocio cerrado</div>
+      ${diasTrend}
+    </div>
+    <div class="kpi-ger-card green">
+      <span class="kpi-ger-card-icon">💰</span>
+      <div class="kpi-ger-card-label">Ingresos Realizados</div>
+      <div class="kpi-ger-card-val" style="font-size:28px">${fmt(m.ingresosRealizados)}</div>
+      <div class="kpi-ger-card-sub">Esperados: ${fmt(m.ingresosEsperados)}</div>
+      ${ingresosTrend}
+    </div>
+    <div class="kpi-ger-card ${m.pctRiesgo > 25 ? 'red' : m.pctRiesgo > 10 ? 'gold' : 'purple'}">
+      <span class="kpi-ger-card-icon">⚠️</span>
+      <div class="kpi-ger-card-label">Clientes en Riesgo</div>
+      <div class="kpi-ger-card-val">${m.pctRiesgo}%</div>
+      <div class="kpi-ger-card-sub">${m.enRiesgo} de ${m.totalClientes} clientes</div>
+      ${riesgoTrend}
+    </div>
+    <div class="kpi-ger-card red">
+      <span class="kpi-ger-card-icon">🔴</span>
+      <div class="kpi-ger-card-label">Seguim. Vencidos</div>
+      <div class="kpi-ger-card-val">${m.vencidos}</div>
+      <div class="kpi-ger-card-sub">${m.totalVencer} en alerta (≤7 días)</div>
+      ${m.vencidos > 0
+        ? `<div class="kpi-ger-trend down">▼ Requiere acción</div>`
+        : `<div class="kpi-ger-trend up">▲ Sin vencidos</div>`}
+    </div>
+    <div class="kpi-ger-card cyan">
+      <span class="kpi-ger-card-icon">🏢</span>
+      <div class="kpi-ger-card-label">Total Portafolio</div>
+      <div class="kpi-ger-card-val">${m.totalProspectos + m.totalClientes}</div>
+      <div class="kpi-ger-card-sub">${m.totalProspectos} prospectos · ${m.totalClientes} clientes</div>
+      <div class="kpi-ger-trend up">📊 Activos en CRM</div>
+    </div>
+  `;
+}
+
+/* ── Gauge SVG semicircular ── */
+function kpigRenderGauge(pct, convertidos, total) {
+  const el = document.getElementById('kpig-conv-gauge');
+  if (!el) return;
+
+  const R = 80;
+  const cx = 130, cy = 100;
+  const circum = Math.PI * R;                      // semicírculo
+  const dashOffset = circum * (1 - pct / 100);
+
+  const color = pct >= 30 ? '#34d399' : pct >= 15 ? '#f59e0b' : '#f87171';
+
+  el.innerHTML = `
+    <svg viewBox="0 0 260 120" style="width:260px;height:120px;overflow:visible">
+      <!-- fondo arco -->
+      <path d="M ${cx-R} ${cy} A ${R} ${R} 0 0 1 ${cx+R} ${cy}"
+        fill="none" stroke="#1e293b" stroke-width="14" stroke-linecap="round"/>
+      <!-- arco progreso -->
+      <path id="kpig-arc-prog" d="M ${cx-R} ${cy} A ${R} ${R} 0 0 1 ${cx+R} ${cy}"
+        fill="none" stroke="${color}" stroke-width="14" stroke-linecap="round"
+        stroke-dasharray="${circum}" stroke-dashoffset="${circum}"
+        style="transition: stroke-dashoffset 1.4s cubic-bezier(0.16,1,0.3,1)"/>
+      <!-- ticks de meta (30%) -->
+      <text x="${cx}" y="${cy+14}" text-anchor="middle"
+        font-family="'Barlow Condensed',sans-serif" font-size="42" font-weight="800"
+        fill="${color}">${pct}%</text>
+      <text x="${cx}" y="${cy+30}" text-anchor="middle"
+        font-family="'Barlow',sans-serif" font-size="11" fill="#64748b">
+        Tasa de conversión
+      </text>
+      <!-- etiquetas extremos -->
+      <text x="${cx-R-8}" y="${cy+4}" text-anchor="end" font-size="10" fill="#64748b">0%</text>
+      <text x="${cx+R+8}" y="${cy+4}" text-anchor="start" font-size="10" fill="#64748b">100%</text>
+      <!-- marca de meta 30% -->
+      <line x1="${cx + R * Math.cos(Math.PI - Math.PI*0.3)}"
+            y1="${cy - R * Math.sin(Math.PI - Math.PI*0.3)}"
+            x2="${cx + (R-18) * Math.cos(Math.PI - Math.PI*0.3)}"
+            y2="${cy - (R-18) * Math.sin(Math.PI - Math.PI*0.3)}"
+            stroke="#f59e0b" stroke-width="2"/>
+      <text x="${cx + (R+10) * Math.cos(Math.PI - Math.PI*0.3)}"
+            y="${cy - (R+10) * Math.sin(Math.PI - Math.PI*0.3)}"
+            text-anchor="middle" font-size="9" fill="#f59e0b">Meta 30%</text>
+    </svg>
+  `;
+
+  // Animar
+  setTimeout(() => {
+    const arc = document.getElementById('kpig-arc-prog');
+    if (arc) arc.style.strokeDashoffset = circum - (circum * pct / 100);
+  }, 80);
+
+  // Detalle bajo el gauge
+  const det = document.getElementById('kpig-conv-detail');
+  if (det) {
+    det.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.2);border-radius:8px;padding:10px 14px;text-align:center">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:800;color:#34d399">${convertidos}</div>
+          <div style="font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">Convertidos</div>
+        </div>
+        <div style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.2);border-radius:8px;padding:10px 14px;text-align:center">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:800;color:var(--accent)">${total - convertidos}</div>
+          <div style="font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase">En Pipeline</div>
+        </div>
+      </div>
+    `;
+  }
+}
+
+/* ── Gráfica: tiempo promedio por etapa ── */
+function kpigRenderTiempoEtapa(prospectos) {
+  const ctx = document.getElementById('kpig-chart-tiempo');
+  if (!ctx) return;
+
+  // Calcular días promedio en cada etapa (entre fecha de registro y hoy, agrupado por estado actual)
+  const sumaDias = {};
+  const countEt  = {};
+  KPIG_ETAPAS.forEach(e => { sumaDias[e.key] = 0; countEt[e.key] = 0; });
+
+  const hoy = new Date();
+  prospectos.forEach(r => {
+    const est = r.estadoProspecto || 'prospecto';
+    if (!sumaDias.hasOwnProperty(est)) return;
+    const fechaReg = r.fecha ? new Date(r.fecha + 'T12:00') : hoy;
+    const dias = Math.max(0, Math.ceil((hoy - fechaReg) / 86400000));
+    sumaDias[est] += dias;
+    countEt[est]++;
+  });
+
+  const labels = KPIG_ETAPAS.map(e => e.label);
+  const data   = KPIG_ETAPAS.map(e =>
+    countEt[e.key] > 0 ? Math.round(sumaDias[e.key] / countEt[e.key]) : 0
+  );
+  const maxVal = Math.max(...data, 1);
+
+  // Colores degradados según urgencia
+  const bgColors = data.map(d => {
+    const ratio = d / maxVal;
+    if (ratio > 0.7) return 'rgba(248,113,113,0.8)';
+    if (ratio > 0.4) return 'rgba(245,158,11,0.8)';
+    return 'rgba(56,189,248,0.8)';
+  });
+
+  if (_kpigCharts['tiempo']) _kpigCharts['tiempo'].destroy();
+  _kpigCharts['tiempo'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Días promedio',
+        data,
+        backgroundColor: bgColors,
+        borderRadius: 6,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.raw} días promedio`
+          },
+          backgroundColor: '#0e1320',
+          borderColor: '#1e293b',
+          borderWidth: 1,
+          titleColor: '#e2e8f0',
+          bodyColor: '#94a3b8',
+          padding: 10
+        },
+        datalabels: false
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(30,41,59,0.8)' },
+          ticks: { color: '#64748b', font: { size: 11 } },
+          title: { display: true, text: 'Días', color: '#64748b', font: { size: 11 } }
+        },
+        y: {
+          grid: { display: false },
+          ticks: { color: '#e2e8f0', font: { size: 12, weight: '600' } }
+        }
+      },
+      animation: {
+        duration: 900,
+        easing: 'easeOutQuart'
+      }
+    },
+    plugins: [{
+      id: 'kpig-datalabels-tiempo',
+      afterDatasetsDraw(chart) {
+        const { ctx: c, data } = chart;
+        chart.getDatasetMeta(0).data.forEach((bar, i) => {
+          const val = data.datasets[0].data[i];
+          if (val === 0) return;
+          c.save();
+          c.fillStyle = '#e2e8f0';
+          c.font = 'bold 12px Barlow';
+          c.textAlign = 'left';
+          c.textBaseline = 'middle';
+          c.fillText(`${val}d`, bar.x + 6, bar.y);
+          c.restore();
+        });
+      }
+    }]
+  });
+}
+
+/* ── Gráfica: Ingresos esperados vs realizados por comercial ── */
+function kpigRenderIngresos(todos) {
+  const ctx = document.getElementById('kpig-chart-ingresos');
+  if (!ctx) return;
+
+  // Agrupar por comercial
+  const mapa = {};
+  todos.forEach(r => {
+    const com = r.comercialNombre || 'Sin asignar';
+    if (!mapa[com]) mapa[com] = { esperado: 0, realizado: 0 };
+    if (r.tipo === 'prospecto' && r.estadoProspecto !== 'facturado') {
+      mapa[com].esperado += Number(r.ingresosEsperados) || 0;
+    }
+    const lineas = r.facturacionLineas || {};
+    mapa[com].realizado += Object.values(lineas).reduce((a, b) => a + (Number(b) || 0), 0);
+  });
+
+  const entries = Object.entries(mapa).filter(([, v]) => v.esperado > 0 || v.realizado > 0);
+  entries.sort((a, b) => (b[1].esperado + b[1].realizado) - (a[1].esperado + a[1].realizado));
+
+  const labels    = entries.map(([k]) => k);
+  const esperados = entries.map(([, v]) => v.esperado);
+  const realizados = entries.map(([, v]) => v.realizado);
+
+  if (_kpigCharts['ingresos']) _kpigCharts['ingresos'].destroy();
+  _kpigCharts['ingresos'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Ingresos Esperados',
+          data: esperados,
+          backgroundColor: 'rgba(56,189,248,0.25)',
+          borderColor: '#38bdf8',
+          borderWidth: 2,
+          borderRadius: 5,
+          borderSkipped: false
+        },
+        {
+          label: 'Ingresos Realizados',
+          data: realizados,
+          backgroundColor: 'rgba(52,211,153,0.65)',
+          borderColor: '#34d399',
+          borderWidth: 0,
+          borderRadius: 5,
+          borderSkipped: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          callbacks: {
+            label: ctx => {
+              const val = ctx.raw;
+              return ` ${ctx.dataset.label}: $${Math.round(val).toLocaleString('es-CO')}`;
+            }
+          },
+          backgroundColor: '#0e1320',
+          borderColor: '#1e293b',
+          borderWidth: 1,
+          titleColor: '#e2e8f0',
+          bodyColor: '#94a3b8',
+          padding: 12
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: '#e2e8f0', font: { size: 12 } }
+        },
+        y: {
+          grid: { color: 'rgba(30,41,59,0.8)' },
+          ticks: {
+            color: '#64748b',
+            font: { size: 11 },
+            callback: v => {
+              if (v >= 1000000) return '$' + (v / 1000000).toFixed(0) + 'M';
+              if (v >= 1000)    return '$' + (v / 1000).toFixed(0) + 'K';
+              return '$' + v;
+            }
+          }
+        }
+      },
+      animation: { duration: 1000, easing: 'easeOutQuart' }
+    },
+    plugins: [{
+      id: 'kpig-datalabels-ingresos',
+      afterDatasetsDraw(chart) {
+        const { ctx: c } = chart;
+        chart.data.datasets.forEach((ds, di) => {
+          chart.getDatasetMeta(di).data.forEach((bar, i) => {
+            const val = ds.data[i];
+            if (val <= 0) return;
+            const label = val >= 1000000
+              ? '$' + (val / 1000000).toFixed(1) + 'M'
+              : val >= 1000
+                ? '$' + (val / 1000).toFixed(0) + 'K'
+                : '$' + val;
+            c.save();
+            c.fillStyle = di === 0 ? '#38bdf8' : '#34d399';
+            c.font = 'bold 11px Barlow';
+            c.textAlign = 'center';
+            c.textBaseline = 'bottom';
+            c.fillText(label, bar.x, bar.y - 4);
+            c.restore();
+          });
+        });
+      }
+    }]
+  });
+
+  // Leyenda manual
+  const leg = document.getElementById('kpig-ingresos-legend');
+  if (leg) {
+    leg.innerHTML = [
+      { color: '#38bdf8', bg: 'rgba(56,189,248,0.12)', label: 'Ingresos Esperados (prospectos activos)' },
+      { color: '#34d399', bg: 'rgba(52,211,153,0.12)', label: 'Ingresos Realizados (facturación efectiva)' }
+    ].map(item => `
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2)">
+        <div style="width:32px;height:12px;background:${item.bg};border:2px solid ${item.color};border-radius:3px"></div>
+        ${item.label}
+      </div>
+    `).join('');
+  }
+}
+
+/* ── Donut: clientes en riesgo ── */
+function kpigRenderRiesgo(activos, enRiesgo, inactivos) {
+  const ctx = document.getElementById('kpig-chart-riesgo');
+  if (!ctx) return;
+
+  const total = activos + enRiesgo + inactivos;
+  if (total === 0) {
+    ctx.parentElement.innerHTML = '<div class="kpi-ger-empty">Sin clientes registrados</div>';
+    return;
+  }
+
+  const datos = [activos, enRiesgo, inactivos];
+  const colores = ['#34d399', '#f59e0b', '#f87171'];
+  const etiquetas = ['✅ Activos', '⚠️ En Riesgo', '💤 Inactivos'];
+
+  if (_kpigCharts['riesgo']) _kpigCharts['riesgo'].destroy();
+  _kpigCharts['riesgo'] = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: etiquetas,
+      datasets: [{
+        data: datos,
+        backgroundColor: colores.map(c => c + 'cc'),
+        borderColor: colores,
+        borderWidth: 2,
+        hoverOffset: 8
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '68%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const pct = total > 0 ? Math.round(ctx.raw / total * 100) : 0;
+              return ` ${ctx.raw} clientes (${pct}%)`;
+            }
+          },
+          backgroundColor: '#0e1320',
+          borderColor: '#1e293b',
+          borderWidth: 1,
+          titleColor: '#e2e8f0',
+          bodyColor: '#94a3b8',
+          padding: 10
+        }
+      },
+      animation: { animateRotate: true, duration: 1000 }
+    },
+    plugins: [{
+      id: 'kpig-donut-center',
+      beforeDraw(chart) {
+        const { ctx: c, chartArea: { left, top, right, bottom } } = chart;
+        const cx = (left + right) / 2;
+        const cy = (top + bottom) / 2;
+        const pct = total > 0 ? Math.round((enRiesgo + inactivos) / total * 100) : 0;
+        c.save();
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        c.fillStyle = pct > 25 ? '#f87171' : pct > 10 ? '#f59e0b' : '#34d399';
+        c.font = "bold 28px 'Barlow Condensed'";
+        c.fillText(pct + '%', cx, cy - 8);
+        c.fillStyle = '#64748b';
+        c.font = "11px 'Barlow'";
+        c.fillText('con alertas', cx, cy + 14);
+        c.restore();
+      }
+    }]
+  });
+
+  // Leyenda
+  const leg = document.getElementById('kpig-riesgo-legend');
+  if (leg) {
+    leg.innerHTML = etiquetas.map((label, i) => {
+      const pct = total > 0 ? Math.round(datos[i] / total * 100) : 0;
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="width:12px;height:12px;border-radius:50%;background:${colores[i]};flex-shrink:0"></div>
+            <span style="font-size:12px;color:var(--text2)">${label}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:800;color:${colores[i]}">${datos[i]}</span>
+            <span style="font-size:11px;color:var(--text2);min-width:34px;text-align:right">${pct}%</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+}
+
+/* ── Funnel: Tasa de abandono por etapa ── */
+function kpigRenderFunnel(prospectos) {
+  const el = document.getElementById('kpig-funnel');
+  if (!el) return;
+
+  // Contar cuántos prospectos hay en cada etapa y los que "quedaron" por etapa
+  const conteo = {};
+  KPIG_ETAPAS.forEach(e => { conteo[e.key] = 0; });
+  prospectos.forEach(r => {
+    const est = r.estadoProspecto || 'prospecto';
+    if (conteo.hasOwnProperty(est)) conteo[est]++;
+  });
+
+  // Calcular acumulados "llegaron" a cada etapa
+  // (todos los que pasaron por ella = los que están en etapas >= i)
+  const etapaKeys = KPIG_ETAPAS.map(e => e.key);
+  const llegaron  = KPIG_ETAPAS.map((e, i) => {
+    // suma de los que están en esta etapa o etapas posteriores
+    return etapaKeys.slice(i).reduce((s, k) => s + (conteo[k] || 0), 0);
+  });
+
+  const maxLlego = llegaron[0] || 1;
+
+  const COLORES_FUNNEL = ['#38bdf8','#34d399','#a78bfa','#f59e0b','#fb923c','#f87171'];
+
+  el.innerHTML = KPIG_ETAPAS.map((etapa, i) => {
+    const n = llegaron[i];
+    const nSig = i < llegaron.length - 1 ? llegaron[i + 1] : n;
+    const abandono = n > 0 ? Math.round(((n - nSig) / n) * 100) : 0;
+    const pctBarra = Math.round((n / maxLlego) * 100);
+    const color = COLORES_FUNNEL[i];
+
+    return `
+      <div class="kpi-funnel-bar">
+        <div class="kpi-funnel-label">${etapa.label}</div>
+        <div class="kpi-funnel-track">
+          <div class="kpi-funnel-fill"
+            style="width:${pctBarra}%;background:${color};transition-delay:${i * 80}ms">
+            <span style="font-size:11px;font-weight:700;color:#000;opacity:0.85;white-space:nowrap;padding-left:6px">${n} prospectos</span>
+          </div>
+        </div>
+        <div class="kpi-funnel-pct" style="color:${abandono > 50 ? '#f87171' : abandono > 25 ? '#f59e0b' : '#34d399'}">
+          ${i < KPIG_ETAPAS.length - 1 ? `-${abandono}%` : '—'}
+        </div>
+      </div>
+    `;
+  }).join('') + `
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;font-size:11px;color:var(--text2)">
+      <span style="color:#34d399">■</span> Bajo abandono (&lt;25%)
+      <span style="color:#f59e0b">■</span> Moderado (25–50%)
+      <span style="color:#f87171">■</span> Alto (&gt;50%)
+    </div>
+  `;
+
+  // Trigger animación CSS
+  setTimeout(() => {
+    el.querySelectorAll('.kpi-funnel-fill').forEach(b => {
+      b.style.transition = `width 1.2s cubic-bezier(0.16, 1, 0.3, 1)`;
+    });
+  }, 50);
+}
+
+/* ── Tabla: Prospectos próximos a vencer seguimiento ── */
+function kpigRenderVencer(lista, hoy) {
+  const tbody = document.getElementById('kpig-vencer-tbody');
+  const badge = document.getElementById('kpig-vencer-badge');
+  if (!tbody) return;
+
+  const vencidos = lista.filter(r => {
+    const diff = Math.ceil((new Date(r.proximoSeguimiento + 'T12:00') - hoy) / 86400000);
+    return diff <= 0;
+  }).length;
+
+  if (badge) {
+    badge.innerHTML = lista.length > 0
+      ? `<span style="color:var(--red);font-weight:700">${vencidos} vencidos</span> · <span>${lista.length} en alerta total</span>`
+      : '<span style="color:var(--green)">✓ Sin alertas activas</span>';
+  }
+
+  if (!lista.length) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="kpi-ger-empty">✅ No hay prospectos con seguimiento vencido o próximo a vencer en los próximos 7 días.</div></td></tr>`;
+    return;
+  }
+
+  const ESTADOS_LABEL = {
+    prospecto:            '🎯 Prospecto',
+    reconocimiento:       '👁 Visita',
+    propuesta:            '📄 Propuesta',
+    aceptacion_propuesta: '🤝 Aceptación',
+    creacion_sop:         '📋 Ficha Cliente',
+    facturado:            '💰 Facturado'
+  };
+
+  tbody.innerHTML = lista.map(r => {
+    const fechaSeg = new Date(r.proximoSeguimiento + 'T12:00');
+    const diffDias = Math.ceil((fechaSeg - hoy) / 86400000);
+    const diasTxt  = diffDias < 0
+      ? `${Math.abs(diffDias)} días`
+      : diffDias === 0 ? 'Hoy' : `En ${diffDias} d`;
+
+    let urgenciaClass, urgenciaLabel;
+    if (diffDias < 0) {
+      urgenciaClass = 'critico'; urgenciaLabel = `🔴 ${Math.abs(diffDias)}d vencido`;
+    } else if (diffDias <= 3) {
+      urgenciaClass = 'alto';    urgenciaLabel = `⚠️ Urgente (${diffDias}d)`;
+    } else {
+      urgenciaClass = 'normal';  urgenciaLabel = `📅 Próximo (${diffDias}d)`;
+    }
+
+    const ingresos = Number(r.ingresosEsperados) || 0;
+    const ingresosFmt = ingresos > 0
+      ? '$' + Math.round(ingresos).toLocaleString('es-CO')
+      : '—';
+
+    const fechaFmt = fechaSeg.toLocaleDateString('es-CO', {
+      day: '2-digit', month: 'short', year: 'numeric'
+    });
+
+    const diasColor = diffDias < 0 ? 'var(--red)' : diffDias <= 3 ? 'var(--gold)' : 'var(--accent)';
+
+    return `
+      <tr>
+        <td>
+          <div style="font-weight:600;color:var(--text)">${r.empresa || '—'}</div>
+          ${r.nit ? `<div style="font-size:11px;color:var(--text2)">NIT: ${r.nit}</div>` : ''}
+        </td>
+        <td style="color:var(--text2)">${r.comercialNombre || '—'}</td>
+        <td>
+          <span style="font-size:11px;color:var(--text2)">
+            ${ESTADOS_LABEL[r.estadoProspecto] || r.estadoProspecto || '—'}
+          </span>
+        </td>
+        <td style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;color:var(--gold)">
+          ${ingresosFmt}
+        </td>
+        <td style="color:var(--text2);white-space:nowrap">${fechaFmt}</td>
+        <td>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:800;color:${diasColor}">
+            ${diasTxt}
+          </span>
+        </td>
+        <td>
+          <span class="kpi-urgencia ${urgenciaClass}">${urgenciaLabel}</span>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+/* ── Llamar automáticamente si la página ya está visible ── */
+// (En el archivo original, agregar dentro de la función showPage:)
+// if(page === 'kpis-gerenciales') renderKPIsGerenciales();
+
+</script>
+
+<!-- ── DEMO SCRIPT (solo para esta vista previa, NO copiar) ── -->
+<script>
+// Datos de demostración (simulan el objeto db del CRM real)
+const db = {
+  records: [
+    // Prospectos
+    { id:'p1', tipo:'prospecto', empresa:'Importaciones Globex S.A.S.', nit:'900.111.222-3', comercialNombre:'Laura García', ingresosEsperados:8500000, estadoProspecto:'propuesta', fecha:'2025-02-10', proximoSeguimiento:'2025-05-25', facturacionLineas:{} },
+    { id:'p2', tipo:'prospecto', empresa:'Logística del Pacífico', nit:'800.333.444-1', comercialNombre:'Carlos Ruiz', ingresosEsperados:22000000, estadoProspecto:'aceptacion_propuesta', fecha:'2025-01-15', proximoSeguimiento:'2025-05-20', facturacionLineas:{} },
+    { id:'p3', tipo:'prospecto', empresa:'Distribuidora Norteamérica', nit:'901.555.666-2', comercialNombre:'Andrés Morales', ingresosEsperados:6000000, estadoProspecto:'reconocimiento', fecha:'2025-03-01', proximoSeguimiento:'2025-06-10', facturacionLineas:{} },
+    { id:'p4', tipo:'prospecto', empresa:'Tech Parts Colombia', nit:'800.777.888-5', comercialNombre:'Laura García', ingresosEsperados:45000000, estadoProspecto:'facturado', fecha:'2024-11-01', fechaVisita:'2025-01-20', proximoSeguimiento:'2025-06-15', facturacionLineas:{'Zona Franca':38000000, 'Aduana':7000000} },
+    { id:'p5', tipo:'prospecto', empresa:'Químicos del Sur', nit:'900.222.111-8', comercialNombre:'Carlos Ruiz', ingresosEsperados:12000000, estadoProspecto:'prospecto', fecha:'2025-04-01', proximoSeguimiento:'2025-05-27', facturacionLineas:{} },
+    { id:'p6', tipo:'prospecto', empresa:'Alimentos La Colina', nit:'800.444.555-9', comercialNombre:'Andrés Morales', ingresosEsperados:9000000, estadoProspecto:'creacion_sop', fecha:'2025-01-20', proximoSeguimiento:'2025-05-22', facturacionLineas:{} },
+    { id:'p7', tipo:'prospecto', empresa:'Textiles Mediterráneo', nit:'900.666.777-1', comercialNombre:'Laura García', ingresosEsperados:18000000, estadoProspecto:'facturado', fecha:'2024-12-10', fechaVisita:'2025-02-28', proximoSeguimiento:'2025-06-20', facturacionLineas:{'CEDI':15000000,'Transporte':3000000} },
+    { id:'p8', tipo:'prospecto', empresa:'Electrónica Pacífico', nit:'901.888.999-3', comercialNombre:'Carlos Ruiz', ingresosEsperados:5500000, estadoProspecto:'propuesta', fecha:'2025-03-15', proximoSeguimiento:'2025-05-29', facturacionLineas:{} },
+    { id:'p9', tipo:'prospecto', empresa:'Mineros de Colombia', nit:'800.111.333-7', comercialNombre:'Andrés Morales', ingresosEsperados:31000000, estadoProspecto:'reconocimiento', fecha:'2025-02-20', proximoSeguimiento:'2025-05-28', facturacionLineas:{} },
+    // Clientes
+    { id:'c1', tipo:'cliente', empresa:'Farmacéutica Nacional S.A.', nit:'800.123.456-7', comercialNombre:'Laura García', estadoCliente:'activo', facturacionLineas:{'Zona Franca':28000000,'Depósito Aduanero':12000000} },
+    { id:'c2', tipo:'cliente', empresa:'Importaciones Andinas', nit:'900.987.654-2', comercialNombre:'Carlos Ruiz', estadoCliente:'en-riesgo', facturacionLineas:{'Transporte':8500000} },
+    { id:'c3', tipo:'cliente', empresa:'Comercial del Caribe', nit:'800.456.789-1', comercialNombre:'Andrés Morales', estadoCliente:'activo', facturacionLineas:{'CEDI':19000000,'Aduana':6000000} },
+    { id:'c4', tipo:'cliente', empresa:'Logística de Oriente', nit:'901.321.654-8', comercialNombre:'Laura García', estadoCliente:'inactivo', facturacionLineas:{'Paqueteo':3500000} },
+    { id:'c5', tipo:'cliente', empresa:'Multinacional XYZ', nit:'900.147.258-3', comercialNombre:'Carlos Ruiz', estadoCliente:'activo', facturacionLineas:{'Zona Franca':55000000,'CEDI':22000000,'Transporte':9000000} },
+    { id:'c6', tipo:'cliente', empresa:'Materias Primas S.A.S.', nit:'800.369.147-6', comercialNombre:'Andrés Morales', estadoCliente:'en-riesgo', facturacionLineas:{'Depósito Aduanero':14000000} },
+  ]
+};
+
+// Inicializar la vista de demo
+document.addEventListener('DOMContentLoaded', () => {
+  renderKPIsGerenciales();
+});
+</script>
+
+</body>
+</html>
