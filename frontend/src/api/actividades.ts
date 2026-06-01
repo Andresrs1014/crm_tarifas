@@ -21,6 +21,9 @@ export interface ActividadCalendario {
 export const getActividadesCalendario = (params: { tipo?: string; mes?: string; comercialId?: string }) =>
   client.get<ActividadCalendario[]>('/api/actividades', { params }).then(r => r.data)
 
+export const getVisitasVencidas = () =>
+  client.get<ActividadCalendario[]>('/api/actividades/vencidas').then(r => r.data)
+
 export const createActividad = (recordId: string, data: ActividadCreate & { hora?: string; lugar?: string; origen?: string }) =>
   client.post<Actividad>(`/api/records/${recordId}/actividades`, data).then((r) => r.data)
 

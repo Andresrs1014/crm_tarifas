@@ -23,6 +23,7 @@ router.get('/contactos', async (req: Request, res: Response, next: NextFunction)
         record: {
           select: {
             empresa: true,
+            categoria: true,
             comercial: { select: { nombre: true } },
           },
         },
@@ -34,9 +35,58 @@ router.get('/contactos', async (req: Request, res: Response, next: NextFunction)
       ...c,
       empresa: c.record.empresa,
       comercial: c.record.comercial.nombre,
+      categoria: (c.record as unknown as Record<string, unknown>).categoria ?? null,
     }));
 
     res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/sac/fda → todos los contactos con recibeRegalos=true (para sección Fin de Año)
+router.get('/fda', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const contactos = await prisma.contacto.findMany({
+      where: { recibeRegalos: true },
+      include: {
+        record: {
+          select: {
+            empresa: true,
+            categoria: true,
+            comercial: { select: { nombre: true } },
+          },
+        },
+      },
+      orderBy: [{ fdaEntregado: 'asc' }, { cumpleanos: 'asc' }],
+    });
+    const result = contactos.map((c) => ({
+      ...c,
+      empresa: c.record.empresa,
+      comercial: c.record.comercial.nombre,
+      categoria: (c.record as unknown as Record<string, unknown>).categoria ?? null,
+    }));
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PATCH /api/sac/contactos/:id/datos → edita cargo, telefono, email del contacto
+router.patch('/contactos/:id/datos', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { cargo, telefono, email } = req.body as {
+      cargo?: string; telefono?: string; email?: string;
+    };
+    const updated = await prisma.contacto.update({
+      where: { id: String(req.params.id) },
+      data: {
+        ...(cargo    !== undefined && { cargo }),
+        ...(telefono !== undefined && { telefono }),
+        ...(email    !== undefined && { email }),
+      },
+    });
+    res.json(updated);
   } catch (err) {
     next(err);
   }

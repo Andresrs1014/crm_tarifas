@@ -25,6 +25,7 @@ export interface User {
   username: string
   role: 'superadmin' | 'usuario'
   createdAt: string
+  comercial?: { id: string; nombre: string; cargo?: string } | null
 }
 
 // ─── Comerciales ──────────────────────────────────────────────────────────────
@@ -288,4 +289,5 @@ export interface CotizacionCreate {
 export interface ContactoSAC extends Contacto {
   empresa: string
   comercial: string
+  categoria?: 'A' | 'B' | 'C' | null
 }

@@ -98,7 +98,11 @@ Herramientas expuestas:
 - registrar_entrega_regalo(id, fotos[]) → sube fotos + marca como entregado
 - get_pendientes_sac()          → sin regalo registrado en el mes
 ```
-**Caso de uso:** Bot que recuerde al equipo los cumpleaños pendientes cada lunes.
+**Caso de uso:** Bot que recuerde al equipo los cumpleaños pendientes un mes antes, y un día antes del cumpleaños.
+Correo para contabilidad y administrativo que validen la cartera y le entreguen a los que se deba un regalo de cumpleaños y realice la solicitud de compra, en una lista de regalos de cumpleaños, únicamente cliente aprobados (Al día con cartera).
+
+Tarjeta de cumpleaños Cliente -> Via outlook
+Sube foto con el MCP automáticamente al CRM
 
 ---
 

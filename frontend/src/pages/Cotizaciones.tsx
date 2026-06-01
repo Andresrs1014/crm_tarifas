@@ -1,13 +1,54 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   getCotizaciones, deleteCotizacion, duplicarCotizacion, updateCotizacion, getCotizacion,
+  actualizarTarifas,
 } from '../api/cotizaciones'
 import { toast } from '../store/toastStore'
 import type { EstadoCotizacion } from '../types'
 import { exportCotizacionPDF } from '../utils/exportPDF'
 import { exportCotizacionesExcel } from '../utils/exportExcel'
+
+// ─── Helpers para preview de incremento ────────────────────────────────────────
+
+function parseTarifaMoneda(tarifa: string): number | null {
+  const cleaned = tarifa.replace(/\$/g, '').replace(/\./g, '').replace(/,/g, '.').trim()
+  const num = parseFloat(cleaned)
+  return isNaN(num) ? null : num
+}
+
+function fmtMoneda(value: number): string {
+  return '$' + Math.round(value).toLocaleString('es-CO')
+}
+
+interface PreviewItem {
+  descripcion: string
+  antes: string
+  despues: string
+}
+
+function buildPreview(snapshot: Record<string, unknown>, pct: number): PreviewItem[] {
+  const items: PreviewItem[] = []
+  const factor = 1 + pct / 100
+  for (const grupos of Object.values(snapshot)) {
+    for (const arr of Object.values(grupos as Record<string, unknown>)) {
+      for (const item of arr as Array<Record<string, unknown>>) {
+        if (item.tipoTarifa === 'moneda' && typeof item.tarifa === 'string') {
+          const val = parseTarifaMoneda(item.tarifa)
+          if (val !== null) {
+            items.push({
+              descripcion: (item.descripcion as string) || '—',
+              antes: item.tarifa,
+              despues: fmtMoneda(val * factor),
+            })
+          }
+        }
+      }
+    }
+  }
+  return items
+}
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
 
@@ -51,6 +92,8 @@ export default function Cotizaciones() {
   const [search, setSearch] = useState('')
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [pdfLoading, setPdfLoading] = useState<string | null>(null)
+  const [actualizarId, setActualizarId] = useState<string | null>(null)
+  const [incremento, setIncremento] = useState('')
 
   const { data: cotizaciones = [], isLoading } = useQuery({
     queryKey: ['cotizaciones', estado, search],
@@ -94,6 +137,31 @@ export default function Cotizaciones() {
       toast.success('Cotización rechazada')
     },
     onError: () => toast.error('Error al actualizar'),
+  })
+
+  // ── Actualizar Tarifas ──────────────────────────────────────────────────────
+  const { data: cotActualizar, isLoading: loadingActualizar } = useQuery({
+    queryKey: ['cotizacion-detail', actualizarId],
+    queryFn: () => getCotizacion(actualizarId!),
+    enabled: !!actualizarId,
+  })
+
+  const pct = parseFloat(incremento) || 0
+  const previewItems = useMemo(() => {
+    if (!cotActualizar?.itemsSnapshot) return []
+    return buildPreview(cotActualizar.itemsSnapshot as Record<string, unknown>, pct)
+  }, [cotActualizar, pct])
+
+  const actualizarMut = useMutation({
+    mutationFn: ({ id, inc }: { id: string; inc: number }) => actualizarTarifas(id, inc),
+    onSuccess: ({ cotizacion, itemsActualizados }) => {
+      qc.invalidateQueries({ queryKey: ['cotizaciones'] })
+      toast.success(`Nueva cotización ${cotizacion.numero} creada · ${itemsActualizados} ítems actualizados`)
+      setActualizarId(null)
+      setIncremento('')
+      navigate(`/cotizaciones/${cotizacion.id}/editar`)
+    },
+    onError: () => toast.error('Error al actualizar tarifas'),
   })
 
   async function handlePDF(cotId: string, numero: string) {
@@ -273,6 +341,15 @@ export default function Cotizaciones() {
                           </button>
                         )}
 
+                        {/* Actualizar Tarifas */}
+                        <button
+                          className="btn-ghost btn-sm px-2 py-1 text-xs text-gold"
+                          onClick={() => { setActualizarId(cot.id); setIncremento('') }}
+                          title="Actualizar tarifas con incremento %"
+                        >
+                          📈
+                        </button>
+
                         {/* Duplicar */}
                         <button
                           className="btn-ghost btn-sm px-2 py-1 text-xs"
@@ -301,6 +378,121 @@ export default function Cotizaciones() {
           </table>
         )}
       </div>
+
+      {/* Modal actualizar tarifas */}
+      {actualizarId && (
+        <div
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+          onClick={() => { setActualizarId(null); setIncremento('') }}
+        >
+          <div
+            className="card w-full max-w-2xl max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-border">
+              <div>
+                <h3 className="font-bold text-foreground text-lg">📈 Actualizar Tarifas</h3>
+                {cotActualizar && (
+                  <p className="text-sm text-muted mt-0.5">
+                    Base: <span className="font-mono text-accent">{cotActualizar.numero}</span>
+                    {' · '}{cotActualizar.empresa}
+                  </p>
+                )}
+              </div>
+              <button
+                className="text-muted hover:text-foreground text-xl leading-none"
+                onClick={() => { setActualizarId(null); setIncremento('') }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              {/* % input */}
+              <div className="flex items-center gap-4">
+                <label className="text-xs text-muted uppercase tracking-widest font-semibold whitespace-nowrap">
+                  % Incremento
+                </label>
+                <input
+                  type="number"
+                  className="filter-input w-32 font-mono text-lg text-center"
+                  placeholder="Ej: 5"
+                  min="0"
+                  max="200"
+                  step="0.1"
+                  value={incremento}
+                  onChange={(e) => setIncremento(e.target.value)}
+                  autoFocus
+                />
+                <span className="text-gold font-bold text-2xl">%</span>
+                <p className="text-xs text-muted">
+                  La cotización original queda intacta. Se crea una nueva con número nuevo.
+                </p>
+              </div>
+
+              {/* Preview */}
+              {loadingActualizar ? (
+                <div className="space-y-2">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="h-8 bg-surface2 rounded animate-pulse" />
+                  ))}
+                </div>
+              ) : previewItems.length === 0 ? (
+                <div className="text-center py-6 text-muted text-sm">
+                  {pct === 0
+                    ? 'Ingresa un porcentaje para ver el preview'
+                    : 'Esta cotización no tiene ítems de tipo moneda para actualizar'}
+                </div>
+              ) : (
+                <div>
+                  <p className="text-xs text-muted uppercase tracking-widest font-semibold mb-2">
+                    Preview · {previewItems.length} ítem{previewItems.length !== 1 ? 's' : ''} monetarios
+                  </p>
+                  <div className="rounded-lg border border-border overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border bg-surface2">
+                          <th className="text-left px-3 py-2 text-xs text-muted font-semibold">Ítem</th>
+                          <th className="text-right px-3 py-2 text-xs text-muted font-semibold">Antes</th>
+                          <th className="text-right px-3 py-2 text-xs text-muted font-semibold">Después</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {previewItems.map((item, i) => (
+                          <tr key={i} className="border-b border-border/50 last:border-0">
+                            <td className="px-3 py-2 text-foreground truncate max-w-xs">{item.descripcion}</td>
+                            <td className="px-3 py-2 text-right font-mono text-muted line-through">{item.antes}</td>
+                            <td className="px-3 py-2 text-right font-mono text-gold font-semibold">{item.despues}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end gap-2 p-4 border-t border-border">
+              <button
+                className="btn-secondary btn-sm"
+                onClick={() => { setActualizarId(null); setIncremento('') }}
+              >
+                Cancelar
+              </button>
+              <button
+                className="btn-primary btn-sm"
+                disabled={pct <= 0 || previewItems.length === 0 || actualizarMut.isPending}
+                onClick={() => actualizarMut.mutate({ id: actualizarId, inc: pct })}
+              >
+                {actualizarMut.isPending ? 'Creando...' : '✅ Aplicar y crear nueva cotización'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal confirm delete */}
       {confirmId && (

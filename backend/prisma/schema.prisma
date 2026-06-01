@@ -9,11 +9,12 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  username  String   @unique
+  id        String     @id @default(uuid())
+  username  String     @unique
   password  String
-  role      String   @default("usuario") // "superadmin" | "usuario"
-  createdAt DateTime @default(now()) @map("created_at")
+  role      String     @default("usuario") // "superadmin" | "usuario"
+  createdAt DateTime   @default(now()) @map("created_at")
+  comercial Comercial?
 
   @@map("users")
 }
@@ -25,6 +26,8 @@ model Comercial {
   email     String?
   tel       String?
   activo    Boolean  @default(true)
+  userId    String?  @unique @map("user_id")
+  user      User?    @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now()) @map("created_at")
   records   Record[]
 
