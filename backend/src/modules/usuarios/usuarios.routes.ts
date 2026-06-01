@@ -17,6 +17,11 @@ const CreateSchema = z.object({
   username: z.string().min(1),
   password: z.string().min(6),
   role: z.enum(['superadmin', 'usuario']).default('usuario'),
+  esComercial: z.boolean().optional(),
+  nombreComercial: z.string().min(1).optional(),
+  cargo: z.string().optional(),
+  email: z.string().email().optional().or(z.literal('')),
+  tel: z.string().optional(),
 });
 
 const UpdateSchema = z.object({

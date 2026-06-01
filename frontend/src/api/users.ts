@@ -4,7 +4,16 @@ import type { User } from '../types'
 export const getUsers = () =>
   client.get<User[]>('/api/admin/usuarios').then((r) => r.data)
 
-export const createUser = (data: { username: string; password: string; role: 'superadmin' | 'usuario' }) =>
+export const createUser = (data: {
+  username: string
+  password: string
+  role: 'superadmin' | 'usuario'
+  esComercial?: boolean
+  nombreComercial?: string
+  cargo?: string
+  email?: string
+  tel?: string
+}) =>
   client.post<User>('/api/admin/usuarios', data).then((r) => r.data)
 
 export const updateUser = (id: string, data: { username?: string; password?: string; role?: 'superadmin' | 'usuario' }) =>

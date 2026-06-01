@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
   type DragStartEvent, type DragEndEvent, type DragOverEvent,
@@ -192,6 +192,14 @@ export default function CRMKanban() {
     ? prospectos.filter((p) => (p.servicios as string[]).some((s) => s.toLowerCase().includes(lineaFiltro.toLowerCase())))
     : prospectos
 
+  // KPIs
+  const ESTADOS_ACTIVOS = ['prospecto', 'reconocimiento', 'propuesta', 'aceptacion_propuesta', 'creacion_sop']
+  const kpiTotal      = prospectosFiltrados.length
+  const kpiEnPipeline = prospectosFiltrados.filter((p) => ESTADOS_ACTIVOS.includes(p.estadoProspecto ?? 'prospecto')).length
+  const kpiFacturados = prospectosFiltrados.filter((p) => p.estadoProspecto === 'facturado').length
+  const kpiPerdidos   = prospectosFiltrados.filter((p) => p.estadoProspecto === 'perdido' || p.estadoProspecto === 'frio').length
+  const kpiIngresos   = prospectosFiltrados.reduce((a, p) => a + (p.ingresosEsperados ?? 0), 0)
+
   function handleDragStart(e: DragStartEvent) {
     const record = prospectos.find((p) => p.id === e.active.id)
     setActiveCard(record ?? null)
@@ -227,13 +235,13 @@ export default function CRMKanban() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Pipeline Kanban</h1>
+          <h1 className="text-2xl font-bold text-foreground">🗂️ CRM Pipeline</h1>
           <p className="text-sm text-muted mt-0.5">
             {prospectosFiltrados.length} prospectos
             {lineaFiltro && <span className="text-accent ml-1">· {lineaFiltro}</span>}
           </p>
         </div>
-        <div className="flex gap-3 flex-wrap">
+        <div className="flex gap-3 flex-wrap items-center">
           <input
             className="filter-input min-w-48"
             placeholder="Buscar empresa..."
@@ -241,17 +249,40 @@ export default function CRMKanban() {
             onChange={(e) => setSearch(e.target.value)}
           />
           <select className="filter-select" value={lineaFiltro} onChange={(e) => setLineaFiltro(e.target.value)}>
-            <option value="">Todas las líneas</option>
+            <option value="">🏢 Todas las compañías</option>
             <option value="logimat">Logimat</option>
             <option value="depósito">IMC Depósito</option>
             <option value="cargo">IMC Cargo</option>
             <option value="aduana">Aduana</option>
           </select>
           <select className="filter-select" value={comercialId} onChange={(e) => setComercialId(e.target.value)}>
-            <option value="">Todos los comerciales</option>
+            <option value="">👥 Todos los comerciales</option>
             {comerciales.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
           </select>
+          <Link to="/registro" className="btn-primary btn-sm whitespace-nowrap">➕ Nuevo Prospecto</Link>
         </div>
+      </div>
+
+      {/* KPI strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        {[
+          { label: 'Total Prospectos',   val: kpiTotal,      color: '#00c2ff' },
+          { label: 'En Pipeline',        val: kpiEnPipeline, color: '#a855f7' },
+          { label: 'Facturados',         val: kpiFacturados, color: '#00e676' },
+          { label: 'Frío / Perdido',     val: kpiPerdidos,   color: '#ff4444' },
+          { label: 'Ingresos Esperados', val: kpiIngresos ? fmt(kpiIngresos) : '—', color: '#f5a623' },
+        ].map((k) => (
+          <div
+            key={k.label}
+            className="card px-4 py-3"
+            style={{ borderTop: `3px solid ${k.color}` }}
+          >
+            <p className="text-2xs text-muted uppercase tracking-widest font-bold mb-1">{k.label}</p>
+            <p className="font-bold text-2xl" style={{ color: k.color, fontFamily: "'Barlow Condensed', sans-serif" }}>
+              {k.val}
+            </p>
+          </div>
+        ))}
       </div>
 
       {/* Banner: visitas vencidas (tipo=visita, hecho=false, fecha<=hoy) */}

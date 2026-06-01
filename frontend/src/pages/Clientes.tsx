@@ -40,15 +40,22 @@ function fmt(n: number) {
 export default function Clientes() {
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const [search, setSearch]           = useState('')
-  const [estado, setEstado]           = useState('')
-  const [comercialId, setComercialId] = useState('')
-  const [confirmId, setConfirmId]     = useState<string | null>(null)
+  const [search, setSearch]               = useState('')
+  const [estado, setEstado]               = useState('')
+  const [comercialId, setComercialId]     = useState('')
+  const [facturadoFiltro, setFacturadoF]  = useState('')
+  const [lineaFiltro, setLineaFiltro]     = useState('')
+  const [confirmId, setConfirmId]         = useState<string | null>(null)
 
-  const { data: clientes = [], isLoading } = useQuery({
+  const { data: clientesRaw = [], isLoading } = useQuery({
     queryKey: ['records', 'cliente', estado, comercialId, search],
     queryFn: () => getRecords({ tipo: 'cliente', estado: estado || undefined, comercialId: comercialId || undefined, search: search || undefined }),
   })
+
+  // Filtros client-side (facturado + línea de negocio)
+  const clientes = clientesRaw
+    .filter((c) => !facturadoFiltro || (facturadoFiltro === 'no' ? (!c.facturado || c.facturado === 'no') : c.facturado === facturadoFiltro))
+    .filter((c) => !lineaFiltro || (c.servicios as string[]).some((s) => s.toLowerCase().includes(lineaFiltro.toLowerCase())))
 
   const { data: comerciales = [] } = useQuery({
     queryKey: ['comerciales'],
@@ -107,6 +114,18 @@ export default function Clientes() {
         <select className="filter-select" value={estado} onChange={(e) => setEstado(e.target.value)}>
           {ESTADOS_CLIENTE.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
         </select>
+        <select className="filter-select" value={facturadoFiltro} onChange={(e) => setFacturadoF(e.target.value)}>
+          <option value="">Facturación: Todos</option>
+          <option value="si">Facturado</option>
+          <option value="no">No Facturado</option>
+        </select>
+        <select className="filter-select" value={lineaFiltro} onChange={(e) => setLineaFiltro(e.target.value)}>
+          <option value="">🏢 Todas las compañías</option>
+          <option value="logimat">Logimat</option>
+          <option value="depósito">IMC Depósito</option>
+          <option value="cargo">IMC Cargo</option>
+          <option value="aduana">Aduana</option>
+        </select>
         <select className="filter-select" value={comercialId} onChange={(e) => setComercialId(e.target.value)}>
           <option value="">Todos los comerciales</option>
           {comerciales.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
@@ -136,6 +155,7 @@ export default function Clientes() {
                 <th>Comercial</th>
                 <th>Servicios</th>
                 <th>Visita</th>
+                <th>Nuevo Servicio</th>
                 <th>Facturación</th>
                 <th>Estado</th>
                 <th>Cat.</th>
@@ -169,6 +189,12 @@ export default function Clientes() {
                   <td>
                     {c.visitaCliente && c.visitaCliente !== 'no'
                       ? <span className="badge-green">{c.visitaCliente}</span>
+                      : <span className="text-muted text-xs">—</span>
+                    }
+                  </td>
+                  <td className="text-sm">
+                    {(c.nuevoServicio || c.servicioNuevo)
+                      ? <span className="badge-blue">{c.nuevoServicio || c.servicioNuevo}</span>
                       : <span className="text-muted text-xs">—</span>
                     }
                   </td>

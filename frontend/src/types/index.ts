@@ -25,6 +25,7 @@ export interface User {
   username: string
   role: 'superadmin' | 'usuario'
   createdAt: string
+  comercial?: { id: string; nombre: string; cargo?: string } | null
 }
 
 // ─── Comerciales ──────────────────────────────────────────────────────────────

@@ -11,9 +11,17 @@ interface UserForm {
   username: string
   password: string
   role: Role
+  esComercial: boolean
+  nombreComercial: string
+  cargo: string
+  email: string
+  tel: string
 }
 
-const EMPTY_FORM: UserForm = { username: '', password: '', role: 'usuario' }
+const EMPTY_FORM: UserForm = {
+  username: '', password: '', role: 'usuario',
+  esComercial: false, nombreComercial: '', cargo: '', email: '', tel: '',
+}
 
 function UserRow({
   user,
@@ -92,6 +100,16 @@ function UserRow({
           {user.role}
         </span>
       </td>
+      <td>
+        {user.comercial ? (
+          <div>
+            <span className="badge-blue">📊 Comercial</span>
+            <div className="text-xs text-muted mt-0.5">{user.comercial.nombre}{user.comercial.cargo ? ` · ${user.comercial.cargo}` : ''}</div>
+          </div>
+        ) : (
+          <span className="text-muted text-xs">—</span>
+        )}
+      </td>
       <td className="text-xs text-muted">
         {new Date(user.createdAt).toLocaleDateString('es-CO')}
       </td>
@@ -124,10 +142,22 @@ export default function Usuarios() {
   })
 
   const createMut = useMutation({
-    mutationFn: () => createUser({ username: form.username, password: form.password, role: form.role }),
+    mutationFn: () => createUser({
+      username: form.username,
+      password: form.password,
+      role: form.role,
+      ...(form.esComercial ? {
+        esComercial: true,
+        nombreComercial: form.nombreComercial || form.username,
+        cargo: form.cargo || undefined,
+        email: form.email || undefined,
+        tel: form.tel || undefined,
+      } : {}),
+    }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['usuarios'] })
-      toast.success('Usuario creado')
+      qc.invalidateQueries({ queryKey: ['comerciales'] })
+      toast.success(form.esComercial ? 'Usuario y comercial creados' : 'Usuario creado')
       setShowForm(false)
       setForm(EMPTY_FORM)
     },
@@ -162,6 +192,8 @@ export default function Usuarios() {
       {showForm && (
         <div className="card p-5 space-y-4 border border-accent/30">
           <h3 className="text-sm font-bold text-foreground">Nuevo usuario</h3>
+
+          {/* Campos de acceso */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
               <label className="text-xs text-muted block mb-1">Username <span className="text-danger">*</span></label>
@@ -184,16 +216,65 @@ export default function Usuarios() {
               </select>
             </div>
           </div>
+
+          {/* Toggle comercial */}
+          <div
+            className={`rounded-xl border p-4 transition-colors cursor-pointer ${
+              form.esComercial ? 'border-accent/50 bg-accent/5' : 'border-border'
+            }`}
+            onClick={() => setForm((s) => ({ ...s, esComercial: !s.esComercial }))}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-5 rounded-full transition-colors relative ${form.esComercial ? 'bg-accent' : 'bg-surface2'}`}>
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${form.esComercial ? 'left-5' : 'left-0.5'}`} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">📊 Es parte del equipo comercial</p>
+                <p className="text-xs text-muted">Se creará también como comercial y podrá ser asignado a prospectos y clientes</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Campos comercial (solo si esComercial) */}
+          {form.esComercial && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-1">
+              <div>
+                <label className="text-xs text-muted block mb-1">Nombre completo <span className="text-danger">*</span></label>
+                <input className="input w-full" value={form.nombreComercial}
+                  onChange={(e) => setForm((s) => ({ ...s, nombreComercial: e.target.value }))}
+                  placeholder="Ej: Andrés Quintero" />
+              </div>
+              <div>
+                <label className="text-xs text-muted block mb-1">Cargo</label>
+                <input className="input w-full" value={form.cargo}
+                  onChange={(e) => setForm((s) => ({ ...s, cargo: e.target.value }))}
+                  placeholder="Ej: Ejecutivo Comercial" />
+              </div>
+              <div>
+                <label className="text-xs text-muted block mb-1">Email</label>
+                <input type="email" className="input w-full" value={form.email}
+                  onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))}
+                  placeholder="correo@empresa.com" />
+              </div>
+              <div>
+                <label className="text-xs text-muted block mb-1">Teléfono</label>
+                <input className="input w-full" value={form.tel}
+                  onChange={(e) => setForm((s) => ({ ...s, tel: e.target.value }))}
+                  placeholder="300 000 0000" />
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-2 justify-end">
             <button className="btn-secondary btn-sm" onClick={() => { setShowForm(false); setForm(EMPTY_FORM) }}>
               Cancelar
             </button>
             <button
               className="btn-primary btn-sm"
-              disabled={!form.username || !form.password || createMut.isPending}
+              disabled={!form.username || !form.password || (form.esComercial && !form.nombreComercial) || createMut.isPending}
               onClick={() => createMut.mutate()}
             >
-              {createMut.isPending ? 'Creando...' : 'Crear usuario'}
+              {createMut.isPending ? 'Creando...' : form.esComercial ? '💾 Crear usuario y comercial' : '💾 Crear usuario'}
             </button>
           </div>
         </div>
@@ -213,6 +294,7 @@ export default function Usuarios() {
               <tr>
                 <th>Username</th>
                 <th>Rol</th>
+                <th>Equipo Comercial</th>
                 <th>Creado</th>
                 <th></th>
               </tr>

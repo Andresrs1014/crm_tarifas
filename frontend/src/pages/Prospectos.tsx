@@ -7,13 +7,15 @@ import { toast } from '../store/toastStore'
 import { exportRecordsExcel } from '../utils/exportExcel'
 
 const ESTADOS: { value: string; label: string; badge: string }[] = [
-  { value: '',                   label: 'Todos los estados',     badge: '' },
-  { value: 'prospecto',          label: 'Prospecto',             badge: 'badge-blue' },
-  { value: 'reconocimiento',     label: 'Reconocimiento',        badge: 'badge-purple' },
-  { value: 'propuesta',          label: 'Propuesta',             badge: 'badge-gold' },
-  { value: 'aceptacion_propuesta', label: 'Aceptación',         badge: 'badge-green' },
-  { value: 'creacion_sop',       label: 'Creación SOP',          badge: 'badge-gold' },
-  { value: 'facturado',          label: 'Facturado',             badge: 'badge-green' },
+  { value: '',                     label: 'Todos los estados',               badge: '' },
+  { value: 'prospecto',            label: '🎯 Prospecto',                    badge: 'badge-blue' },
+  { value: 'reconocimiento',       label: '🏢 Visita',                       badge: 'badge-purple' },
+  { value: 'propuesta',            label: '📄 Propuesta Comercial',          badge: 'badge-gold' },
+  { value: 'aceptacion_propuesta', label: '🤝 Aceptación Propuesta',         badge: 'badge-green' },
+  { value: 'creacion_sop',         label: '📋 Creación Ficha Cliente',       badge: 'badge-gold' },
+  { value: 'facturado',            label: '💰 Facturado',                    badge: 'badge-green' },
+  { value: 'frio',                 label: '🧊 Frío',                         badge: 'badge-gray' },
+  { value: 'perdido',              label: '❌ Perdido',                      badge: 'badge-red' },
 ]
 
 const ESTADO_BADGE: Record<string, string> = {
