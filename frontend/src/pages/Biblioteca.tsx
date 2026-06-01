@@ -5,9 +5,10 @@ import {
   createLinea, updateLinea, deleteLinea,
   createGrupo, updateGrupo, deleteGrupo,
   createItem, updateItem, deleteItem,
+  createObs, updateObs, deleteObs,
 } from '../api/biblioteca'
 import { toast } from '../store/toastStore'
-import type { BibliotecaLinea, BibliotecaGrupo, BibliotecaItem } from '../types'
+import type { BibliotecaLinea, BibliotecaGrupo, BibliotecaItem, BibliotecaObs } from '../types'
 
 // ─── Item inline editor ────────────────────────────────────────────────────────
 
@@ -233,6 +234,199 @@ function GrupoSection({
   )
 }
 
+// ─── Columnas section ─────────────────────────────────────────────────────────
+
+function ColumnasSection({ linea }: { linea: BibliotecaLinea }) {
+  const qc = useQueryClient()
+  const [nueva, setNueva] = useState('')
+
+  const saveMut = useMutation({
+    mutationFn: (cols: string[]) => updateLinea(linea.id, { columnas: cols }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
+    onError: () => toast.error('Error al guardar columnas'),
+  })
+
+  const cols: string[] = (linea.columnas as string[]) ?? []
+
+  function addCol() {
+    const trimmed = nueva.trim()
+    if (!trimmed || cols.includes(trimmed)) return
+    saveMut.mutate([...cols, trimmed])
+    setNueva('')
+  }
+
+  function removeCol(col: string) {
+    saveMut.mutate(cols.filter((c) => c !== col))
+  }
+
+  return (
+    <div className="rounded-xl border border-border p-4 space-y-3">
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-xs font-bold text-accent uppercase tracking-widest">🗂 Columnas extra en cotización</span>
+        <span className="text-2xs text-muted">(se muestran como columnas adicionales en la tabla de tarifas)</span>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {cols.length === 0 && (
+          <span className="text-xs text-muted">Sin columnas extra. Las columnas por defecto son: Servicio, Tarifa, Observaciones.</span>
+        )}
+        {cols.map((col) => (
+          <div key={col} className="flex items-center gap-1 bg-surface2 rounded-lg px-2 py-1">
+            <span className="text-xs font-semibold text-foreground">{col}</span>
+            <button
+              className="text-muted hover:text-danger text-xs leading-none ml-1"
+              onClick={() => removeCol(col)}
+              title="Eliminar columna"
+            >×</button>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2 items-center">
+        <input
+          className="input text-sm flex-1 max-w-xs"
+          placeholder="Nombre de la columna (ej: Mínimo)"
+          value={nueva}
+          onChange={(e) => setNueva(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && addCol()}
+        />
+        <button
+          className="btn-primary btn-sm text-xs"
+          disabled={!nueva.trim() || saveMut.isPending}
+          onClick={addCol}
+        >
+          + Agregar
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Observaciones section ────────────────────────────────────────────────────
+
+function ObsCard({ obs, onDelete }: { obs: BibliotecaObs; onDelete: () => void }) {
+  const qc = useQueryClient()
+  const [editing, setEditing] = useState(false)
+  const [nombre, setNombre] = useState(obs.nombre)
+  const [html, setHtml] = useState(obs.html)
+
+  const saveMut = useMutation({
+    mutationFn: () => updateObs(obs.id, { nombre, html }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['biblioteca'] }); setEditing(false) },
+    onError: () => toast.error('Error al guardar'),
+  })
+
+  if (!editing) {
+    return (
+      <div className="rounded-lg border border-border p-3 group">
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <span className="text-xs font-bold text-foreground">{obs.nombre}</span>
+          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button className="btn-ghost btn-sm px-1.5 py-0.5 text-xs" onClick={() => setEditing(true)}>✏️</button>
+            <button className="btn-danger btn-sm px-1.5 py-0.5 text-xs" onClick={onDelete}>×</button>
+          </div>
+        </div>
+        <div
+          className="text-xs text-muted leading-relaxed line-clamp-3"
+          dangerouslySetInnerHTML={{ __html: obs.html }}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-lg border border-accent/30 bg-accent/5 p-3 space-y-2">
+      <div>
+        <label className="text-2xs text-muted block mb-0.5">Nombre / Título</label>
+        <input className="input w-full text-sm" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+      </div>
+      <div>
+        <label className="text-2xs text-muted block mb-0.5">Contenido (HTML o texto)</label>
+        <textarea
+          className="input w-full text-sm font-mono min-h-24 resize-y"
+          value={html}
+          onChange={(e) => setHtml(e.target.value)}
+        />
+      </div>
+      <div className="flex gap-2 justify-end">
+        <button className="btn-secondary btn-sm text-xs" onClick={() => setEditing(false)}>Cancelar</button>
+        <button className="btn-primary btn-sm text-xs" disabled={saveMut.isPending} onClick={() => saveMut.mutate()}>
+          {saveMut.isPending ? 'Guardando...' : 'Guardar'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function ObsSection({ linea }: { linea: BibliotecaLinea }) {
+  const qc = useQueryClient()
+  const [adding, setAdding] = useState(false)
+  const [newNombre, setNewNombre] = useState('')
+  const [newHtml, setNewHtml] = useState('')
+
+  const addMut = useMutation({
+    mutationFn: () => createObs(linea.id, { nombre: newNombre, html: newHtml }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['biblioteca'] })
+      setAdding(false); setNewNombre(''); setNewHtml('')
+      toast.success('Observación agregada')
+    },
+    onError: () => toast.error('Error al agregar'),
+  })
+
+  const delMut = useMutation({
+    mutationFn: deleteObs,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
+    onError: () => toast.error('Error al eliminar'),
+  })
+
+  const obs: BibliotecaObs[] = linea.obs ?? []
+
+  return (
+    <div className="rounded-xl border border-border p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-bold text-accent uppercase tracking-widest">📝 Observaciones de cotización</span>
+        <button className="btn-ghost btn-sm text-xs" onClick={() => setAdding(true)}>+ Nueva</button>
+      </div>
+
+      {obs.length === 0 && !adding && (
+        <p className="text-xs text-muted">Sin observaciones. Se mostrarán al pie de la cotización en PDF.</p>
+      )}
+
+      <div className="space-y-2">
+        {obs.map((o) => (
+          <ObsCard key={o.id} obs={o} onDelete={() => delMut.mutate(o.id)} />
+        ))}
+      </div>
+
+      {adding && (
+        <div className="rounded-lg border border-accent/30 bg-accent/5 p-3 space-y-2">
+          <div>
+            <label className="text-2xs text-muted block mb-0.5">Nombre / Título *</label>
+            <input className="input w-full text-sm" placeholder="Ej: Notas generales" value={newNombre}
+              onChange={(e) => setNewNombre(e.target.value)} autoFocus />
+          </div>
+          <div>
+            <label className="text-2xs text-muted block mb-0.5">Contenido (HTML o texto)</label>
+            <textarea
+              className="input w-full text-sm font-mono min-h-20 resize-y"
+              placeholder="Ej: <p>Tarifas sujetas a cambio sin previo aviso.</p>"
+              value={newHtml}
+              onChange={(e) => setNewHtml(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button className="btn-secondary btn-sm text-xs" onClick={() => { setAdding(false); setNewNombre(''); setNewHtml('') }}>Cancelar</button>
+            <button className="btn-primary btn-sm text-xs"
+              disabled={!newNombre.trim() || addMut.isPending}
+              onClick={() => addMut.mutate()}>
+              {addMut.isPending ? 'Guardando...' : 'Agregar'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Linea section ─────────────────────────────────────────────────────────────
 
 function LineaSection({ linea }: { linea: BibliotecaLinea }) {
@@ -304,9 +498,9 @@ function LineaSection({ linea }: { linea: BibliotecaLinea }) {
         </div>
       </div>
 
-      {/* Grupos */}
+      {/* Grupos + Columnas + Observaciones */}
       {expanded && (
-        <div className="p-5 space-y-3">
+        <div className="p-5 space-y-4">
           {showAddGrupo && (
             <div className="flex gap-2 items-center p-3 rounded-lg border border-accent/30 bg-accent/5">
               <input className="input flex-1 text-sm" placeholder="Nombre del grupo" value={nuevoGrupo}
@@ -326,6 +520,11 @@ function LineaSection({ linea }: { linea: BibliotecaLinea }) {
           {linea.grupos.map((grupo) => (
             <GrupoSection key={grupo.id} grupo={grupo} lineaId={linea.id} columnas={linea.columnas ?? []} />
           ))}
+
+          <div className="border-t border-border pt-4 space-y-3">
+            <ColumnasSection linea={linea} />
+            <ObsSection linea={linea} />
+          </div>
         </div>
       )}
     </div>
