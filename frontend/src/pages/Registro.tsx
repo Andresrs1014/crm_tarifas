@@ -10,6 +10,7 @@ import type { TipoRecord, RecordCreate, ContactoCreate } from '../types'
 const ESTADOS_PROSPECTO = [
   'prospecto', 'reconocimiento', 'propuesta',
   'aceptacion_propuesta', 'creacion_sop', 'facturado',
+  'frio', 'perdido',
 ]
 
 const TIPOS_CONTACTO = [

@@ -132,12 +132,12 @@ export default function Clientes() {
             <thead>
               <tr>
                 <th>Empresa</th>
-                <th>Tipo</th>
+                <th>Contacto</th>
                 <th>Comercial</th>
-                <th>Estado</th>
                 <th>Servicios</th>
-                <th>Facturación</th>
                 <th>Visita</th>
+                <th>Facturación</th>
+                <th>Estado</th>
                 <th>Cat.</th>
                 <th></th>
               </tr>
@@ -149,15 +149,13 @@ export default function Clientes() {
                     <div className="font-semibold text-foreground">{c.empresa}</div>
                     {c.nit && <div className="text-xs text-muted">NIT: {c.nit}</div>}
                   </td>
-                  <td>
-                    <span className="badge-gray capitalize">{c.tipoCliente}</span>
+                  <td className="text-sm text-muted">
+                    {c.contactos?.[0]?.nombre || '—'}
+                    {c.contactos?.[0]?.cargo && (
+                      <div className="text-xs text-muted/60">{c.contactos[0].cargo}</div>
+                    )}
                   </td>
                   <td className="text-sm">{c.comercial?.nombre || '—'}</td>
-                  <td>
-                    <span className={ESTADO_BADGE[c.estadoCliente ?? 'activo'] ?? 'badge-gray'}>
-                      {c.estadoCliente ?? 'activo'}
-                    </span>
-                  </td>
                   <td>
                     <div className="flex flex-wrap gap-1">
                       {(c.servicios as string[]).slice(0, 2).map((s) => (
@@ -169,6 +167,12 @@ export default function Clientes() {
                     </div>
                   </td>
                   <td>
+                    {c.visitaCliente && c.visitaCliente !== 'no'
+                      ? <span className="badge-green">{c.visitaCliente}</span>
+                      : <span className="text-muted text-xs">—</span>
+                    }
+                  </td>
+                  <td>
                     <div className="font-mono text-sm text-success">{fmt(c.valor ?? 0)}</div>
                     <div className="mt-0.5">
                       <span className={FACTURADO_BADGE[c.facturado ?? 'no'] ?? 'badge-gray'}>
@@ -177,10 +181,9 @@ export default function Clientes() {
                     </div>
                   </td>
                   <td>
-                    {c.visitaCliente && c.visitaCliente !== 'no'
-                      ? <span className="badge-green">{c.visitaCliente}</span>
-                      : <span className="text-muted text-xs">—</span>
-                    }
+                    <span className={ESTADO_BADGE[c.estadoCliente ?? 'activo'] ?? 'badge-gray'}>
+                      {c.estadoCliente ?? 'activo'}
+                    </span>
                   </td>
                   <td>
                     {c.categoria ? (

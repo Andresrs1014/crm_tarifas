@@ -50,6 +50,28 @@ router.get('/actividades', async (req: Request, res: Response, next: NextFunctio
   }
 });
 
+// GET /api/actividades/vencidas → tipo=visita, fecha<=hoy, hecho=false
+router.get('/actividades/vencidas', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const hoy = new Date()
+    hoy.setHours(23, 59, 59, 999)
+    const actividades = await prisma.actividad.findMany({
+      where: {
+        tipo: 'visita',
+        hecho: false,
+        fecha: { lte: hoy },
+      },
+      include: {
+        record: { select: { id: true, empresa: true, comercialId: true, comercial: { select: { nombre: true } } } },
+      },
+      orderBy: { fecha: 'asc' },
+    })
+    res.json(actividades)
+  } catch (err) {
+    next(err)
+  }
+})
+
 // POST /api/records/:recordId/actividades
 router.post(
   '/records/:recordId/actividades',

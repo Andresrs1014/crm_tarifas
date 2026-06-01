@@ -288,4 +288,5 @@ export interface CotizacionCreate {
 export interface ContactoSAC extends Contacto {
   empresa: string
   comercial: string
+  categoria?: 'A' | 'B' | 'C' | null
 }

@@ -23,4 +23,6 @@ export const duplicarCotizacion = (id: string) =>
   client.post<Cotizacion>(`/api/cotizaciones/${id}/duplicar`).then((r) => r.data)
 
 export const actualizarTarifas = (id: string, incremento: number) =>
-  client.post<Cotizacion>(`/api/cotizaciones/${id}/actualizar-tarifas`, { incremento }).then((r) => r.data)
+  client.post<{ cotizacion: Cotizacion; itemsActualizados: number }>(
+    `/api/cotizaciones/${id}/actualizar-tarifas`, { incremento }
+  ).then((r) => r.data)

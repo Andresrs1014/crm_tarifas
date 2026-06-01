@@ -161,13 +161,12 @@ export default function Prospectos() {
             <thead>
               <tr>
                 <th>Empresa</th>
-                <th>Ciudad</th>
+                <th>Contacto</th>
                 <th>Comercial</th>
-                <th>Estado</th>
                 <th>Servicios</th>
-                <th>Visita</th>
-                <th>Ingresos esp.</th>
-                <th>Fecha</th>
+                <th>Estado</th>
+                <th>Facturado</th>
+                <th>Próx. Seguimiento</th>
                 <th></th>
               </tr>
             </thead>
@@ -178,13 +177,13 @@ export default function Prospectos() {
                     <div className="font-semibold text-foreground">{p.empresa}</div>
                     {p.nit && <div className="text-xs text-muted">NIT: {p.nit}</div>}
                   </td>
-                  <td className="text-muted text-sm">{p.ciudad || '—'}</td>
-                  <td className="text-sm">{p.comercial?.nombre || '—'}</td>
-                  <td>
-                    <span className={ESTADO_BADGE[p.estadoProspecto ?? 'prospecto'] ?? 'badge-gray'}>
-                      {p.estadoProspecto ?? 'prospecto'}
-                    </span>
+                  <td className="text-sm text-muted">
+                    {p.contactos?.[0]?.nombre || '—'}
+                    {p.contactos?.[0]?.cargo && (
+                      <div className="text-xs text-muted/60">{p.contactos[0].cargo}</div>
+                    )}
                   </td>
+                  <td className="text-sm">{p.comercial?.nombre || '—'}</td>
                   <td>
                     <div className="flex flex-wrap gap-1">
                       {(p.servicios as string[]).slice(0, 2).map((s) => (
@@ -196,16 +195,21 @@ export default function Prospectos() {
                     </div>
                   </td>
                   <td>
-                    {p.visita && p.visita !== 'no'
-                      ? <span className="badge-green">{p.visita}</span>
-                      : <span className="text-muted text-xs">—</span>
-                    }
+                    <span className={ESTADO_BADGE[p.estadoProspecto ?? 'prospecto'] ?? 'badge-gray'}>
+                      {p.estadoProspecto ?? 'prospecto'}
+                    </span>
                   </td>
-                  <td className="font-mono text-sm text-success">
-                    {p.ingresosEsperados ? fmt(p.ingresosEsperados) : '—'}
+                  <td>
+                    <span className={p.facturado === 'si' ? 'badge-green' : p.facturado === 'parcial' ? 'badge-gold' : 'badge-gray'}>
+                      {p.facturado ?? 'no'}
+                    </span>
                   </td>
-                  <td className="text-muted text-xs whitespace-nowrap">
-                    {new Date(p.fecha).toLocaleDateString('es-CO')}
+                  <td className="text-xs whitespace-nowrap">
+                    {p.proximoSeguimiento ? (
+                      <span className={new Date(p.proximoSeguimiento) < new Date() ? 'text-danger font-semibold' : 'text-muted'}>
+                        {new Date(p.proximoSeguimiento).toLocaleDateString('es-CO')}
+                      </span>
+                    ) : <span className="text-muted">—</span>}
                   </td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <div className="flex gap-1">
