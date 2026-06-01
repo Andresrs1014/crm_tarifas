@@ -16,7 +16,16 @@ export const createUser = (data: {
 }) =>
   client.post<User>('/api/admin/usuarios', data).then((r) => r.data)
 
-export const updateUser = (id: string, data: { username?: string; password?: string; role?: 'superadmin' | 'usuario' }) =>
+export const updateUser = (id: string, data: {
+  username?: string
+  password?: string
+  role?: 'superadmin' | 'usuario'
+  esComercial?: boolean
+  nombreComercial?: string
+  cargo?: string
+  email?: string
+  tel?: string
+}) =>
   client.put<User>(`/api/admin/usuarios/${id}`, data).then((r) => r.data)
 
 export const deleteUser = (id: string) =>

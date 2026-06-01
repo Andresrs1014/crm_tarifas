@@ -34,20 +34,37 @@ function UserRow({
 }) {
   const qc = useQueryClient()
   const [editing, setEditing] = useState(false)
-  const [form, setForm] = useState({ username: user.username, password: '', role: user.role as Role })
+  const [form, setForm] = useState({
+    username: user.username,
+    password: '',
+    role: user.role as Role,
+    esComercial: !!user.comercial,
+    nombreComercial: user.comercial?.nombre ?? '',
+    cargo: user.comercial?.cargo ?? '',
+    email: '',
+    tel: '',
+  })
 
   const updateMut = useMutation({
     mutationFn: () => updateUser(user.id, {
       username: form.username,
       role: form.role,
       ...(form.password ? { password: form.password } : {}),
+      esComercial: form.esComercial,
+      ...(form.esComercial ? {
+        nombreComercial: form.nombreComercial || form.username,
+        cargo: form.cargo || undefined,
+        email: form.email || undefined,
+        tel: form.tel || undefined,
+      } : {}),
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['usuarios'] })
+      qc.invalidateQueries({ queryKey: ['comerciales'] })
       toast.success('Usuario actualizado')
       setEditing(false)
     },
-    onError: () => toast.error('Error al actualizar'),
+    onError: (e: Error) => toast.error(e.message || 'Error al actualizar'),
   })
 
   const isSelf = user.id === currentUserId
@@ -56,27 +73,79 @@ function UserRow({
     return (
       <tr>
         <td colSpan={5}>
-          <div className="p-3 rounded-lg border border-accent/30 bg-accent/5 flex flex-wrap gap-2 items-end">
-            <div>
-              <label className="text-2xs text-muted block mb-0.5">Username</label>
-              <input className="input text-sm" value={form.username}
-                onChange={(e) => setForm((s) => ({ ...s, username: e.target.value }))} />
+          <div className="p-4 rounded-xl border border-accent/30 bg-accent/5 space-y-3">
+            {/* Campos de acceso */}
+            <div className="flex flex-wrap gap-2 items-end">
+              <div>
+                <label className="text-2xs text-muted block mb-0.5">Username</label>
+                <input className="input text-sm" value={form.username}
+                  onChange={(e) => setForm((s) => ({ ...s, username: e.target.value }))} />
+              </div>
+              <div>
+                <label className="text-2xs text-muted block mb-0.5">Nueva contraseña</label>
+                <input type="password" className="input text-sm" placeholder="(sin cambios)"
+                  value={form.password}
+                  onChange={(e) => setForm((s) => ({ ...s, password: e.target.value }))} />
+              </div>
+              <div>
+                <label className="text-2xs text-muted block mb-0.5">Rol</label>
+                <select className="filter-select text-sm" value={form.role}
+                  onChange={(e) => setForm((s) => ({ ...s, role: e.target.value as Role }))}>
+                  <option value="usuario">usuario</option>
+                  <option value="superadmin">superadmin</option>
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="text-2xs text-muted block mb-0.5">Nueva contraseña</label>
-              <input type="password" className="input text-sm" placeholder="(sin cambios)"
-                value={form.password}
-                onChange={(e) => setForm((s) => ({ ...s, password: e.target.value }))} />
+
+            {/* Toggle comercial */}
+            <div
+              className={`rounded-lg border p-3 cursor-pointer transition-colors ${
+                form.esComercial ? 'border-accent/40 bg-accent/5' : 'border-border'
+              }`}
+              onClick={() => setForm((s) => ({ ...s, esComercial: !s.esComercial }))}
+            >
+              <div className="flex items-center gap-2.5">
+                <div className={`w-9 h-5 rounded-full relative transition-colors ${form.esComercial ? 'bg-accent' : 'bg-surface2'}`}>
+                  <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${form.esComercial ? 'left-4' : 'left-0.5'}`} />
+                </div>
+                <span className="text-sm font-semibold text-foreground">📊 Equipo comercial</span>
+                {user.comercial && !form.esComercial && (
+                  <span className="text-2xs text-danger ml-1">(se eliminará el comercial vinculado)</span>
+                )}
+              </div>
             </div>
-            <div>
-              <label className="text-2xs text-muted block mb-0.5">Rol</label>
-              <select className="filter-select text-sm" value={form.role}
-                onChange={(e) => setForm((s) => ({ ...s, role: e.target.value as Role }))}>
-                <option value="usuario">usuario</option>
-                <option value="superadmin">superadmin</option>
-              </select>
-            </div>
-            <div className="flex gap-2">
+
+            {/* Campos comercial */}
+            {form.esComercial && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div>
+                  <label className="text-2xs text-muted block mb-0.5">Nombre completo *</label>
+                  <input className="input text-sm" value={form.nombreComercial}
+                    onChange={(e) => setForm((s) => ({ ...s, nombreComercial: e.target.value }))}
+                    placeholder="Nombre completo" />
+                </div>
+                <div>
+                  <label className="text-2xs text-muted block mb-0.5">Cargo</label>
+                  <input className="input text-sm" value={form.cargo}
+                    onChange={(e) => setForm((s) => ({ ...s, cargo: e.target.value }))}
+                    placeholder="Ej: Ejecutivo Comercial" />
+                </div>
+                <div>
+                  <label className="text-2xs text-muted block mb-0.5">Email</label>
+                  <input type="email" className="input text-sm" value={form.email}
+                    onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))}
+                    placeholder="correo@empresa.com" />
+                </div>
+                <div>
+                  <label className="text-2xs text-muted block mb-0.5">Teléfono</label>
+                  <input className="input text-sm" value={form.tel}
+                    onChange={(e) => setForm((s) => ({ ...s, tel: e.target.value }))}
+                    placeholder="300 000 0000" />
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end">
               <button className="btn-secondary btn-sm text-xs" onClick={() => setEditing(false)}>Cancelar</button>
               <button className="btn-primary btn-sm text-xs" disabled={updateMut.isPending}
                 onClick={() => updateMut.mutate()}>

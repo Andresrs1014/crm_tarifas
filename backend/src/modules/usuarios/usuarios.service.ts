@@ -63,17 +63,70 @@ export async function createUsuario(data: {
 
 export async function updateUsuario(
   id: string,
-  data: { username?: string; password?: string; role?: string }
+  data: {
+    username?: string;
+    password?: string;
+    role?: string;
+    esComercial?: boolean;
+    nombreComercial?: string;
+    cargo?: string;
+    email?: string;
+    tel?: string;
+  }
 ) {
-  const updateData: Record<string, unknown> = {};
-  if (data.username) updateData.username = data.username;
-  if (data.role) updateData.role = data.role;
-  if (data.password) updateData.password = await bcrypt.hash(data.password, 10);
+  const userUpdate: Record<string, unknown> = {};
+  if (data.username) userUpdate.username = data.username;
+  if (data.role)     userUpdate.role     = data.role;
+  if (data.password) userUpdate.password = await bcrypt.hash(data.password, 10);
+
+  if (data.esComercial === true) {
+    // Verificar si ya tiene un comercial vinculado
+    const existing = await prisma.comercial.findUnique({ where: { userId: id } });
+    if (existing) {
+      // Actualizar datos del comercial existente
+      await prisma.comercial.update({
+        where: { userId: id },
+        data: {
+          nombre: data.nombreComercial ?? existing.nombre,
+          cargo:  data.cargo  !== undefined ? data.cargo  : existing.cargo,
+          email:  data.email  !== undefined ? data.email  : existing.email,
+          tel:    data.tel    !== undefined ? data.tel    : existing.tel,
+        },
+      });
+    } else {
+      // Crear y vincular un nuevo comercial
+      userUpdate.comercial = {
+        create: {
+          nombre: data.nombreComercial || 'Sin nombre',
+          cargo:  data.cargo  || undefined,
+          email:  data.email  || undefined,
+          tel:    data.tel    || undefined,
+          activo: true,
+        },
+      };
+    }
+  } else if (data.esComercial === false) {
+    // Desvincular: eliminar comercial solo si no tiene records asignados
+    const existing = await prisma.comercial.findUnique({ where: { userId: id } });
+    if (existing) {
+      const count = await prisma.record.count({ where: { comercialId: existing.id } });
+      if (count > 0) {
+        throw Object.assign(
+          new Error(`No se puede quitar: el comercial tiene ${count} registros asignados`),
+          { statusCode: 400 }
+        );
+      }
+      await prisma.comercial.delete({ where: { userId: id } });
+    }
+  }
 
   const user = await prisma.user.update({
     where: { id },
-    data: updateData,
-    select: { id: true, username: true, role: true, createdAt: true },
+    data: userUpdate,
+    select: {
+      id: true, username: true, role: true, createdAt: true,
+      comercial: { select: { id: true, nombre: true, cargo: true } },
+    },
   });
   return user;
 }
