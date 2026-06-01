@@ -28,6 +28,12 @@ const UpdateSchema = z.object({
   username: z.string().min(1).optional(),
   password: z.string().min(6).optional(),
   role: z.enum(['superadmin', 'usuario']).optional(),
+  // comercial
+  esComercial: z.boolean().optional(),
+  nombreComercial: z.string().min(1).optional(),
+  cargo: z.string().optional(),
+  email: z.string().email().optional().or(z.literal('')),
+  tel: z.string().optional(),
 });
 
 router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
