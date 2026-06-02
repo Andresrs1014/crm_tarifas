@@ -66,6 +66,7 @@ model Record {
   ingresosEsperados  Int?        @map("ingresos_esperados")
   servicios          Json        @default("[]")
   facturacionLineas  Json        @default("{}") @map("facturacion_lineas")
+  stageHistory       Json        @default("[]") @map("stage_history")
   contactos          Contacto[]
   actividades        Actividad[]
   cotizaciones       Cotizacion[]
@@ -86,6 +87,7 @@ model Contacto {
   cargo         String?
   telefono      String?
   email         String?
+  direccion     String?
   orden         Int      @default(0)
   cumpleanos    String?
   recibeRegalos Boolean  @default(false) @map("recibe_regalos")

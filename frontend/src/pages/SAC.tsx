@@ -55,19 +55,52 @@ function EditModal({
   onClose: () => void
   onSaved: () => void
 }) {
-  const [cargo,    setCargo]    = useState(contacto.cargo    ?? '')
-  const [telefono, setTelefono] = useState(contacto.telefono ?? '')
-  const [email,    setEmail]    = useState(contacto.email    ?? '')
+  const [cargo,     setCargo]     = useState(contacto.cargo     ?? '')
+  const [telefono,  setTelefono]  = useState(contacto.telefono  ?? '')
+  const [email,     setEmail]     = useState(contacto.email     ?? '')
+  const [direccion, setDireccion] = useState(contacto.direccion ?? '')
+  const [fotos,     setFotos]     = useState<string[]>(contacto.fotosEntrega ?? [])
 
-  const mut = useMutation({
-    mutationFn: () => updateSacContacto(contacto.id, { cargo, telefono, email }),
+  const datosMut = useMutation({
+    mutationFn: () => updateSacContacto(contacto.id, { cargo, telefono, email, direccion }),
     onSuccess: () => { toast.success('Contacto actualizado'); onSaved(); onClose() },
     onError:   () => toast.error('Error al guardar'),
   })
 
+  const fotosMut = useMutation({
+    mutationFn: (nuevasFotos: string[]) => updateSacFotos(contacto.id, { fotos: nuevasFotos }),
+    onSuccess: (_data, nuevasFotos) => { setFotos(nuevasFotos); toast.success('Fotos actualizadas') },
+    onError:   () => toast.error('Error al actualizar fotos'),
+  })
+
+  function handleAgregarFotos(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    if (!files.length) return
+    const readers = files.map(
+      (f) =>
+        new Promise<string>((res) => {
+          const r = new FileReader()
+          r.onload = () => res(r.result as string)
+          r.readAsDataURL(f)
+        })
+    )
+    Promise.all(readers).then((b64s) => {
+      const nuevasFotos = [...fotos, ...b64s]
+      fotosMut.mutate(nuevasFotos)
+    })
+    e.target.value = ''
+  }
+
+  function handleEliminarFoto(idx: number) {
+    const nuevasFotos = fotos.filter((_, i) => i !== idx)
+    fotosMut.mutate(nuevasFotos)
+  }
+
+  const tipoLabel = contacto.tipoCliente === 'referido' ? 'Referido' : contacto.tipoCliente === 'directo' ? 'Directo' : '—'
+
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="card w-full max-w-lg space-y-5" onClick={(e) => e.stopPropagation()}>
+      <div className="card w-full max-w-lg space-y-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
 
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -80,14 +113,10 @@ function EditModal({
 
         {/* Info empresa (solo lectura) */}
         <div className="rounded-lg border border-border bg-surface2 p-4 grid grid-cols-2 gap-3 text-sm">
-          <div><div className="text-xs text-muted mb-0.5">Empresa</div><div className="font-semibold text-foreground">{contacto.empresa}</div></div>
+          <div><div className="text-xs text-muted mb-0.5">📋 Empresa</div><div className="font-semibold text-foreground">{contacto.empresa}</div></div>
+          <div><div className="text-xs text-muted mb-0.5">Tipo</div><div className="text-foreground">{tipoLabel}</div></div>
           <div><div className="text-xs text-muted mb-0.5">Comercial</div><div className="text-foreground">{contacto.comercial}</div></div>
           <div><div className="text-xs text-muted mb-0.5">Cumpleaños</div><div className="text-gold font-semibold">{contacto.cumpleanos?.slice(5) ?? '—'}</div></div>
-          <div><div className="text-xs text-muted mb-0.5">Categoría</div>
-            <div style={{ color: CAT_COLOR[contacto.categoria ?? ''] ?? '#8899b4' }} className="font-bold">
-              {contacto.categoria ?? '—'}
-            </div>
-          </div>
         </div>
 
         {/* Campos editables */}
@@ -103,17 +132,46 @@ function EditModal({
               <input className="input w-full" value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="Teléfono..." />
             </div>
             <div className="col-span-2 space-y-1">
-              <label className="text-xs text-muted uppercase tracking-widest">Email</label>
+              <label className="text-xs text-muted uppercase tracking-widest">Correo electrónico</label>
               <input className="input w-full" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="correo@empresa.com" />
             </div>
+            <div className="col-span-2 space-y-1">
+              <label className="text-xs text-muted uppercase tracking-widest">Dirección</label>
+              <input className="input w-full" value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder="Dirección..." />
+            </div>
           </div>
+        </div>
+
+        {/* Fotos de entrega */}
+        <div>
+          <p className="text-xs text-gold font-bold uppercase tracking-widest mb-3">📸 Foto de entrega de regalo</p>
+          {fotos.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {fotos.map((src, i) => (
+                <div key={i} className="relative group">
+                  <img src={src} alt={`foto-${i}`} className="w-20 h-20 object-cover rounded-lg border border-border" />
+                  <button
+                    className="absolute top-0.5 right-0.5 w-5 h-5 bg-black/70 text-white rounded-full text-xs hidden group-hover:flex items-center justify-center"
+                    onClick={() => handleEliminarFoto(i)}
+                    disabled={fotosMut.isPending}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <label className="flex items-center gap-2 bg-surface2 border border-dashed border-border rounded-lg px-4 py-2.5 cursor-pointer text-sm text-muted hover:border-accent transition-colors">
+            <span>📷</span> Subir foto de entrega
+            <input type="file" accept="image/*" multiple className="hidden" onChange={handleAgregarFotos} disabled={fotosMut.isPending} />
+          </label>
         </div>
 
         {/* Footer */}
         <div className="flex justify-end gap-2">
           <button className="btn-secondary btn-sm" onClick={onClose}>Cancelar</button>
-          <button className="btn-primary btn-sm" disabled={mut.isPending} onClick={() => mut.mutate()}>
-            {mut.isPending ? 'Guardando...' : '💾 Guardar cambios'}
+          <button className="btn-primary btn-sm" disabled={datosMut.isPending} onClick={() => datosMut.mutate()}>
+            {datosMut.isPending ? 'Guardando...' : '💾 Guardar cambios'}
           </button>
         </div>
       </div>

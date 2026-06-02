@@ -70,10 +70,14 @@ export async function getRecordById(id: string) {
         select: { id: true, numero: true, estado: true, empresa: true, createdAt: true, updatedAt: true },
         orderBy: { createdAt: 'desc' },
       },
+      matrizRiesgo: { select: { companias: true } },
     },
   });
   if (!record) throw Object.assign(new Error('Registro no encontrado'), { statusCode: 404 });
-  return record;
+  return {
+    ...record,
+    companias: (record.matrizRiesgo?.companias as string[]) ?? [],
+  };
 }
 
 export async function createRecord(data: {
@@ -226,6 +230,28 @@ export async function updateRecord(id: string, data: Partial<{
         recibeRegalos: c.recibeRegalos ?? false,
       })),
     };
+  }
+
+  // Trackear cambio de etapa en stageHistory
+  if (rest.estadoProspecto !== undefined) {
+    const current = await prisma.record.findUnique({
+      where: { id },
+      select: { estadoProspecto: true, stageHistory: true, createdAt: true },
+    });
+    if (current && current.estadoProspecto !== rest.estadoProspecto) {
+      const now = new Date().toISOString();
+      const history = (current.stageHistory as JsonInput[]) ?? [];
+      // Inicializar si está vacío
+      if (history.length === 0 && current.estadoProspecto) {
+        history.push({ stage: current.estadoProspecto, desde: current.createdAt.toISOString(), hasta: now });
+      } else {
+        // Cerrar la entrada abierta
+        const last = history[history.length - 1];
+        if (last && last.hasta === null) last.hasta = now;
+      }
+      history.push({ stage: rest.estadoProspecto, desde: now, hasta: null });
+      updateObj.stageHistory = history as JsonInput;
+    }
   }
 
   return prisma.record.update({
