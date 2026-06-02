@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { CalendarDays, ChevronLeft, ChevronRight, Check, Clock, MapPin } from 'lucide-react'
 import { getActividadesCalendario, updateActividad, ActividadCalendario } from '../api/actividades'
@@ -7,14 +7,18 @@ import { useToastStore } from '../store/toastStore'
 import { useNavigate } from 'react-router-dom'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+const MESES       = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const DIAS_CORTOS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
+const DIAS_LARGOS = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado']
+const HORA_INICIO = 6
+const HORA_FIN    = 21
+const ALTURA_HORA = 64 // px
 
 function padded(n: number): string { return String(n).padStart(2, '0') }
 function mesStr(y: number, m: number): string { return `${y}-${padded(m + 1)}` }
 function fechaStr(y: number, m: number, d: number): string { return `${y}-${padded(m + 1)}-${padded(d)}` }
 
-// ─── Day detail panel ─────────────────────────────────────────────────────────
+// ─── Day detail panel (slide-in) ──────────────────────────────────────────────
 function DayPanel({
   fecha, visitas, onClose,
 }: {
@@ -45,7 +49,6 @@ function DayPanel({
             <ChevronRight size={18} />
           </button>
         </div>
-
         <div className="p-5 space-y-3">
           {visitas.length === 0 ? (
             <div className="text-sm text-muted py-8 text-center">No hay visitas para este día.</div>
@@ -56,10 +59,7 @@ function DayPanel({
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <button
-                    onClick={() => navigate(`/detalle/${v.record.id}`)}
-                    className="text-sm font-semibold text-foreground hover:text-accent transition-colors text-left"
-                  >
+                  <button onClick={() => navigate(`/detalle/${v.record.id}`)} className="text-sm font-semibold text-foreground hover:text-accent transition-colors text-left">
                     {v.record.empresa}
                   </button>
                   <div className="text-xs text-muted mt-0.5">{v.record.comercial.nombre}</div>
@@ -72,15 +72,13 @@ function DayPanel({
                   <Check size={11} />
                 </button>
               </div>
-
               <p className={`text-xs leading-relaxed ${v.hecho ? 'line-through text-muted' : 'text-foreground/80'}`}>
                 {v.descripcion}
               </p>
-
               {(v.hora || v.lugar) && (
                 <div className="flex flex-wrap gap-3 text-[10px] text-muted">
-                  {v.hora && <span className="flex items-center gap-1"><Clock size={10} />{v.hora}</span>}
-                  {v.lugar && <span className="flex items-center gap-1"><MapPin size={10} />{v.lugar}</span>}
+                  {v.hora  && <span className="flex items-center gap-1"><Clock  size={10} />{v.hora}</span>}
+                  {v.lugar && <span className="flex items-center gap1"><MapPin size={10} />{v.lugar}</span>}
                 </div>
               )}
             </div>
@@ -91,19 +89,115 @@ function DayPanel({
   )
 }
 
+// ─── Timeline (vista día) ─────────────────────────────────────────────────────
+function Timeline({
+  visitas, fechaActual,
+}: {
+  visitas: ActividadCalendario[]; fechaActual: string
+}) {
+  const navigate  = useNavigate()
+  const nowRef    = useRef<HTMLDivElement>(null)
+  const now       = new Date()
+  const esHoy     = fechaActual === now.toISOString().slice(0, 10)
+  const horaActual = now.getHours()
+
+  useEffect(() => {
+    if (esHoy && nowRef.current) {
+      nowRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }
+  }, [esHoy])
+
+  // split by hora
+  const conHora: Record<number, ActividadCalendario[]> = {}
+  const sinHora: ActividadCalendario[] = []
+  for (const v of visitas) {
+    if (v.hora) {
+      const h = parseInt(v.hora.split(':')[0])
+      if (!conHora[h]) conHora[h] = []
+      conHora[h].push(v)
+    } else {
+      sinHora.push(v)
+    }
+  }
+
+  function VisitaCard({ v }: { v: ActividadCalendario }) {
+    const col = v.hecho ? '#64748b' : '#34d399'
+    return (
+      <div
+        onClick={() => navigate(`/detalle/${v.record.id}`)}
+        className="mx-2 my-1 rounded-lg px-3 py-2 cursor-pointer transition-opacity hover:opacity-80"
+        style={{ background: col + '18', borderLeft: `3px solid ${col}` }}
+      >
+        <div className="text-xs font-bold" style={{ color: col }}>{v.record.empresa}</div>
+        {v.descripcion && <div className="text-[10px] text-muted mt-0.5 line-clamp-1">{v.descripcion}</div>}
+        {v.lugar       && <div className="text-[10px] text-muted mt-0.5">📍 {v.lugar}</div>}
+        <div className="text-[10px] text-muted mt-0.5">{v.record.comercial.nombre}</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="overflow-y-auto" style={{ maxHeight: '70vh' }}>
+      {Array.from({ length: HORA_FIN - HORA_INICIO + 1 }).map((_, i) => {
+        const h     = HORA_INICIO + i
+        const hStr  = `${padded(h)}:00`
+        const items = conHora[h] ?? []
+        const esAhora = esHoy && h === horaActual
+
+        return (
+          <div key={h} className="flex border-t border-border/60 relative" style={{ minHeight: ALTURA_HORA }}>
+            {/* Hora label */}
+            <div className="w-14 flex-shrink-0 px-2 pt-1 text-right text-[11px] font-semibold text-muted leading-none select-none">
+              {hStr}
+            </div>
+            {/* Slot */}
+            <div className="flex-1 border-l border-border/60 relative min-h-full">
+              {esAhora && (
+                <div ref={nowRef} className="absolute top-0 left-0 right-0 h-0.5 bg-red-500 z-10" />
+              )}
+              {items.map(v => <VisitaCard key={v.id} v={v} />)}
+            </div>
+          </div>
+        )
+      })}
+
+      {/* Slot sin hora */}
+      <div className="flex border-t border-border" style={{ minHeight: 48 }}>
+        <div className="w-14 flex-shrink-0 px-2 pt-1 text-right text-[10px] text-muted leading-none select-none">
+          Sin hora
+        </div>
+        <div className="flex-1 border-l border-border/60 py-1">
+          {sinHora.map(v => (
+            <div
+              key={v.id}
+              onClick={() => navigate(`/detalle/${v.record.id}`)}
+              className="mx-2 my-0.5 rounded-lg px-3 py-1.5 cursor-pointer hover:opacity-80 transition-opacity"
+              style={{ background: (v.hecho ? '#64748b' : '#34d399') + '18', borderLeft: `3px solid ${v.hecho ? '#64748b' : '#34d399'}` }}
+            >
+              <span className="text-xs font-semibold" style={{ color: v.hecho ? '#64748b' : '#34d399' }}>{v.record.empresa}</span>
+              {v.descripcion && <span className="text-[10px] text-muted ml-2">{v.descripcion}</span>}
+            </div>
+          ))}
+          {sinHora.length === 0 && <p className="text-[10px] text-muted px-3 py-2">—</p>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function CalendarioVisitas() {
   const now = new Date()
-  const [anio, setAnio] = useState(now.getFullYear())
-  const [mes, setMes]   = useState(now.getMonth())
-  const [vista, setVista] = useState<'mes' | 'dia'>('mes')
-  const [diaActivo, setDiaActivo] = useState<string | null>(null)
+  const [anio, setAnio]       = useState(now.getFullYear())
+  const [mes, setMes]         = useState(now.getMonth())
+  const [dia, setDia]         = useState(now.getDate())
+  const [vista, setVista]     = useState<'mes' | 'dia'>('mes')
   const [filtComercial, setFiltComercial] = useState('')
-  const [panelFecha, setPanelFecha] = useState<string | null>(null)
+  const [panelFecha, setPanelFecha]       = useState<string | null>(null)
 
   const { data: comerciales = [] } = useQuery({ queryKey: ['comerciales'], queryFn: getComercialesApi })
 
-  const { data: visitas = [], isLoading } = useQuery({
+  const { data: visitasMes = [], isLoading } = useQuery({
     queryKey: ['actividades-calendario', anio, mes, filtComercial],
     queryFn: () => getActividadesCalendario({
       tipo: 'visita',
@@ -113,42 +207,82 @@ export default function CalendarioVisitas() {
     staleTime: 30_000,
   })
 
-  // Group by date string
+  // For day view: fetch that specific day (same endpoint, filter client-side)
+  const diaStr = fechaStr(anio, mes, dia)
+
+  const { data: visitasDiaRaw = [] } = useQuery({
+    queryKey: ['actividades-calendario', anio, mes, filtComercial, 'dia'],
+    queryFn: () => getActividadesCalendario({
+      tipo: 'visita',
+      mes: mesStr(anio, mes),
+      comercialId: filtComercial || undefined,
+    }),
+    enabled: vista === 'dia',
+    staleTime: 30_000,
+  })
+
+  const visitasDia = useMemo(
+    () => visitasDiaRaw.filter(v => v.fecha.slice(0, 10) === diaStr),
+    [visitasDiaRaw, diaStr]
+  )
+
+  // Group month visitas by date
   const byDate = useMemo(() => {
     const m: Record<string, ActividadCalendario[]> = {}
-    for (const v of visitas) {
+    for (const v of visitasMes) {
       const d = v.fecha.slice(0, 10)
       if (!m[d]) m[d] = []
       m[d].push(v)
     }
     return m
-  }, [visitas])
+  }, [visitasMes])
 
   const hoyStr = now.toISOString().slice(0, 10)
 
   // Calendar grid (Mon-first)
-  const primerDia = new Date(anio, mes, 1)
-  const offsetLunes = (primerDia.getDay() + 6) % 7 // 0=lun
-  const diasEnMes = new Date(anio, mes + 1, 0).getDate()
+  const primerDia   = new Date(anio, mes, 1)
+  const offsetLunes = (primerDia.getDay() + 6) % 7
+  const diasEnMes   = new Date(anio, mes + 1, 0).getDate()
   const totalCeldas = Math.ceil((offsetLunes + diasEnMes) / 7) * 7
 
-  function prevMes() {
-    if (mes === 0) { setAnio(a => a - 1); setMes(11) } else setMes(m => m - 1)
+  // Navigation — month or day depending on vista
+  function prevPeriodo() {
+    if (vista === 'dia') {
+      const d = new Date(anio, mes, dia - 1)
+      setAnio(d.getFullYear()); setMes(d.getMonth()); setDia(d.getDate())
+    } else {
+      if (mes === 0) { setAnio(a => a - 1); setMes(11) } else setMes(m => m - 1)
+    }
   }
-  function nextMes() {
-    if (mes === 11) { setAnio(a => a + 1); setMes(0) } else setMes(m => m + 1)
+  function nextPeriodo() {
+    if (vista === 'dia') {
+      const d = new Date(anio, mes, dia + 1)
+      setAnio(d.getFullYear()); setMes(d.getMonth()); setDia(d.getDate())
+    } else {
+      if (mes === 11) { setAnio(a => a + 1); setMes(0) } else setMes(m => m + 1)
+    }
+  }
+  function irHoy() {
+    setAnio(now.getFullYear()); setMes(now.getMonth()); setDia(now.getDate())
+  }
+  function abrirDia(fStr: string) {
+    const d = new Date(fStr + 'T12:00:00')
+    setAnio(d.getFullYear()); setMes(d.getMonth()); setDia(d.getDate())
+    setVista('dia')
   }
 
-  // Day-list view: current day's visitas
-  const diaVisitas = diaActivo ? (byDate[diaActivo] ?? []) : []
+  // Period label
+  const periodoLabel = vista === 'dia'
+    ? `${DIAS_LARGOS[new Date(anio, mes, dia).getDay()]} ${dia} de ${MESES[mes]} ${anio}`
+    : `${MESES[mes]} ${anio}`
 
-  // Stats
-  const total   = visitas.length
-  const hechas  = visitas.filter(v => v.hecho).length
+  // KPIs (based on current month)
+  const total   = visitasMes.length
+  const hechas  = visitasMes.filter(v => v.hecho).length
   const pending = total - hechas
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3">
@@ -159,17 +293,30 @@ export default function CalendarioVisitas() {
           </div>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
+          {/* Comercial filter */}
           <select
             value={filtComercial}
             onChange={e => setFiltComercial(e.target.value)}
             className="px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent"
           >
-            <option value="">Todos los comerciales</option>
+            <option value="">👥 Todos los comerciales</option>
             {comerciales.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
           </select>
+
+          {/* Vista toggle */}
           <div className="flex rounded-lg border border-border overflow-hidden text-xs">
-            <button onClick={() => setVista('mes')} className={`px-3 py-1.5 transition-colors ${vista === 'mes' ? 'bg-accent text-black font-bold' : 'text-muted hover:text-foreground'}`}>Mes</button>
-            <button onClick={() => setVista('dia')} className={`px-3 py-1.5 transition-colors ${vista === 'dia' ? 'bg-accent text-black font-bold' : 'text-muted hover:text-foreground'}`}>Lista</button>
+            <button
+              onClick={() => setVista('mes')}
+              className={`px-4 py-1.5 font-bold transition-colors ${vista === 'mes' ? 'bg-accent2 text-white' : 'text-muted hover:text-foreground'}`}
+            >
+              Mes
+            </button>
+            <button
+              onClick={() => setVista('dia')}
+              className={`px-4 py-1.5 font-bold transition-colors ${vista === 'dia' ? 'bg-accent2 text-white' : 'text-muted hover:text-foreground'}`}
+            >
+              Día
+            </button>
           </div>
         </div>
       </div>
@@ -188,15 +335,21 @@ export default function CalendarioVisitas() {
         ))}
       </div>
 
-      {/* Navigation */}
-      <div className="flex items-center gap-4">
-        <button onClick={prevMes} className="p-1.5 rounded-lg hover:bg-white/[0.05] text-muted hover:text-foreground transition-colors"><ChevronLeft size={18} /></button>
-        <div className="text-lg font-display font-bold text-foreground min-w-[200px] text-center">
-          {MESES[mes]} {anio}
+      {/* Navigation bar */}
+      <div className="flex items-center gap-3">
+        <button onClick={prevPeriodo} className="p-1.5 rounded-lg border border-border text-muted hover:text-foreground transition-colors">
+          <ChevronLeft size={18} />
+        </button>
+        <div className="text-base font-display font-bold text-foreground min-w-[240px] text-center">
+          {periodoLabel}
         </div>
-        <button onClick={nextMes} className="p-1.5 rounded-lg hover:bg-white/[0.05] text-muted hover:text-foreground transition-colors"><ChevronRight size={18} /></button>
-        <button onClick={() => { setAnio(now.getFullYear()); setMes(now.getMonth()) }}
-          className="text-xs px-3 py-1.5 rounded-lg border border-border text-muted hover:text-foreground transition-colors">
+        <button onClick={nextPeriodo} className="p-1.5 rounded-lg border border-border text-muted hover:text-foreground transition-colors">
+          <ChevronRight size={18} />
+        </button>
+        <button
+          onClick={irHoy}
+          className="text-xs px-3 py-1.5 rounded-lg border border-border text-muted hover:text-foreground transition-colors"
+        >
           Hoy
         </button>
       </div>
@@ -204,32 +357,35 @@ export default function CalendarioVisitas() {
       {isLoading ? (
         <div className="text-sm text-muted py-12 text-center">Cargando...</div>
       ) : vista === 'mes' ? (
+
         /* ─── Month grid ─── */
         <div className="card-glass rounded-xl border border-border overflow-hidden">
           {/* Day headers */}
-          <div className="grid grid-cols-7 border-b border-border">
-            {DIAS_CORTOS.map(d => (
-              <div key={d} className="py-2 text-center text-[10px] font-semibold text-muted uppercase tracking-wider">{d}</div>
+          <div className="grid grid-cols-7 border-b border-border bg-surface3">
+            {DIAS_CORTOS.map((d, i) => (
+              <div key={d} className={`py-2.5 text-center text-[10px] font-bold uppercase tracking-wider ${i >= 5 ? 'text-accent' : 'text-muted'}`}>
+                {d}
+              </div>
             ))}
           </div>
           {/* Cells */}
           <div className="grid grid-cols-7">
             {Array.from({ length: totalCeldas }).map((_, i) => {
-              const diaNum = i - offsetLunes + 1
-              const esMes = diaNum >= 1 && diaNum <= diasEnMes
-              const fStr = esMes ? fechaStr(anio, mes, diaNum) : ''
+              const diaNum    = i - offsetLunes + 1
+              const esMes     = diaNum >= 1 && diaNum <= diasEnMes
+              const fStr      = esMes ? fechaStr(anio, mes, diaNum) : ''
               const dayVisitas = esMes ? (byDate[fStr] ?? []) : []
-              const esHoy = fStr === hoyStr
-              const esFinde = i % 7 >= 5
+              const esHoy     = fStr === hoyStr
+              const esFinde   = i % 7 >= 5
 
               return (
                 <div
                   key={i}
                   onClick={() => esMes && setPanelFecha(fStr)}
                   className={[
-                    'min-h-[90px] p-1.5 border-b border-r border-border/50',
+                    'min-h-[90px] p-1.5 border-b border-r border-border/40',
                     esMes ? 'cursor-pointer hover:bg-white/[0.02]' : 'bg-white/[0.01]',
-                    esFinde && esMes ? 'bg-blue-500/[0.02]' : '',
+                    esFinde && esMes ? 'bg-blue-500/[0.015]' : '',
                   ].join(' ')}
                 >
                   {esMes && (
@@ -241,15 +397,16 @@ export default function CalendarioVisitas() {
                         {dayVisitas.slice(0, 3).map(v => (
                           <div
                             key={v.id}
-                            className="text-[9px] font-semibold px-1.5 py-0.5 rounded truncate"
+                            onClick={e => { e.stopPropagation(); abrirDia(fStr) }}
+                            className="text-[9px] font-semibold px-1.5 py-0.5 rounded truncate cursor-pointer"
                             style={{
-                              background: v.hecho ? 'rgba(100,116,139,0.15)' : 'rgba(52,211,153,0.15)',
-                              color: v.hecho ? '#64748b' : '#34d399',
-                              borderLeft: `2px solid ${v.hecho ? '#64748b' : '#34d399'}`,
+                              background:     v.hecho ? 'rgba(100,116,139,0.15)' : 'rgba(52,211,153,0.15)',
+                              color:          v.hecho ? '#64748b' : '#34d399',
+                              borderLeft:     `2px solid ${v.hecho ? '#64748b' : '#34d399'}`,
                               textDecoration: v.hecho ? 'line-through' : 'none',
                             }}
                           >
-                            {v.record.empresa}
+                            {v.hora ? `${v.hora} ` : ''}{v.record.empresa}
                           </div>
                         ))}
                         {dayVisitas.length > 3 && (
@@ -263,53 +420,23 @@ export default function CalendarioVisitas() {
             })}
           </div>
         </div>
+
       ) : (
-        /* ─── List view ─── */
-        <div className="space-y-3">
-          {Object.entries(byDate).sort(([a], [b]) => a.localeCompare(b)).map(([fecha, items]) => {
-            const [fy, fm, fd] = fecha.split('-').map(Number)
-            const diaN = new Date(fy, fm - 1, fd).getDay()
-            const diaLabel = DIAS_CORTOS[(diaN + 6) % 7]
-            return (
-              <div key={fecha} className="card-glass rounded-xl border border-border overflow-hidden">
-                <div
-                  className="px-4 py-2.5 border-b border-border flex items-center gap-3 cursor-pointer"
-                  onClick={() => setDiaActivo(diaActivo === fecha ? null : fecha)}
-                >
-                  <div className={`text-sm font-bold ${fecha === hoyStr ? 'text-accent' : 'text-foreground'}`}>
-                    {diaLabel} {fd} {MESES[fm - 1]}
-                  </div>
-                  <span className="text-xs text-muted">{items.length} visita{items.length !== 1 ? 's' : ''}</span>
-                  <ChevronRight size={13} className={`ml-auto text-muted transition-transform ${diaActivo === fecha ? 'rotate-90' : ''}`} />
-                </div>
-                {diaActivo === fecha && (
-                  <div className="divide-y divide-border/50">
-                    {items.map(v => (
-                      <div key={v.id} className={`px-4 py-3 flex items-start gap-3 ${v.hecho ? 'opacity-60' : ''}`}>
-                        <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${v.hecho ? 'bg-muted' : 'bg-green-400'}`} />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-foreground">{v.record.empresa}</div>
-                          <div className="text-xs text-muted">{v.descripcion}</div>
-                          {v.hora && <div className="text-[10px] text-muted mt-0.5">{v.hora}{v.lugar ? ' · ' + v.lugar : ''}</div>}
-                        </div>
-                        <div className="text-xs text-muted flex-shrink-0">{v.record.comercial.nombre}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-          {Object.keys(byDate).length === 0 && (
-            <div className="text-sm text-muted py-12 text-center card-glass rounded-xl border border-border">
-              No hay visitas registradas para {MESES[mes]} {anio}.
-            </div>
-          )}
+
+        /* ─── Day timeline view ─── */
+        <div className="card-glass rounded-xl border border-border overflow-hidden">
+          {/* Day header */}
+          <div className="bg-surface3 border-b border-border px-5 py-3 flex items-center justify-between">
+            <div className="font-display text-xl font-bold text-foreground">{periodoLabel}</div>
+            <div className="text-xs text-muted">{visitasDia.length} visita{visitasDia.length !== 1 ? 's' : ''}</div>
+          </div>
+          <Timeline visitas={visitasDia} fechaActual={diaStr} />
         </div>
+
       )}
 
-      {/* Day detail panel */}
-      {panelFecha && (
+      {/* Day detail panel (only in month view) */}
+      {panelFecha && vista === 'mes' && (
         <DayPanel
           fecha={panelFecha}
           visitas={byDate[panelFecha] ?? []}
