@@ -92,6 +92,7 @@ function enrichRow(r: {
   id: string; empresa: string; nit: string | null; ciudad: string | null;
   tipoCliente: string; estadoCliente: string | null;
   comercial: { nombre: string };
+  matrizRiesgo: { companias: JsonInput } | null;
   gestionDocumental: { id: string; docs: JsonInput; cicloActual: number; updatedAt: Date } | null;
 }) {
   const gd = r.gestionDocumental;
@@ -108,6 +109,7 @@ function enrichRow(r: {
     ciudad:        r.ciudad,
     tipoCliente:   r.tipoCliente,
     estadoCliente: r.estadoCliente,
+    companias:     (r.matrizRiesgo?.companias as string[]) ?? [],
     comercial:     r.comercial,
     gd: {
       id:            gd?.id ?? null,
@@ -128,7 +130,10 @@ export async function listGD(filters: { search?: string; vencimiento?: string; e
       id: true, empresa: true, nit: true, ciudad: true,
       tipoCliente: true, estadoCliente: true,
       comercial: { select: { nombre: true } },
-      gestionDocumental: true,
+      matrizRiesgo: { select: { companias: true } },
+      gestionDocumental: {
+        select: { id: true, docs: true, cicloActual: true, updatedAt: true },
+      },
     },
     orderBy: { empresa: 'asc' },
   });
