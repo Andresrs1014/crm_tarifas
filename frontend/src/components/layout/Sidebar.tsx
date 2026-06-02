@@ -15,6 +15,7 @@ import {
   Calculator,
   CalendarDays,
   Package,
+  ClipboardList,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 
@@ -40,7 +41,8 @@ const NAV_COMERCIAL: NavItem[] = [
   { to: '/gestion-documental', icon: <FolderOpen  size={16} />, label: 'Gestión Documental' },
   { to: '/preliquidador',      icon: <Calculator  size={16} />, label: 'Preliquidador'       },
   { to: '/calendario',         icon: <CalendarDays size={16}/>, label: 'Calendario'          },
-  { to: '/cotizador',          icon: <Package      size={16}/>, label: 'Cotizador Paqueteo'  },
+  { to: '/cotizador',          icon: <Package         size={16}/>, label: 'Cotizador Paqueteo'  },
+  { to: '/fichas',             icon: <ClipboardList   size={16}/>, label: 'Fichas de Cliente'   },
 ]
 
 const NAV_HERRAMIENTAS: NavItem[] = [
