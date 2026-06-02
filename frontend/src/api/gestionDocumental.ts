@@ -26,6 +26,7 @@ export interface GDRow {
   ciudad?: string
   tipoCliente: string
   estadoCliente?: string
+  companias: string[]
   comercial: { nombre: string }
   gd: GDData
   cumplimiento: number
