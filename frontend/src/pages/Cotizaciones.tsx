@@ -95,10 +95,20 @@ export default function Cotizaciones() {
   const [actualizarId, setActualizarId] = useState<string | null>(null)
   const [incremento, setIncremento] = useState('')
 
+  const [comercialFiltro, setComercialFiltro] = useState('')
+
   const { data: cotizaciones = [], isLoading } = useQuery({
     queryKey: ['cotizaciones', estado, search],
     queryFn: () => getCotizaciones({ estado: estado || undefined, search: search || undefined }),
   })
+
+  // Filtro comercial client-side (cotizacion.comercial es string, no FK)
+  const cotizacionesFiltradas = comercialFiltro
+    ? cotizaciones.filter((c) => c.comercial === comercialFiltro)
+    : cotizaciones
+
+  // Lista única de comerciales para el filtro
+  const comercialesUnicos = [...new Set(cotizaciones.map((c) => c.comercial).filter(Boolean))].sort()
 
   const deleteMut = useMutation({
     mutationFn: deleteCotizacion,
@@ -177,10 +187,10 @@ export default function Cotizaciones() {
     }
   }
 
-  // KPIs rápidos
-  const aprobadas   = cotizaciones.filter((c) => c.estado === 'aprobada').length
-  const enviadas    = cotizaciones.filter((c) => c.estado === 'enviada').length
-  const rechazadas  = cotizaciones.filter((c) => c.estado === 'rechazada').length
+  // KPIs rápidos (sobre la lista ya filtrada)
+  const aprobadas   = cotizacionesFiltradas.filter((c) => c.estado === 'aprobada').length
+  const enviadas    = cotizacionesFiltradas.filter((c) => c.estado === 'enviada').length
+  const rechazadas  = cotizacionesFiltradas.filter((c) => c.estado === 'rechazada').length
 
   return (
     <div className="p-6 space-y-5">
@@ -190,7 +200,7 @@ export default function Cotizaciones() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Cotizaciones</h1>
           <p className="text-sm text-muted mt-0.5">
-            {cotizaciones.length} registros ·{' '}
+            {cotizacionesFiltradas.length} registros ·{' '}
             <span className="text-success">{aprobadas} aprobadas</span> ·{' '}
             <span className="text-accent">{enviadas} enviadas</span>
             {rechazadas > 0 && <span className="text-danger"> · {rechazadas} rechazadas</span>}
@@ -222,6 +232,10 @@ export default function Cotizaciones() {
         <select className="filter-select" value={estado} onChange={(e) => setEstado(e.target.value)}>
           {ESTADOS.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
         </select>
+        <select className="filter-select" value={comercialFiltro} onChange={(e) => setComercialFiltro(e.target.value)}>
+          <option value="">Todos los comerciales</option>
+          {comercialesUnicos.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
       </div>
 
       {/* Tabla */}
@@ -232,7 +246,7 @@ export default function Cotizaciones() {
               <div key={i} className="h-10 bg-surface2 rounded animate-pulse" />
             ))}
           </div>
-        ) : cotizaciones.length === 0 ? (
+        ) : cotizacionesFiltradas.length === 0 ? (
           <div className="empty-state">
             <div className="text-4xl mb-3">📋</div>
             <p className="font-semibold text-foreground mb-1">Sin cotizaciones</p>
@@ -253,7 +267,7 @@ export default function Cotizaciones() {
               </tr>
             </thead>
             <tbody>
-              {cotizaciones.map((cot) => {
+              {cotizacionesFiltradas.map((cot) => {
                 const nextEstado = ESTADO_NEXT[cot.estado]
                 return (
                   <tr key={cot.id}>
@@ -348,6 +362,18 @@ export default function Cotizaciones() {
                           title="Actualizar tarifas con incremento %"
                         >
                           📈
+                        </button>
+
+                        {/* Copiar link */}
+                        <button
+                          className="btn-ghost btn-sm px-2 py-1 text-xs"
+                          title="Copiar link público"
+                          onClick={() => {
+                            const url = `${window.location.origin}/cot/${cot.numero}`
+                            navigator.clipboard.writeText(url).then(() => toast.success('Link copiado'))
+                          }}
+                        >
+                          🔗
                         </button>
 
                         {/* Duplicar */}

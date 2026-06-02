@@ -39,6 +39,7 @@ export interface MatrizRiesgoUpsert {
   facturacion?: string
   cert?: string
   anFin?: string
+  control?: string
   frecControl?: string
 }
 
