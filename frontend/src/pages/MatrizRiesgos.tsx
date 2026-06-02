@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ShieldAlert, Search, RefreshCw, CheckCircle2, Clock } from 'lucide-react'
+import { ShieldAlert, Search, RefreshCw, CheckCircle2, Clock, BookOpen } from 'lucide-react'
 import { listMatriz, upsertMatriz, MatrizRiesgoRow, MatrizRiesgoUpsert } from '../api/matrizRiesgos'
 import { useToastStore } from '../store/toastStore'
 
@@ -75,9 +75,11 @@ export default function MatrizRiesgos() {
   const qc = useQueryClient()
   const { push } = useToastStore()
 
+  const [activeTab, setActiveTab]   = useState<'matriz' | 'referencia'>('matriz')
   const [search, setSearch]         = useState('')
   const [filtRiesgo, setFiltRiesgo] = useState('')
   const [filtComp, setFiltComp]     = useState('')
+  const [filtCia, setFiltCia]       = useState('')
   const [editing, setEditing]       = useState<Record<string, MatrizRiesgoUpsert>>({})
 
   const { data: rows = [], isLoading, refetch } = useQuery({
@@ -116,25 +118,31 @@ export default function MatrizRiesgos() {
       facturacion: draft.facturacion ?? m?.facturacion,
       cert:        draft.cert        ?? m?.cert,
       anFin:       draft.anFin       ?? m?.anFin,
+      control:     draft.control     ?? m?.control,
       frecControl: draft.frecControl ?? m?.frecControl,
     }
     mutate.mutate({ recordId: row.id, data: merged })
     setEditing(prev => { const n = { ...prev }; delete n[row.id]; return n })
   }, [editing, mutate])
 
+  // Client-side cia filter
+  const filteredRows = filtCia
+    ? rows.filter(r => r.matrizRiesgo?.companias?.includes(filtCia))
+    : rows
+
   // KPI counts
   const kpis = RIESGO_ORDER.map(r => ({
     label: r,
-    value: rows.filter(row => (row.matrizRiesgo?.riesgo ?? 'PENDIENTE') === r).length,
+    value: filteredRows.filter(row => (row.matrizRiesgo?.riesgo ?? 'PENDIENTE') === r).length,
     color: (RIESGO_STYLE[r] ?? RIESGO_STYLE['PENDIENTE']).text,
   }))
 
-  const pendientes = rows.filter(r => !r.matrizRiesgo?.mercancia).length
+  const pendientes = filteredRows.filter(r => !r.matrizRiesgo?.mercancia).length
 
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <ShieldAlert size={22} className="text-accent" />
           <div>
@@ -142,15 +150,35 @@ export default function MatrizRiesgos() {
             <p className="text-xs text-muted">FR-002-GC · Solo clientes activos</p>
           </div>
         </div>
-        <button
-          onClick={() => refetch()}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface border border-border text-muted hover:text-foreground text-xs transition-colors"
-        >
-          <RefreshCw size={13} />
-          Actualizar
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Tabs */}
+          <div className="flex bg-surface border border-border rounded-lg p-0.5 text-xs">
+            <button
+              onClick={() => setActiveTab('matriz')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${activeTab === 'matriz' ? 'bg-accent/15 text-accent font-semibold' : 'text-muted hover:text-foreground'}`}
+            >
+              <ShieldAlert size={12} />
+              Matriz
+            </button>
+            <button
+              onClick={() => setActiveTab('referencia')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${activeTab === 'referencia' ? 'bg-accent/15 text-accent font-semibold' : 'text-muted hover:text-foreground'}`}
+            >
+              <BookOpen size={12} />
+              Datos de Referencia
+            </button>
+          </div>
+          <button
+            onClick={() => refetch()}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface border border-border text-muted hover:text-foreground text-xs transition-colors"
+          >
+            <RefreshCw size={13} />
+            Actualizar
+          </button>
+        </div>
       </div>
 
+      {activeTab === 'matriz' && (<>
       {/* Alert banner */}
       {pendientes > 0 && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-sm">
@@ -185,6 +213,16 @@ export default function MatrizRiesgos() {
           {RIESGO_ORDER.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
         <select
+          value={filtCia}
+          onChange={e => setFiltCia(e.target.value)}
+          className="px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent"
+        >
+          <option value="">Todas las compañías</option>
+          <option value="Logimat">Logimat</option>
+          <option value="IMC Cargo">IMC Cargo</option>
+          <option value="IMC Depósito">IMC Depósito</option>
+        </select>
+        <select
           value={filtComp}
           onChange={e => setFiltComp(e.target.value)}
           className="px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent"
@@ -209,6 +247,8 @@ export default function MatrizRiesgos() {
               <th className="text-left px-3 py-3 font-semibold">Facturación</th>
               <th className="text-left px-3 py-3 font-semibold">Certificación</th>
               <th className="text-left px-3 py-3 font-semibold">Análisis Fin.</th>
+              <th className="text-left px-3 py-3 font-semibold">Control a Aplicar</th>
+              <th className="text-left px-3 py-3 font-semibold">Frecuencia</th>
               <th className="text-center px-3 py-3 font-semibold">Puntaje</th>
               <th className="text-center px-3 py-3 font-semibold">Riesgo</th>
               <th className="text-center px-3 py-3 font-semibold w-[60px]"></th>
@@ -217,13 +257,13 @@ export default function MatrizRiesgos() {
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={12} className="text-center py-12 text-muted">Cargando...</td>
+                <td colSpan={14} className="text-center py-12 text-muted">Cargando...</td>
               </tr>
-            ) : rows.length === 0 ? (
+            ) : filteredRows.length === 0 ? (
               <tr>
-                <td colSpan={12} className="text-center py-12 text-muted">No hay clientes registrados.</td>
+                <td colSpan={14} className="text-center py-12 text-muted">No hay clientes registrados.</td>
               </tr>
-            ) : rows.map(row => {
+            ) : filteredRows.map(row => {
               const m = row.matrizRiesgo
               const d = editing[row.id] ?? {}
               const isEdited = !!editing[row.id]
@@ -263,6 +303,18 @@ export default function MatrizRiesgos() {
                   <td className="px-3 py-2.5 min-w-[120px]">
                     <InlineSelect value={val('anFin')} options={MR_OPCIONES.anFin} onChange={v => handleChange(row.id, 'anFin', v)} />
                   </td>
+                  <td className="px-3 py-2.5 min-w-[160px]">
+                    <input
+                      type="text"
+                      value={(d.control as string | undefined) ?? m?.control ?? ''}
+                      onChange={e => handleChange(row.id, 'control', e.target.value)}
+                      placeholder="Descripción del control..."
+                      className="w-full bg-surface border border-border rounded text-xs text-foreground px-2 py-1 focus:outline-none focus:border-accent placeholder:text-muted/50"
+                    />
+                  </td>
+                  <td className="px-3 py-2.5 min-w-[110px]">
+                    <InlineSelect value={val('frecControl')} options={MR_OPCIONES.frecControl} onChange={v => handleChange(row.id, 'frecControl', v)} placeholder="—" />
+                  </td>
                   <td className="px-3 py-2.5 text-center">
                     <span className="font-mono font-bold text-sm text-foreground">
                       {m?.puntaje?.toFixed(2) ?? '—'}
@@ -294,11 +346,11 @@ export default function MatrizRiesgos() {
       </div>
 
       {/* Control suggestions panel */}
-      {rows.some(r => r.matrizRiesgo?.control) && (
+      {filteredRows.some(r => r.matrizRiesgo?.control) && (
         <div className="card-glass rounded-xl border border-border p-5 space-y-3">
           <h2 className="text-xs font-semibold text-muted uppercase tracking-[1.5px]">Controles sugeridos</h2>
           <div className="space-y-2">
-            {rows
+            {filteredRows
               .filter(r => r.matrizRiesgo?.control && r.matrizRiesgo.riesgo !== 'PENDIENTE')
               .sort((a, b) =>
                 RIESGO_ORDER.indexOf(a.matrizRiesgo!.riesgo) - RIESGO_ORDER.indexOf(b.matrizRiesgo!.riesgo)
@@ -316,6 +368,84 @@ export default function MatrizRiesgos() {
                 </div>
               ))
             }
+          </div>
+        </div>
+      )}
+      </>)}
+
+      {/* ── Datos de Referencia tab ─────────────────────────────────────────── */}
+      {activeTab === 'referencia' && (
+        <div className="space-y-5">
+          <p className="text-xs text-muted">Tablas de referencia para la calificación de criterios según FR-002-GC.</p>
+
+          {/* Pesos por criterio */}
+          <div className="card-glass rounded-xl border border-border overflow-hidden">
+            <div className="px-5 py-3 border-b border-border">
+              <h3 className="text-xs font-semibold text-muted uppercase tracking-[1.5px]">Pesos por Criterio</h3>
+            </div>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border text-muted text-[10px] uppercase tracking-[1px]">
+                  <th className="text-left px-5 py-2 font-semibold">Criterio</th>
+                  <th className="text-center px-4 py-2 font-semibold">Peso</th>
+                  <th className="text-left px-4 py-2 font-semibold">Escala (Bajo / Medio / Alto)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { criterio: 'Mercancía', peso: '45%', escala: '1 — 3 — 5' },
+                  { criterio: 'Facturación', peso: '25%', escala: '1 — 3 — 5' },
+                  { criterio: 'Frecuencia de Operación', peso: '15%', escala: '1 — 3 — 5' },
+                  { criterio: 'Tipo de Persona', peso: '5%', escala: 'Natural: 1 · Jurídica: 5' },
+                  { criterio: 'Tiempo como cliente', peso: '5%', escala: '>3 años: 1 · 1-3 años: 3 · <1 año: 5' },
+                  { criterio: 'Capital declarado', peso: '5%', escala: '>100M: 1 · 50-100M: 2 · 1-50M: 3 · <1M: 5' },
+                ].map(r => (
+                  <tr key={r.criterio} className="border-b border-border/50 hover:bg-white/[0.02]">
+                    <td className="px-5 py-2.5 font-medium text-foreground">{r.criterio}</td>
+                    <td className="px-4 py-2.5 text-center">
+                      <span className="font-bold text-accent">{r.peso}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-muted">{r.escala}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Niveles de riesgo */}
+          <div className="card-glass rounded-xl border border-border overflow-hidden">
+            <div className="px-5 py-3 border-b border-border">
+              <h3 className="text-xs font-semibold text-muted uppercase tracking-[1.5px]">Niveles de Riesgo</h3>
+            </div>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border text-muted text-[10px] uppercase tracking-[1px]">
+                  <th className="text-left px-5 py-2 font-semibold">Nivel</th>
+                  <th className="text-center px-4 py-2 font-semibold">Rango de Puntaje</th>
+                  <th className="text-left px-4 py-2 font-semibold">Acción Recomendada</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { nivel: 'BAJO', rango: '1.00 – 1.99', accion: 'Monitoreo anual', riesgoKey: 'BAJO' },
+                  { nivel: 'MEDIO', rango: '2.00 – 2.99', accion: 'Seguimiento semestral', riesgoKey: 'MEDIO' },
+                  { nivel: 'ALTO', rango: '3.00 – 3.99', accion: 'Control trimestral + visita', riesgoKey: 'ALTO' },
+                  { nivel: 'CRÍTICO', rango: '4.00 – 5.00', accion: 'Revisión inmediata — posible rechazo', riesgoKey: 'CRÍTICO' },
+                ].map(r => (
+                  <tr key={r.nivel} className="border-b border-border/50 hover:bg-white/[0.02]">
+                    <td className="px-5 py-2.5"><RiesgoBadge riesgo={r.nivel} /></td>
+                    <td className="px-4 py-2.5 text-center font-mono text-foreground">{r.rango}</td>
+                    <td className="px-4 py-2.5 text-muted">{r.accion}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Nota escala */}
+          <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-accent/5 border border-accent/20 text-xs text-muted">
+            <span className="text-accent font-bold flex-shrink-0">ℹ</span>
+            <span>La escala de calificación es <strong className="text-foreground">1 (Bajo riesgo) · 3 (Riesgo medio) · 5 (Alto riesgo)</strong>. El puntaje final es la suma ponderada de todos los criterios. Se requiere certificado BASC vigente para reducir el nivel de riesgo.</span>
           </div>
         </div>
       )}
