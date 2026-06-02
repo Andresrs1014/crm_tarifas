@@ -1,7 +1,9 @@
 import { useState, useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { Calculator, Search, ChevronRight, ChevronDown, Check, X, Printer } from 'lucide-react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Calculator, Search, ChevronRight, ChevronDown, Check, X, Printer, History, Trash2 } from 'lucide-react'
 import { getCotizaciones } from '../api/cotizaciones'
+import { getPreliqHistorial, savePreliqHistorial, deletePreliqEntry, PreliqEntry } from '../api/preliqHistorial'
+import { toast } from '../store/toastStore'
 import type { Cotizacion } from '../types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -278,9 +280,34 @@ export default function Preliquidador() {
   const [form, setForm]             = useState<FormState>({ producto: '', cif: '', tipo: '', numCont: 1, peso: '', pallets: '', unidades: '' })
   const [result, setResult]         = useState<ResultLine[] | null>(null)
 
+  const qc = useQueryClient()
+
   const { data: cots = [] } = useQuery({
     queryKey: ['cotizaciones', 'preliq'],
     queryFn: () => getCotizaciones({}),
+  })
+
+  const { data: historial = [] } = useQuery({
+    queryKey: ['preliq-historial'],
+    queryFn: getPreliqHistorial,
+    staleTime: 30_000,
+  })
+
+  const saveMut = useMutation({
+    mutationFn: savePreliqHistorial,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['preliq-historial'] })
+      toast.success('Preliquidación guardada en historial')
+    },
+    onError: () => toast.error('Error al guardar en historial'),
+  })
+
+  const deleteMut = useMutation({
+    mutationFn: deletePreliqEntry,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['preliq-historial'] })
+      toast.success('Entrada eliminada')
+    },
   })
 
   const filtered = useMemo(() => {
@@ -344,6 +371,26 @@ export default function Preliquidador() {
     const lines = calcPreliq(checkedItems, form, allItemsByLinea)
     setResult(lines)
     setStep(3)
+    // Auto-save to historial
+    if (selectedCot) {
+      const total = lines.filter(l => !l._seccion).reduce((s, l) => s + (l.resultado ?? 0), 0)
+      const servicios = [...new Set(checkedItems.map(i => i._linea))]
+      saveMut.mutate({
+        empresa:    selectedCot.empresa,
+        cotNumero:  selectedCot.numero,
+        servicios,
+        parametros: { ...form },
+        lineas:     lines,
+        total,
+      })
+    }
+  }
+
+  function loadFromHistory(entry: PreliqEntry) {
+    setResult(entry.lineas as ResultLine[])
+    setStep(3)
+    setForm({ ...({ producto: '', cif: '', tipo: '', numCont: 1, peso: '', pallets: '', unidades: '' }), ...entry.parametros } as FormState)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const total = result?.filter(l => !l._seccion).reduce((s, l) => s + (l.resultado ?? 0), 0) ?? 0
@@ -547,6 +594,11 @@ export default function Preliquidador() {
         </div>
       )}
 
+      {/* Step 3: Result — saved indicator */}
+      {saveMut.isPending && (
+        <div className="text-xs text-muted animate-pulse">Guardando en historial...</div>
+      )}
+
       {/* Step 3: Result */}
       {result && (
         <div className="rounded-xl border border-border overflow-hidden" id="preliq-result">
@@ -628,6 +680,61 @@ export default function Preliquidador() {
           </div>
         </div>
       )}
+      {/* Historial */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <History size={15} className="text-muted" />
+          <span className="text-xs font-semibold text-muted uppercase tracking-wider">Historial de Preliquidaciones</span>
+          <span className="text-[10px] text-muted/60">({historial.length})</span>
+        </div>
+
+        {historial.length === 0 ? (
+          <div className="text-sm text-muted text-center py-6 rounded-xl border border-border bg-surface/40">
+            No hay preliquidaciones guardadas aún.
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {historial.map(entry => (
+              <div key={entry.id} className="card-glass rounded-xl border border-border px-5 py-4 flex items-center justify-between flex-wrap gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2.5 flex-wrap mb-1">
+                    <span className="font-semibold text-foreground text-sm">{entry.empresa}</span>
+                    <span className="text-[10px] text-muted bg-surface border border-border rounded px-1.5 py-0.5">Cot. {entry.cotNumero}</span>
+                    {entry.servicios.map(s => (
+                      <span key={s} className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/20">{s}</span>
+                    ))}
+                  </div>
+                  <div className="text-xs text-muted">
+                    {new Date(entry.createdAt).toLocaleString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    {entry.parametros.producto && <span className="ml-2">· {entry.parametros.producto}</span>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <div className="text-[10px] text-muted uppercase tracking-wider">Total</div>
+                    <div className="text-lg font-display font-bold text-green-400">{fmtCOP(entry.total)}</div>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => loadFromHistory(entry)}
+                      className="px-3 py-1.5 rounded-lg bg-surface border border-border text-xs text-foreground hover:bg-white/[0.05] transition-colors"
+                    >
+                      Ver
+                    </button>
+                    <button
+                      onClick={() => deleteMut.mutate(entry.id)}
+                      disabled={deleteMut.isPending}
+                      className="p-1.5 rounded-lg bg-danger/10 border border-danger/30 text-danger hover:bg-danger/20 transition-colors disabled:opacity-40"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

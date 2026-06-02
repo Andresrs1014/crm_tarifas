@@ -9,12 +9,13 @@ datasource db {
 }
 
 model User {
-  id        String     @id @default(uuid())
-  username  String     @unique
-  password  String
-  role      String     @default("usuario") // "superadmin" | "usuario"
-  createdAt DateTime   @default(now()) @map("created_at")
-  comercial Comercial?
+  id          String              @id @default(uuid())
+  username    String              @unique
+  password    String
+  role        String              @default("usuario") // "superadmin" | "usuario"
+  createdAt   DateTime            @default(now()) @map("created_at")
+  comercial   Comercial?
+  preliqHistorial PreliqHistorial[]
 
   @@map("users")
 }
@@ -232,4 +233,19 @@ model MatrizRiesgo {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("matriz_riesgos")
+}
+
+model PreliqHistorial {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  empresa      String
+  cotNumero    String   @map("cot_numero")
+  servicios    Json     @default("[]")   // string[]
+  parametros   Json     @default("{}")   // { producto, cif, tipo, numCont, peso, pallets, unidades }
+  lineas       Json     @default("[]")   // ResultLine[]
+  total        Float    @default(0)
+  createdAt    DateTime @default(now())  @map("created_at")
+
+  @@map("preliq_historial")
 }

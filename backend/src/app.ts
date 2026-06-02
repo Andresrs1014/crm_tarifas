@@ -14,6 +14,7 @@ import usuariosRoutes from './modules/usuarios/usuarios.routes';
 import crmRoutes from './modules/crm/crm.routes';
 import matrizRiesgosRoutes from './modules/matriz-riesgos/matriz-riesgos.routes';
 import gestionDocumentalRoutes from './modules/gestion-documental/gestion-documental.routes';
+import preliqHistorialRoutes from './modules/preliq-historial/preliq-historial.routes';
 
 const app = express();
 
@@ -44,6 +45,7 @@ app.use('/api/admin/usuarios', usuariosRoutes);
 app.use('/api/crm', crmRoutes);
 app.use('/api/matriz-riesgos', matrizRiesgosRoutes);
 app.use('/api/gestion-documental', gestionDocumentalRoutes);
+app.use('/api/preliq-historial', preliqHistorialRoutes);
 
 // Public cotizacion by numero
 app.get('/api/cot/:numero', async (req, res, next) => {

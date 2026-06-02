@@ -91,8 +91,8 @@ function calcEstadoDocs(docs: Record<string, DocEstado>, tipoCliente: string): '
 function enrichRow(r: {
   id: string; empresa: string; nit: string | null; ciudad: string | null;
   tipoCliente: string; estadoCliente: string | null;
-  companias: JsonInput;
   comercial: { nombre: string };
+  matrizRiesgo: { companias: JsonInput } | null;
   gestionDocumental: { id: string; docs: JsonInput; cicloActual: number; updatedAt: Date } | null;
 }) {
   const gd = r.gestionDocumental;
@@ -109,7 +109,7 @@ function enrichRow(r: {
     ciudad:        r.ciudad,
     tipoCliente:   r.tipoCliente,
     estadoCliente: r.estadoCliente,
-    companias:     (r.companias as string[]) ?? [],
+    companias:     (r.matrizRiesgo?.companias as string[]) ?? [],
     comercial:     r.comercial,
     gd: {
       id:            gd?.id ?? null,
@@ -128,9 +128,12 @@ export async function listGD(filters: { search?: string; vencimiento?: string; e
     where: { tipo: 'cliente' },
     select: {
       id: true, empresa: true, nit: true, ciudad: true,
-      tipoCliente: true, estadoCliente: true, companias: true,
+      tipoCliente: true, estadoCliente: true,
       comercial: { select: { nombre: true } },
-      gestionDocumental: true,
+      matrizRiesgo: { select: { companias: true } },
+      gestionDocumental: {
+        select: { id: true, docs: true, cicloActual: true, updatedAt: true },
+      },
     },
     orderBy: { empresa: 'asc' },
   });
