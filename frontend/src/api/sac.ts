@@ -12,5 +12,5 @@ export const getSacFda = () =>
 export const updateSacFotos = (id: string, data: { fotos?: string[]; fdaEntregado?: boolean }) =>
   client.patch(`/api/sac/contactos/${id}/fotos`, data).then((r) => r.data)
 
-export const updateSacContacto = (id: string, data: { cargo?: string; telefono?: string; email?: string }) =>
+export const updateSacContacto = (id: string, data: { cargo?: string; telefono?: string; email?: string; direccion?: string }) =>
   client.patch(`/api/sac/contactos/${id}/datos`, data).then((r) => r.data)

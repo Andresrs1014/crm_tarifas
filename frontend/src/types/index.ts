@@ -54,6 +54,7 @@ export interface Contacto {
   cargo?: string
   telefono?: string
   email?: string
+  direccion?: string
   orden: number
   cumpleanos?: string
   recibeRegalos: boolean
@@ -133,6 +134,8 @@ export interface CRMRecord {
   ingresosEsperados?: number
   servicios: string[]
   facturacionLineas: { [linea: string]: number }
+  stageHistory: { stage: string; desde: string; hasta: string | null }[]
+  companias: string[]
   contactos: Contacto[]
   actividades: Actividad[]
   createdAt: string
@@ -290,4 +293,5 @@ export interface ContactoSAC extends Contacto {
   empresa: string
   comercial: string
   categoria?: 'A' | 'B' | 'C' | null
+  tipoCliente?: string | null
 }

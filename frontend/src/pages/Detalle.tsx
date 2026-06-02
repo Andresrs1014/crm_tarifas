@@ -290,6 +290,46 @@ export default function Detalle() {
         </div>
       </div>
 
+      {/* Pipeline bar (solo prospectos) ── */}
+      {isProspecto && (
+        <div className="flex rounded-xl overflow-hidden border border-border">
+          {[
+            { value: 'prospecto',            label: 'Prospecto',     color: '#00c2ff' },
+            { value: 'reconocimiento',       label: 'Reconocimiento', color: '#a855f7' },
+            { value: 'propuesta',            label: 'Propuesta',     color: '#f5a623' },
+            { value: 'aceptacion_propuesta', label: 'Aceptación',    color: '#00e676' },
+            { value: 'creacion_sop',         label: 'Creación SOP',  color: '#f5a623' },
+            { value: 'facturado',            label: 'Facturado',     color: '#00e676' },
+          ].map((stage, idx, arr) => {
+            const isActive = record.estadoProspecto === stage.value
+            const stageIdx = arr.findIndex((s) => s.value === record.estadoProspecto)
+            const isPast   = idx < stageIdx
+            return (
+              <div
+                key={stage.value}
+                className="flex-1 py-2 px-1 text-center transition-all"
+                style={{
+                  background: isActive
+                    ? `${stage.color}22`
+                    : isPast
+                    ? 'rgba(255,255,255,0.03)'
+                    : 'transparent',
+                  borderRight: idx < arr.length - 1 ? '1px solid var(--border)' : undefined,
+                  borderBottom: isActive ? `3px solid ${stage.color}` : '3px solid transparent',
+                }}
+              >
+                <div
+                  className="text-xs font-bold truncate"
+                  style={{ color: isActive ? stage.color : isPast ? 'var(--muted)' : 'var(--muted)' }}
+                >
+                  {isActive ? '▶ ' : isPast ? '✓ ' : ''}{stage.label}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {/* Tabs ── */}
       <div className="flex border-b border-border gap-0">
         {(['info', 'actividades', 'cotizaciones'] as Tab[]).map((t) => (
@@ -349,6 +389,16 @@ export default function Detalle() {
                   <label className="text-xs text-muted block mb-1">Tipo cliente</label>
                   <p className="text-foreground capitalize">{record.tipoCliente}</p>
                 </div>
+                {record.companias && record.companias.length > 0 && (
+                  <div className="col-span-2">
+                    <label className="text-xs text-muted block mb-1">Compañías</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {record.companias.map((c) => (
+                        <span key={c} className="stag" style={{ background: 'rgba(0,194,255,0.12)', color: 'var(--accent)' }}>{c}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Estado */}
@@ -487,6 +537,52 @@ export default function Detalle() {
               </div>
             </div>
           </div>
+
+          {/* Tiempos en etapas (solo prospectos con historial) */}
+          {isProspecto && (record.stageHistory?.length > 0 || record.estadoProspecto) && (
+            <div className="lg:col-span-2">
+              <div className="card p-5 space-y-3">
+                <h3 className="text-xs font-bold text-muted uppercase tracking-widest">⏱ Tiempos en etapas</h3>
+                <div className="flex flex-wrap gap-2">
+                  {(() => {
+                    const STAGE_COLORS: Record<string, string> = {
+                      prospecto: '#00c2ff', reconocimiento: '#a855f7', propuesta: '#f5a623',
+                      aceptacion_propuesta: '#00e676', creacion_sop: '#f5a623', facturado: '#00e676',
+                      frio: '#8899b4', perdido: '#ff4444',
+                    }
+                    const STAGE_LABELS: Record<string, string> = {
+                      prospecto: 'Prospecto', reconocimiento: 'Reconocimiento', propuesta: 'Propuesta',
+                      aceptacion_propuesta: 'Aceptación', creacion_sop: 'Creación SOP',
+                      facturado: 'Facturado', frio: 'Frío', perdido: 'Perdido',
+                    }
+                    const history = record.stageHistory ?? []
+                    // Si no hay historial aún, mostrar solo la etapa actual con días desde creación
+                    const entries = history.length > 0
+                      ? history
+                      : record.estadoProspecto
+                        ? [{ stage: record.estadoProspecto, desde: record.createdAt, hasta: null }]
+                        : []
+                    return entries.map((e, i) => {
+                      const desde = new Date(e.desde)
+                      const hasta = e.hasta ? new Date(e.hasta) : new Date()
+                      const dias = Math.max(1, Math.ceil((hasta.getTime() - desde.getTime()) / (1000 * 60 * 60 * 24)))
+                      const color = STAGE_COLORS[e.stage] ?? '#8899b4'
+                      const isActual = e.hasta === null
+                      return (
+                        <div key={i} className="flex items-center gap-2 rounded-lg px-3 py-2 border"
+                          style={{ background: `${color}10`, borderColor: `${color}40` }}>
+                          <div>
+                            <div className="text-xs font-bold" style={{ color }}>{STAGE_LABELS[e.stage] ?? e.stage}</div>
+                            <div className="text-xs text-muted">{dias} {dias === 1 ? 'día' : 'días'}{isActual ? ' (actual)' : ''}</div>
+                          </div>
+                        </div>
+                      )
+                    })
+                  })()}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Panel lateral: Contactos */}
           <div className="space-y-4">

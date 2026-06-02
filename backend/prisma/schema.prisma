@@ -66,12 +66,14 @@ model Record {
   ingresosEsperados  Int?        @map("ingresos_esperados")
   servicios          Json        @default("[]")
   facturacionLineas  Json        @default("{}") @map("facturacion_lineas")
+  stageHistory       Json        @default("[]") @map("stage_history")
   contactos          Contacto[]
   actividades        Actividad[]
   cotizaciones       Cotizacion[]
   crmMeta            CrmMeta?
   matrizRiesgo       MatrizRiesgo?
   gestionDocumental  GestionDocumental?
+  fichaCliente       FichaCliente?
   createdAt          DateTime    @default(now()) @map("created_at")
   updatedAt          DateTime    @updatedAt @map("updated_at")
 
@@ -86,6 +88,7 @@ model Contacto {
   cargo         String?
   telefono      String?
   email         String?
+  direccion     String?
   orden         Int      @default(0)
   cumpleanos    String?
   recibeRegalos Boolean  @default(false) @map("recibe_regalos")
@@ -233,6 +236,28 @@ model MatrizRiesgo {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("matriz_riesgos")
+}
+
+model Analista {
+  id     String  @id @default(uuid())
+  nombre String
+  email  String?
+  tel    String?
+
+  @@map("analistas")
+}
+
+model FichaCliente {
+  id        String   @id @default(uuid())
+  recordId  String   @unique @map("record_id")
+  record    Record   @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  estado    String   @default("pendiente")
+  pct       Int      @default(0)
+  data      Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("fichas_cliente")
 }
 
 model PreliqHistorial {

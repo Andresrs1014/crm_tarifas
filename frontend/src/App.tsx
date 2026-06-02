@@ -25,6 +25,9 @@ import MatrizRiesgos from './pages/MatrizRiesgos'
 import GestionDocumental from './pages/GestionDocumental'
 import Preliquidador from './pages/Preliquidador'
 import CalendarioVisitas from './pages/CalendarioVisitas'
+import CotizadorPaqueteo from './pages/CotizadorPaqueteo'
+import FichaCliente from './pages/FichaCliente'
+import FichaDetalle from './pages/FichaDetalle'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -93,6 +96,9 @@ export default function App() {
             <Route path="gestion-documental" element={<GestionDocumental />} />
             <Route path="preliquidador" element={<Preliquidador />} />
             <Route path="calendario" element={<CalendarioVisitas />} />
+            <Route path="cotizador" element={<CotizadorPaqueteo />} />
+            <Route path="fichas" element={<FichaCliente />} />
+            <Route path="fichas/:recordId" element={<FichaDetalle />} />
             <Route
               path="admin/usuarios"
               element={

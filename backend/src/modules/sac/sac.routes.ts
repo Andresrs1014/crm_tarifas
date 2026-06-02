@@ -24,6 +24,7 @@ router.get('/contactos', async (req: Request, res: Response, next: NextFunction)
           select: {
             empresa: true,
             categoria: true,
+            tipoCliente: true,
             comercial: { select: { nombre: true } },
           },
         },
@@ -36,6 +37,7 @@ router.get('/contactos', async (req: Request, res: Response, next: NextFunction)
       empresa: c.record.empresa,
       comercial: c.record.comercial.nombre,
       categoria: (c.record as unknown as Record<string, unknown>).categoria ?? null,
+      tipoCliente: (c.record as unknown as Record<string, unknown>).tipoCliente ?? null,
     }));
 
     res.json(result);
@@ -54,6 +56,7 @@ router.get('/fda', async (req: Request, res: Response, next: NextFunction) => {
           select: {
             empresa: true,
             categoria: true,
+            tipoCliente: true,
             comercial: { select: { nombre: true } },
           },
         },
@@ -65,6 +68,7 @@ router.get('/fda', async (req: Request, res: Response, next: NextFunction) => {
       empresa: c.record.empresa,
       comercial: c.record.comercial.nombre,
       categoria: (c.record as unknown as Record<string, unknown>).categoria ?? null,
+      tipoCliente: (c.record as unknown as Record<string, unknown>).tipoCliente ?? null,
     }));
     res.json(result);
   } catch (err) {
@@ -75,15 +79,16 @@ router.get('/fda', async (req: Request, res: Response, next: NextFunction) => {
 // PATCH /api/sac/contactos/:id/datos → edita cargo, telefono, email del contacto
 router.patch('/contactos/:id/datos', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { cargo, telefono, email } = req.body as {
-      cargo?: string; telefono?: string; email?: string;
+    const { cargo, telefono, email, direccion } = req.body as {
+      cargo?: string; telefono?: string; email?: string; direccion?: string;
     };
     const updated = await prisma.contacto.update({
       where: { id: String(req.params.id) },
       data: {
-        ...(cargo    !== undefined && { cargo }),
-        ...(telefono !== undefined && { telefono }),
-        ...(email    !== undefined && { email }),
+        ...(cargo     !== undefined && { cargo }),
+        ...(telefono  !== undefined && { telefono }),
+        ...(email     !== undefined && { email }),
+        ...(direccion !== undefined && { direccion }),
       },
     });
     res.json(updated);
