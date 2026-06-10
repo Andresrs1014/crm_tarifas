@@ -34,7 +34,7 @@ lightrag-index \
 
 ---
 
-## Mapa de nodos (21 nodos)
+## Mapa de nodos (23 nodos)
 
 ### Agentes
 | Nodo | Tag | Descripción |
@@ -75,6 +75,8 @@ lightrag-index \
 | [[Gestion_Documental_BASC]] | #modulo | 18 docs BASC, cumplimiento ponderado y vencimiento |
 | [[Preliquidador]] | #herramienta | Simulador de tarifas client-side (MAX calculado vs mínima) |
 | [[Calendario_Visitas]] | #seguimiento | Calendario mensual de visitas comerciales |
+| [[Cotizador_Paqueteo]] | #herramienta | Simulador de envíos paqueteo — 3 mensajeradoras, zonas, peso cobrable |
+| [[Ficha_Cliente]] | #modulo | Formulario SOP onboarding — 5 tabs, analistas, progreso % |
 
 ---
 
@@ -120,3 +122,4 @@ Cada nodo sigue esta estructura:
 
 *Creado: 2026-05-28 — Área de Desarrollo e Innovación, Grupo ZYMO*
 *Actualizado: 2026-05-29 — Módulos BASC + Herramientas comerciales + guía de mantenimiento*
+*Actualizado: 2026-06-02 — Cotizador Paqueteo, Ficha Cliente SOP, stageHistory, SAC mejoras, MCPs documentados*

@@ -41,8 +41,9 @@ SAC gestiona el seguimiento de cumpleaños de contactos clave para fortalecer re
 |-------|------|-------------|
 | `cumpleanos` | `string` | Formato `YYYY-MM-DD` |
 | `recibeRegalos` | `boolean` | Si el contacto recibe regalo de la empresa |
-| `fotosEntrega` | `string[]` | URLs de fotos del momento de entrega |
+| `fotosEntrega` | `string[]` | Fotos en base64 del momento de entrega (sin servidor de archivos) |
 | `fdaEntregado` | `boolean` | Formulario de acuse de entrega |
+| `direccion` | `string?` | Dirección física del contacto (editable en modal SAC) |
 
 ---
 
@@ -56,9 +57,26 @@ El [[Mente_ZYMO_SUBAGENT]] prioriza contactos SAC en este orden:
 
 ---
 
+## Modal de edición SAC
+
+El modal permite editar directamente desde la tabla SAC:
+- Cargo, teléfono, email, **dirección** del contacto → `PATCH /api/sac/datos`
+- Fotos de entrega (base64, múltiples) → `PATCH /api/sac/contactos/:id/fotos`
+- La info de solo lectura muestra **Tipo de cliente** (directo / intermediario / referido) en lugar de Categoría
+
+## Automatización futura — MCP SAC (`crm-sac-mcp`)
+
+Ver plan en `documentacion/plan-implementacion-mcps.md`:
+- Cron día 1 del mes → validar cartera → solicitar compra de regalos (email a Contabilidad + Administrativo)
+- Cron 30 días antes → notificación al comercial
+- Cron 1 día antes → enviar tarjeta personalizada por Outlook
+- Registro automático de fotos con `registrar_entrega_regalo(contacto_id, fotos[])`
+
+---
+
 ## Conexiones
 
 - [[Alertas_y_Triggers]] — trigger del cumpleaños del mes
-- [[Flujos_Email]] — email recordatorio al comercial
+- [[Flujos_Email]] — email recordatorio al comercial + tarjeta Outlook
 - [[Actores_y_Roles]] — comercial es el responsable del FDA
 - [[Mente_ZYMO_SUBAGENT]] — prioriza y contextualiza alertas SAC

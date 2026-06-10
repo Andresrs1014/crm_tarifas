@@ -28,6 +28,9 @@ Tablas principales:
 | `User` | Usuarios del sistema con roles |
 | `MatrizRiesgo` | Scoring BASC por record (puntaje, riesgo, companias) |
 | `GestionDocumental` | Documentos BASC por record (18 docs, ciclo, cumplimiento) |
+| `PreliqHistorial` | Historial de preliquidaciones por usuario |
+| `FichaCliente` | Formulario SOP de onboarding — 5 pestañas, pct de completitud |
+| `Analista` | Analistas de operaciones — usados en Ficha Cliente |
 
 ---
 
@@ -68,8 +71,23 @@ Tablas principales:
 - `GET /api/crm/actividades/vencidas` — actividades pendientes
 
 ### SAC
-- `GET /api/sac/contactos?mes=N` — contactos por mes
-- `PATCH /api/sac/contactos/:id/fotos` — actualizar FDA/fotos
+- `GET /api/sac/contactos?mes=N` — contactos por mes (incluye tipoCliente)
+- `GET /api/sac/fda` — contactos con `recibeRegalos: true` (incluye tipoCliente)
+- `PATCH /api/sac/contactos/:id/fotos` — actualizar fotos base64 + fdaEntregado
+- `PATCH /api/sac/datos` — actualizar cargo, tel, email, dirección del contacto
+
+### Fichas de Cliente (SOP)
+- `GET /api/fichas` — lista con filtros (estado, comercialId)
+- `GET /api/fichas/record/:recordId` — get-or-create ficha por record
+- `PUT /api/fichas/:id` — actualizar estado, pct y data (JSON completo)
+- `GET /api/fichas/analistas` — lista analistas de operaciones
+- `POST /api/fichas/analistas` — crear analista
+- `DELETE /api/fichas/analistas/:id` — eliminar analista
+
+### Preliquidador Historial
+- `GET /api/preliq-historial` — historial del usuario autenticado
+- `POST /api/preliq-historial` — guardar resultado de preliquidación
+- `DELETE /api/preliq-historial/:id` — eliminar entrada del historial
 
 ### Biblioteca
 - `GET /api/biblioteca` — árbol completo líneas→grupos→items
@@ -133,3 +151,5 @@ Frontend only — sin endpoint propio. Lee cotizaciones y calcula MAX(calculado,
 - [[KPIs_Tiempos]] — datos fuente para KPIs
 - [[Biblioteca_Tarifas]] — motor de tarifas
 - [[Conexion_Sistema_Gerencial]] — datos que fluyen hacia arriba
+- [[Ficha_Cliente]] — tablas fichas_cliente + analistas
+- [[Cotizador_Paqueteo]] — herramienta frontend-only sin endpoint
