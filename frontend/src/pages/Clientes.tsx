@@ -55,7 +55,7 @@ export default function Clientes() {
   // Filtros client-side (facturado + línea de negocio)
   const clientes = clientesRaw
     .filter((c) => !facturadoFiltro || (facturadoFiltro === 'no' ? (!c.facturado || c.facturado === 'no') : c.facturado === facturadoFiltro))
-    .filter((c) => !lineaFiltro || (c.servicios as string[]).some((s) => s.toLowerCase().includes(lineaFiltro.toLowerCase())))
+    .filter((c) => !lineaFiltro || (c.servicios as string[]).includes(lineaFiltro))
 
   const { data: comerciales = [] } = useQuery({
     queryKey: ['comerciales'],
@@ -120,11 +120,13 @@ export default function Clientes() {
           <option value="no">No Facturado</option>
         </select>
         <select className="filter-select" value={lineaFiltro} onChange={(e) => setLineaFiltro(e.target.value)}>
-          <option value="">🏢 Todas las compañías</option>
-          <option value="logimat">Logimat</option>
-          <option value="depósito">IMC Depósito</option>
-          <option value="cargo">IMC Cargo</option>
-          <option value="aduana">Aduana</option>
+          <option value="">Todas las líneas</option>
+          <option value="Zona Franca">Zona Franca</option>
+          <option value="Depósito Aduanero">Depósito Aduanero</option>
+          <option value="CEDI">CEDI</option>
+          <option value="Transporte">Transporte</option>
+          <option value="Paqueteo">Paqueteo</option>
+          <option value="Aduana">Aduana</option>
         </select>
         <select className="filter-select" value={comercialId} onChange={(e) => setComercialId(e.target.value)}>
           <option value="">Todos los comerciales</option>
