@@ -55,9 +55,6 @@ export const deleteItem = (id: string) =>
   client.delete(`/api/biblioteca/items/${id}`).then((r) => r.data)
 
 // Observaciones
-export const getObs = (lineaId: string) =>
-  client.get<BibliotecaObs[]>(`/api/biblioteca/lineas/${lineaId}/obs`).then((r) => r.data)
-
 export const createObs = (lineaId: string, data: { nombre: string; html: string }) =>
   client.post<BibliotecaObs>(`/api/biblioteca/lineas/${lineaId}/obs`, data).then((r) => r.data)
 

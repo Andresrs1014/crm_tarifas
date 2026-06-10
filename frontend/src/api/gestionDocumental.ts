@@ -6,14 +6,14 @@ export interface DocEstado {
   fecha?: string
 }
 
-export interface GDData {
+interface GDData {
   id: string | null
   docs: Record<string, DocEstado>
   cicloActual: number
   updatedAt: string | null
 }
 
-export interface GDVencimiento {
+interface GDVencimiento {
   status: 'vencido' | 'por-vencer' | 'con-tiempo' | 'sin-fecha'
   diasRestantes: number | null
   fechaVencimiento: string | null

@@ -10,15 +10,6 @@ export const SERVICIOS = [
 
 export type Servicio = (typeof SERVICIOS)[number]
 
-export const SERVICIO_COLORS: { [k: string]: string } = {
-  'Zona Franca':       '#00c2ff',
-  'Depósito Aduanero': '#f5a623',
-  'CEDI':              '#f5a623',
-  'Transporte':        '#00e676',
-  'Paqueteo':          '#a855f7',
-  'Aduana':            '#ff4444',
-}
-
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 export interface User {
   id: string
