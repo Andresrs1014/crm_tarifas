@@ -295,7 +295,7 @@ async function migrateRecords() {
           direccion: c.direccion || null,
           orden: c.orden || 0,
           cumpleanos: c.cumpleanos || null,
-          recibeRegalos: c.recibeRegalos || false,
+          recibeRegalos: c.recibeRegalos === true || c.recibeRegalos === 'si' || c.recibeRegalos === 'yes',
         },
       });
       totalContactos++;
