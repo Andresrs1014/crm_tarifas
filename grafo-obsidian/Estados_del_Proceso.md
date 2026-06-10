@@ -30,6 +30,26 @@ prospecto → reconocimiento → propuesta → aceptacion_propuesta → creacion
 
 **Transición a cliente:** Cuando `estadoProspecto === "facturado"`, el prospecto se puede duplicar como `tipo: "cliente"` con `estadoCliente: "activo"`.
 
+### Historial de etapas (`stageHistory`)
+
+Cada transición de estado queda registrada en `records.stage_history` (JSON array):
+
+```json
+[
+  { "stage": "prospecto",      "desde": "2026-01-10T00:00:00Z", "hasta": "2026-02-05T14:30:00Z" },
+  { "stage": "reconocimiento", "desde": "2026-02-05T14:30:00Z", "hasta": "2026-03-01T09:00:00Z" },
+  { "stage": "propuesta",      "desde": "2026-03-01T09:00:00Z", "hasta": null }
+]
+```
+
+- `hasta: null` significa que es la etapa actual
+- El servicio `updateRecord` escribe automáticamente el historial cuando cambia `estadoProspecto`
+- Si el registro no tiene historial previo, inicializa con `{ stage: estadoActual, desde: createdAt, hasta: now }` antes de agregar la nueva entrada
+
+**Visualización:** En la página Detalle del prospecto se muestra:
+1. Barra horizontal de pipeline (etapa activa resaltada + etapas pasadas con ✓)
+2. Sección "Tiempos en etapas" con chips mostrando días por etapa
+
 ---
 
 ## Estados de Clientes
