@@ -16,7 +16,7 @@ const ESTADO_LABEL: Record<string, string> = {
 }
 
 export default function FichaCliente() {
-  const [filtEstado, setFiltEstado] = useState('pendiente')
+  const [filtEstado, setFiltEstado] = useState('')
   const [filtComercial, setFiltComercial] = useState('')
   const [search, setSearch] = useState('')
 
@@ -26,6 +26,11 @@ export default function FichaCliente() {
       estado: filtEstado || undefined,
       comercialId: filtComercial || undefined,
     }),
+  })
+
+  const { data: fichasAll = [] } = useQuery({
+    queryKey: ['fichas', 'all', filtComercial],
+    queryFn: () => getFichas({ comercialId: filtComercial || undefined }),
   })
 
   const { data: comerciales = [] } = useQuery({ queryKey: ['comerciales'], queryFn: getComercialesApi })
@@ -39,13 +44,13 @@ export default function FichaCliente() {
     return f.record.empresa.toLowerCase().includes(q)
   })
 
-  // KPIs
-  const total = fichas.length
-  const pendientes = fichas.filter((f) => f.estado === 'pendiente').length
-  const enProceso = fichas.filter((f) => f.estado === 'en_proceso').length
-  const completadas = fichas.filter((f) => f.estado === 'completada').length
-  const pctPromedio = fichas.length
-    ? Math.round(fichas.reduce((s, f) => s + f.pct, 0) / fichas.length)
+  // KPIs — calculados sobre fichasAll (sin filtro de estado) para mostrar totales reales
+  const total = fichasAll.length
+  const pendientes = fichasAll.filter((f) => f.estado === 'pendiente').length
+  const enProceso = fichasAll.filter((f) => f.estado === 'en_proceso').length
+  const completadas = fichasAll.filter((f) => f.estado === 'completada').length
+  const pctPromedio = fichasAll.length
+    ? Math.round(fichasAll.reduce((s, f) => s + f.pct, 0) / fichasAll.length)
     : 0
 
   return (
