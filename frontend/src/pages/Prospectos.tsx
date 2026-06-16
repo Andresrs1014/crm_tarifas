@@ -5,6 +5,7 @@ import { getRecords, deleteRecord } from '../api/records'
 import { getComercialesApi } from '../api/comerciales'
 import { toast } from '../store/toastStore'
 import { exportRecordsExcel } from '../utils/exportExcel'
+import { fmtEstado } from '../utils/fmtEstado'
 
 const ESTADOS: { value: string; label: string; badge: string }[] = [
   { value: '',                     label: 'Todos los estados',               badge: '' },
@@ -27,11 +28,6 @@ const ESTADO_BADGE: Record<string, string> = {
   facturado:            'badge-green',
   frio:                 'badge-gray',
   perdido:              'badge-red',
-}
-
-function fmtEstado(value: string | undefined, map: { value: string; label: string }[]): string {
-  if (!value) return '—'
-  return map.find(e => e.value === value)?.label ?? value.replace(/_/g, ' ')
 }
 
 function fmt(n: number) {

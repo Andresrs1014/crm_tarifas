@@ -9,6 +9,7 @@ import { toast } from '../store/toastStore'
 import type { EstadoCotizacion } from '../types'
 import { exportCotizacionPDF } from '../utils/exportPDF'
 import { exportCotizacionesExcel } from '../utils/exportExcel'
+import { fmtEstado } from '../utils/fmtEstado'
 
 // ─── Helpers para preview de incremento ────────────────────────────────────────
 
@@ -48,13 +49,6 @@ function buildPreview(snapshot: Record<string, unknown>, pct: number): PreviewIt
     }
   }
   return items
-}
-
-// ─── Helpers ───────────────────────────────────────────────────────────────────
-
-function fmtEstado(value: string | undefined, map: { value: string; label: string }[]): string {
-  if (!value) return '—'
-  return map.find(e => e.value === value)?.label ?? value.replace(/_/g, ' ')
 }
 
 // ─── Constantes ────────────────────────────────────────────────────────────────

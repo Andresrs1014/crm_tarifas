@@ -7,6 +7,7 @@ import { createActividad, updateActividad, deleteActividad } from '../api/activi
 import { toast } from '../store/toastStore'
 import type { ActividadTipo, EstadoProspecto, EstadoCliente, TipoVisita, TipoFacturado } from '../types'
 import { SERVICIOS } from '../types'
+import { fmtEstado } from '../utils/fmtEstado'
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -42,11 +43,6 @@ const COT_BADGE: Record<string, string> = {
   negociacion: 'badge-gold',
   aprobada:    'badge-green',
   rechazada:   'badge-red',
-}
-
-function fmtEstado(value: string | undefined, map: { value: string; label: string }[]): string {
-  if (!value) return '—'
-  return map.find(e => e.value === value)?.label ?? value.replace(/_/g, ' ')
 }
 
 const ESTADOS_PROSPECTO: { value: string; label: string }[] = [
@@ -443,8 +439,8 @@ export default function Detalle() {
                         ? (
                           <select className="filter-select w-full" value={edit.estadoProspecto}
                             onChange={(e) => setEdit((s) => ({ ...s, estadoProspecto: e.target.value as EstadoProspecto }))}>
-                            {['prospecto','reconocimiento','propuesta','aceptacion_propuesta','creacion_sop','facturado','frio','perdido'].map((v) => (
-                              <option key={v} value={v}>{v}</option>
+                            {ESTADOS_PROSPECTO.map((e) => (
+                              <option key={e.value} value={e.value}>{e.label}</option>
                             ))}
                           </select>
                         )
@@ -477,7 +473,7 @@ export default function Detalle() {
                         ? (
                           <select className="filter-select w-full" value={edit.estadoCliente}
                             onChange={(e) => setEdit((s) => ({ ...s, estadoCliente: e.target.value as EstadoCliente }))}>
-                            {['activo','en-riesgo','inactivo'].map((v) => <option key={v} value={v}>{v}</option>)}
+                            {ESTADOS_CLIENTE.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
                           </select>
                         )
                         : <span className={ESTADO_BADGE_C[record.estadoCliente ?? 'activo'] ?? 'badge-gray'}>{fmtEstado(record.estadoCliente, ESTADOS_CLIENTE)}</span>}
