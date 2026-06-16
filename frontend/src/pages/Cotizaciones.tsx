@@ -50,6 +50,13 @@ function buildPreview(snapshot: Record<string, unknown>, pct: number): PreviewIt
   return items
 }
 
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+
+function fmtEstado(value: string | undefined, map: { value: string; label: string }[]): string {
+  if (!value) return '—'
+  return map.find(e => e.value === value)?.label ?? value.replace(/_/g, ' ')
+}
+
 // ─── Constantes ────────────────────────────────────────────────────────────────
 
 const ESTADOS: { value: string; label: string }[] = [
@@ -281,7 +288,7 @@ export default function Cotizaciones() {
                     <td className="text-sm text-muted">{cot.comercial}</td>
                     <td>
                       <span className={ESTADO_BADGE[cot.estado] ?? 'badge-gray'}>
-                        {cot.estado}
+                        {fmtEstado(cot.estado, ESTADOS)}
                       </span>
                     </td>
                     <td>

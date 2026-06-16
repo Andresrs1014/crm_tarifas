@@ -44,6 +44,36 @@ const COT_BADGE: Record<string, string> = {
   rechazada:   'badge-red',
 }
 
+function fmtEstado(value: string | undefined, map: { value: string; label: string }[]): string {
+  if (!value) return '—'
+  return map.find(e => e.value === value)?.label ?? value.replace(/_/g, ' ')
+}
+
+const ESTADOS_PROSPECTO: { value: string; label: string }[] = [
+  { value: 'prospecto',            label: '🎯 Prospecto' },
+  { value: 'reconocimiento',       label: '🏢 Visita' },
+  { value: 'propuesta',            label: '📄 Propuesta Comercial' },
+  { value: 'aceptacion_propuesta', label: '🤝 Aceptación Propuesta' },
+  { value: 'creacion_sop',         label: '📋 Creación Ficha Cliente' },
+  { value: 'facturado',            label: '💰 Facturado' },
+  { value: 'frio',                 label: '🧊 Frío' },
+  { value: 'perdido',              label: '❌ Perdido' },
+]
+
+const ESTADOS_CLIENTE: { value: string; label: string }[] = [
+  { value: 'activo',     label: '✅ Activo' },
+  { value: 'en-riesgo',  label: '⚠️ En Riesgo' },
+  { value: 'inactivo',   label: '💤 Inactivo' },
+]
+
+const ESTADOS_COT: { value: string; label: string }[] = [
+  { value: 'borrador',    label: 'Borrador' },
+  { value: 'enviada',     label: 'Enviada' },
+  { value: 'negociacion', label: 'Negociación' },
+  { value: 'aprobada',    label: 'Aprobada' },
+  { value: 'rechazada',   label: 'Rechazada' },
+]
+
 function fmt(n: number) {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`
@@ -237,7 +267,9 @@ export default function Detalle() {
   const estadoBadge = isProspecto
     ? ESTADO_BADGE_P[record.estadoProspecto ?? 'prospecto']
     : ESTADO_BADGE_C[record.estadoCliente ?? 'activo']
-  const estadoLabel = isProspecto ? record.estadoProspecto : record.estadoCliente
+  const estadoLabel = isProspecto
+    ? fmtEstado(record.estadoProspecto, ESTADOS_PROSPECTO)
+    : fmtEstado(record.estadoCliente, ESTADOS_CLIENTE)
 
   const actividadesOrdenadas = [...record.actividades].sort(
     (a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
@@ -416,7 +448,7 @@ export default function Detalle() {
                             ))}
                           </select>
                         )
-                        : <span className={ESTADO_BADGE_P[record.estadoProspecto ?? 'prospecto'] ?? 'badge-gray'}>{record.estadoProspecto}</span>}
+                        : <span className={ESTADO_BADGE_P[record.estadoProspecto ?? 'prospecto'] ?? 'badge-gray'}>{fmtEstado(record.estadoProspecto, ESTADOS_PROSPECTO)}</span>}
                     </div>
                     <div>
                       <label className="text-xs text-muted block mb-1">Visita</label>
@@ -448,7 +480,7 @@ export default function Detalle() {
                             {['activo','en-riesgo','inactivo'].map((v) => <option key={v} value={v}>{v}</option>)}
                           </select>
                         )
-                        : <span className={ESTADO_BADGE_C[record.estadoCliente ?? 'activo'] ?? 'badge-gray'}>{record.estadoCliente}</span>}
+                        : <span className={ESTADO_BADGE_C[record.estadoCliente ?? 'activo'] ?? 'badge-gray'}>{fmtEstado(record.estadoCliente, ESTADOS_CLIENTE)}</span>}
                     </div>
                     <div>
                       <label className="text-xs text-muted block mb-1">Facturado</label>
@@ -813,7 +845,7 @@ export default function Detalle() {
                     <tr key={cot.id}>
                       <td className="font-mono text-accent font-semibold">{cot.numero}</td>
                       <td>
-                        <span className={COT_BADGE[cot.estado] ?? 'badge-gray'}>{cot.estado}</span>
+                        <span className={COT_BADGE[cot.estado] ?? 'badge-gray'}>{fmtEstado(cot.estado, ESTADOS_COT)}</span>
                       </td>
                       <td>
                         <div className="flex flex-wrap gap-1">

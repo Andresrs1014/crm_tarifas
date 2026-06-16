@@ -29,6 +29,11 @@ const ESTADO_BADGE: Record<string, string> = {
   perdido:              'badge-red',
 }
 
+function fmtEstado(value: string | undefined, map: { value: string; label: string }[]): string {
+  if (!value) return '—'
+  return map.find(e => e.value === value)?.label ?? value.replace(/_/g, ' ')
+}
+
 function fmt(n: number) {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`
@@ -198,7 +203,7 @@ export default function Prospectos() {
                   </td>
                   <td>
                     <span className={ESTADO_BADGE[p.estadoProspecto ?? 'prospecto'] ?? 'badge-gray'}>
-                      {p.estadoProspecto ?? 'prospecto'}
+                      {fmtEstado(p.estadoProspecto ?? 'prospecto', ESTADOS)}
                     </span>
                   </td>
                   <td>
