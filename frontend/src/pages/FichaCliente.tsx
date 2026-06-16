@@ -29,7 +29,7 @@ export default function FichaCliente() {
   })
 
   const { data: fichasAll = [] } = useQuery({
-    queryKey: ['fichas', 'all', filtComercial],
+    queryKey: ['fichas-all', filtComercial],
     queryFn: () => getFichas({ comercialId: filtComercial || undefined }),
   })
 
