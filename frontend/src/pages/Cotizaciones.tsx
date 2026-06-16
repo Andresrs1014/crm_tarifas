@@ -9,6 +9,7 @@ import { toast } from '../store/toastStore'
 import type { EstadoCotizacion } from '../types'
 import { exportCotizacionPDF } from '../utils/exportPDF'
 import { exportCotizacionesExcel } from '../utils/exportExcel'
+import { fmtEstado } from '../utils/fmtEstado'
 
 // ─── Helpers para preview de incremento ────────────────────────────────────────
 
@@ -281,7 +282,7 @@ export default function Cotizaciones() {
                     <td className="text-sm text-muted">{cot.comercial}</td>
                     <td>
                       <span className={ESTADO_BADGE[cot.estado] ?? 'badge-gray'}>
-                        {cot.estado}
+                        {fmtEstado(cot.estado, ESTADOS)}
                       </span>
                     </td>
                     <td>

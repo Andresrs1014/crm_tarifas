@@ -85,8 +85,8 @@ export interface ActividadCreate {
 // ─── CRM Records ──────────────────────────────────────────────────────────────
 export type TipoRecord = 'prospecto' | 'cliente'
 export type EstadoProspecto =
-  | 'prospecto' | 'reconocimiento' | 'propuesta' | 'resolucion'
-  | 'aceptacion_alcance' | 'aceptacion_propuesta' | 'firma_contrato'
+  | 'prospecto' | 'reconocimiento' | 'propuesta'
+  | 'aceptacion_propuesta'
   | 'creacion_sop' | 'facturado' | 'frio' | 'perdido'
 export type EstadoCliente = 'activo' | 'en-riesgo' | 'inactivo'
 export type TipoCliente = 'directo' | 'intermediario' | 'referido'

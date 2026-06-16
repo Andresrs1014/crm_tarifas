@@ -5,6 +5,7 @@ import { getRecords, deleteRecord } from '../api/records'
 import { getComercialesApi } from '../api/comerciales'
 import { toast } from '../store/toastStore'
 import { exportRecordsExcel } from '../utils/exportExcel'
+import { fmtEstado } from '../utils/fmtEstado'
 
 const ESTADOS: { value: string; label: string; badge: string }[] = [
   { value: '',                     label: 'Todos los estados',               badge: '' },
@@ -198,7 +199,7 @@ export default function Prospectos() {
                   </td>
                   <td>
                     <span className={ESTADO_BADGE[p.estadoProspecto ?? 'prospecto'] ?? 'badge-gray'}>
-                      {p.estadoProspecto ?? 'prospecto'}
+                      {fmtEstado(p.estadoProspecto ?? 'prospecto', ESTADOS)}
                     </span>
                   </td>
                   <td>

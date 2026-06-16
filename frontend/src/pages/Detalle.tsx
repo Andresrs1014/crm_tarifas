@@ -7,6 +7,7 @@ import { createActividad, updateActividad, deleteActividad } from '../api/activi
 import { toast } from '../store/toastStore'
 import type { ActividadTipo, EstadoProspecto, EstadoCliente, TipoVisita, TipoFacturado } from '../types'
 import { SERVICIOS } from '../types'
+import { fmtEstado } from '../utils/fmtEstado'
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -43,6 +44,31 @@ const COT_BADGE: Record<string, string> = {
   aprobada:    'badge-green',
   rechazada:   'badge-red',
 }
+
+const ESTADOS_PROSPECTO: { value: string; label: string }[] = [
+  { value: 'prospecto',            label: '🎯 Prospecto' },
+  { value: 'reconocimiento',       label: '🏢 Visita' },
+  { value: 'propuesta',            label: '📄 Propuesta Comercial' },
+  { value: 'aceptacion_propuesta', label: '🤝 Aceptación Propuesta' },
+  { value: 'creacion_sop',         label: '📋 Creación Ficha Cliente' },
+  { value: 'facturado',            label: '💰 Facturado' },
+  { value: 'frio',                 label: '🧊 Frío' },
+  { value: 'perdido',              label: '❌ Perdido' },
+]
+
+const ESTADOS_CLIENTE: { value: string; label: string }[] = [
+  { value: 'activo',     label: '✅ Activo' },
+  { value: 'en-riesgo',  label: '⚠️ En Riesgo' },
+  { value: 'inactivo',   label: '💤 Inactivo' },
+]
+
+const ESTADOS_COT: { value: string; label: string }[] = [
+  { value: 'borrador',    label: 'Borrador' },
+  { value: 'enviada',     label: 'Enviada' },
+  { value: 'negociacion', label: 'Negociación' },
+  { value: 'aprobada',    label: 'Aprobada' },
+  { value: 'rechazada',   label: 'Rechazada' },
+]
 
 function fmt(n: number) {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
@@ -237,7 +263,9 @@ export default function Detalle() {
   const estadoBadge = isProspecto
     ? ESTADO_BADGE_P[record.estadoProspecto ?? 'prospecto']
     : ESTADO_BADGE_C[record.estadoCliente ?? 'activo']
-  const estadoLabel = isProspecto ? record.estadoProspecto : record.estadoCliente
+  const estadoLabel = isProspecto
+    ? fmtEstado(record.estadoProspecto, ESTADOS_PROSPECTO)
+    : fmtEstado(record.estadoCliente, ESTADOS_CLIENTE)
 
   const actividadesOrdenadas = [...record.actividades].sort(
     (a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
@@ -411,12 +439,12 @@ export default function Detalle() {
                         ? (
                           <select className="filter-select w-full" value={edit.estadoProspecto}
                             onChange={(e) => setEdit((s) => ({ ...s, estadoProspecto: e.target.value as EstadoProspecto }))}>
-                            {['prospecto','reconocimiento','propuesta','aceptacion_propuesta','creacion_sop','facturado','frio','perdido'].map((v) => (
-                              <option key={v} value={v}>{v}</option>
+                            {ESTADOS_PROSPECTO.map((e) => (
+                              <option key={e.value} value={e.value}>{e.label}</option>
                             ))}
                           </select>
                         )
-                        : <span className={ESTADO_BADGE_P[record.estadoProspecto ?? 'prospecto'] ?? 'badge-gray'}>{record.estadoProspecto}</span>}
+                        : <span className={ESTADO_BADGE_P[record.estadoProspecto ?? 'prospecto'] ?? 'badge-gray'}>{fmtEstado(record.estadoProspecto, ESTADOS_PROSPECTO)}</span>}
                     </div>
                     <div>
                       <label className="text-xs text-muted block mb-1">Visita</label>
@@ -445,10 +473,10 @@ export default function Detalle() {
                         ? (
                           <select className="filter-select w-full" value={edit.estadoCliente}
                             onChange={(e) => setEdit((s) => ({ ...s, estadoCliente: e.target.value as EstadoCliente }))}>
-                            {['activo','en-riesgo','inactivo'].map((v) => <option key={v} value={v}>{v}</option>)}
+                            {ESTADOS_CLIENTE.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
                           </select>
                         )
-                        : <span className={ESTADO_BADGE_C[record.estadoCliente ?? 'activo'] ?? 'badge-gray'}>{record.estadoCliente}</span>}
+                        : <span className={ESTADO_BADGE_C[record.estadoCliente ?? 'activo'] ?? 'badge-gray'}>{fmtEstado(record.estadoCliente, ESTADOS_CLIENTE)}</span>}
                     </div>
                     <div>
                       <label className="text-xs text-muted block mb-1">Facturado</label>
@@ -813,7 +841,7 @@ export default function Detalle() {
                     <tr key={cot.id}>
                       <td className="font-mono text-accent font-semibold">{cot.numero}</td>
                       <td>
-                        <span className={COT_BADGE[cot.estado] ?? 'badge-gray'}>{cot.estado}</span>
+                        <span className={COT_BADGE[cot.estado] ?? 'badge-gray'}>{fmtEstado(cot.estado, ESTADOS_COT)}</span>
                       </td>
                       <td>
                         <div className="flex flex-wrap gap-1">

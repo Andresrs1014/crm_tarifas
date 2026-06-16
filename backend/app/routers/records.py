@@ -5,6 +5,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlmodel import Session, select
 
 from app.auth.dependencies import get_current_active_user
@@ -95,17 +96,19 @@ def list_records(
     records = session.exec(query.order_by(Record.created_at.desc())).all()
 
     # Carga el primer contacto de cada record en una sola query
-    from sqlalchemy import text as _text
-    ids = [str(r.id) for r in records]
+    ids = [r.id for r in records]
     contacto_map: dict[str, str] = {}
     if ids:
-        placeholders = ",".join(f"'{i}'" for i in ids)
-        rows = session.execute(_text(f"""
-            SELECT record_id, nombre FROM contactos
-            WHERE record_id IN ({placeholders})
-            GROUP BY record_id
-            HAVING MIN(orden)
-        """)).all()
+        subq = (
+            select(Contacto.record_id, func.min(Contacto.orden).label("min_orden"))
+            .where(Contacto.record_id.in_(ids))
+            .group_by(Contacto.record_id)
+            .subquery()
+        )
+        rows = session.exec(
+            select(Contacto.record_id, Contacto.nombre)
+            .join(subq, (Contacto.record_id == subq.c.record_id) & (Contacto.orden == subq.c.min_orden))
+        ).all()
         contacto_map = {str(r[0]): r[1] for r in rows}
 
     result = []
