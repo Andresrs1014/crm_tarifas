@@ -92,6 +92,7 @@ model Contacto {
   orden         Int      @default(0)
   cumpleanos    String?
   recibeRegalos Boolean  @default(false) @map("recibe_regalos")
+  tipo          String?
   fotosEntrega  Json     @default("[]") @map("fotos_entrega")
   fdaEntregado  Boolean  @default(false) @map("fda_entregado")
 

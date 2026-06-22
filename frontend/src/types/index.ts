@@ -61,6 +61,8 @@ export interface ContactoCreate {
   orden?: number
   cumpleanos?: string
   recibeRegalos?: boolean
+  /** HTML v6: principal | comercial | gestion-documental | financiero | operativo */
+  tipo?: string
 }
 
 // ─── Actividades ──────────────────────────────────────────────────────────────
@@ -89,7 +91,7 @@ export type EstadoProspecto =
   | 'aceptacion_propuesta'
   | 'creacion_sop' | 'facturado' | 'frio' | 'perdido'
 export type EstadoCliente = 'activo' | 'en-riesgo' | 'inactivo'
-export type TipoCliente = 'directo' | 'intermediario' | 'referido'
+export type TipoCliente = 'directo' | 'indirecto' | 'referido'
 export type TipoVisita = 'no' | 'si' | 'virtual' | 'llamada'
 export type TipoFacturado = 'no' | 'si' | 'parcial'
 
