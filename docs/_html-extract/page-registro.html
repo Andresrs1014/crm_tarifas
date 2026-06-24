@@ -1,0 +1,181 @@
+id="page-registro" class="page">
+<div class="main">
+  <div class="section-title">➕ Nuevo <span>Registro</span></div>
+  <div class="form-card">
+    <!-- TIPO -->
+    <div class="form-group" style="margin-bottom:20px">
+      <label>Tipo de Registro</label>
+      <div class="type-toggle">
+        <button class="type-btn active-prospecto" id="btn-prospecto" onclick="setTipo('prospecto')">🎯 Prospecto</button>
+        <button class="type-btn" id="btn-cliente" onclick="setTipo('cliente')">🏢 Cliente</button>
+      </div>
+    </div>
+    <input type="hidden" id="tipo-registro" value="prospecto">
+
+    <!-- DATOS BÁSICOS -->
+    <div class="form-grid">
+      <div class="form-group"><label>Nombre de la Empresa *</label><input type="text" id="f-empresa" placeholder="Ej: Comercial XYZ S.A.S."></div>
+      <div class="form-group"><label>NIT / Identificación</label><input type="text" id="f-nit" placeholder="Ej: 900.123.456-7"></div>
+      <div class="form-group"><label>Ciudad</label><input type="text" id="f-ciudad" placeholder="Ej: Bogotá"></div>
+      <div class="form-group modal-col-full"><label>Dirección de la Empresa</label><input type="text" id="f-direccion" placeholder="Ej: Cra. 15 #93-75, Bogotá"></div>
+      <div class="form-group"><label>Comercial Responsable *</label><select id="f-comercial"><option value="">— Seleccionar —</option></select></div>
+      <div class="form-group"><label>Fecha de Registro</label><input type="date" id="f-fecha"></div>
+      <div class="form-group"><label>Categoría del Registro</label>
+        <select id="f-categoria">
+          <option value="">— Sin categoría —</option>
+          <option value="A">🏆 A — Más de $50M / mes</option>
+          <option value="B">🥈 B — $10M a $50M / mes</option>
+          <option value="C">🥉 C — Menos de $10M / mes</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- TIPO DE CLIENTE (solo en modo cliente) -->
+    <div class="cliente-section" id="section-tipo-cliente" style="margin-bottom:20px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);margin-bottom:12px">🏷️ Clasificación del Cliente</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Tipo de Cliente *</label>
+          <select id="f-tipo-cliente" onchange="onTipoClienteChange(this.value)">
+            <option value="directo">Directo</option>
+            <option value="indirecto">Intermediario</option>
+            <option value="referido">Referido</option>
+          </select>
+        </div>
+        <div class="form-group" id="grupo-cliente-indirecto" style="display:none"><label>Cliente Indirecto que lo refiere</label>
+          <select id="f-cliente-indirecto"><option value="">— Seleccionar aliado —</option></select>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- CONTACTOS -->
+    <div style="margin-bottom:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <label style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text)">👤 Contactos de la Empresa</label>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="agregarContacto()" style="font-size:12px;border-color:var(--accent);color:var(--accent)">+ Agregar Contacto</button>
+      </div>
+      <div id="f-contactos-list"></div>
+    </div>
+
+    <!-- SERVICIOS -->
+    <div class="form-group" style="margin-bottom:20px">
+      <label>Servicios de Interés *</label>
+      <div class="services-grid" id="services-chips"></div>
+    </div>
+
+    <!-- SECCIÓN PROSPECTO -->
+    <div class="prospecto-section" id="section-prospecto">
+      <div class="form-grid">
+        <div class="form-group"><label>Estado del Prospecto</label>
+          <select id="f-estado-prospecto">
+            <option value="prospecto">🎯 Prospecto</option>
+            <option value="reconocimiento">🏢 Visita</option>
+            <option value="propuesta">📄 Propuesta Comercial</option>
+            <option value="aceptacion_propuesta">🤝 Aceptación Propuesta Comercial</option>
+            <option value="creacion_sop">📋 Creación Ficha Cliente</option>
+            <option value="facturado">💰 Facturado</option>
+          </select>
+        </div>
+        <div class="form-group"><label>¿Se realizó visita?</label>
+          <select id="f-visita">
+            <option value="no">No</option>
+            <option value="si">Sí — Visita Presencial</option>
+            <option value="virtual">Sí — Visita Virtual</option>
+            <option value="llamada">Sí — Llamada Comercial</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Fecha de Visita / Contacto</label><input type="date" id="f-fecha-visita"></div>
+        <div class="form-group"><label>Próximo Seguimiento</label><input type="date" id="f-proximo-seguimiento"></div>
+        <div class="form-group modal-col-full"><label>💵 Ingresos Esperados por Mes</label>
+          <input type="number" id="f-ingresos-esperados" placeholder="Ej: 5000000" min="0" style="width:100%;box-sizing:border-box"
+            oninput="document.getElementById('f-ingresos-preview').textContent=this.value?'$'+Number(this.value).toLocaleString('es-CO'):''">
+          <div id="f-ingresos-preview" style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;color:var(--gold);margin-top:4px"></div>
+        </div>
+      </div>
+      <div style="background:rgba(245,166,35,0.06);border:1px solid rgba(245,166,35,0.2);border-radius:10px;padding:18px;margin-bottom:16px">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:14px">💰 Facturación</div>
+        <div class="form-grid" style="margin-bottom:0">
+          <div class="form-group"><label>¿Se facturó?</label>
+            <select id="f-facturado-p" onchange="onFacturadoChange('p',this.value)">
+              <option value="no">No</option><option value="si">Sí</option><option value="parcial">Parcial</option>
+            </select>
+          </div>
+        </div>
+        <div id="f-billing-block-p" style="display:none;margin-top:16px;padding-top:14px;border-top:1px solid rgba(245,166,35,0.2)">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Ingresa el valor facturado por cada servicio de interés:</div>
+          <div id="f-billing-lines-p" class="form-grid"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+            <span style="font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;font-weight:600">Total Facturado</span>
+            <span id="f-total-p" style="font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:800;color:var(--gold)">$0</span>
+          </div>
+        </div>
+      </div>
+      <div class="form-group"><label>Observaciones del Prospecto</label>
+        <textarea id="f-obs-prospecto" placeholder="Necesidades específicas, notas de la visita, acuerdos preliminares..."></textarea>
+      </div>
+    </div>
+
+    <!-- SECCIÓN CLIENTE -->
+    <div class="cliente-section" id="section-cliente">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--green);margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+        📋 Gestión Cliente Activo
+      </div>
+      <div class="form-grid">
+        <div class="form-group"><label>Estado Relación</label>
+          <select id="f-estado-cliente">
+            <option value="activo">✅ Activo</option>
+            <option value="en-riesgo">⚠️ En Riesgo</option>
+            <option value="inactivo">💤 Inactivo</option>
+          </select>
+        </div>
+        <div class="form-group"><label>¿Se realizó visita?</label>
+          <select id="f-visita-cliente">
+            <option value="no">No</option>
+            <option value="si">Sí — Presencial</option>
+            <option value="virtual">Sí — Virtual</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Fecha de Visita / Gestión</label><input type="date" id="f-fecha-visita-cliente"></div>
+        <div class="form-group"><label>¿Se cerró un nuevo servicio?</label>
+          <select id="f-nuevo-servicio">
+            <option value="no">No</option><option value="si">Sí</option>
+          </select>
+        </div>
+        <div class="form-group" id="grupo-servicio-nuevo" style="display:none"><label>Servicio Cerrado</label>
+          <select id="f-servicio-nuevo">
+            <option value="">— Seleccionar —</option>
+            <option>Zona Franca</option><option>Depósito Aduanero</option>
+            <option>CEDI</option><option>Transporte</option>
+            <option>Paqueteo</option><option>Aduana</option>
+          </select>
+        </div>
+        <div class="form-group"><label>¿Se facturó?</label>
+          <select id="f-facturado" onchange="onFacturadoChange('c',this.value)">
+            <option value="no">No</option><option value="si">Sí — Facturado</option><option value="parcial">Parcial</option>
+          </select>
+        </div>
+      </div>
+      <div id="f-billing-block-c" style="display:none;background:rgba(245,166,35,0.06);border:1px solid rgba(245,166,35,0.2);border-radius:10px;padding:18px;margin-bottom:16px;margin-top:4px">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:6px">💰 Facturación por Línea de Negocio</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Ingresa el valor facturado por cada servicio de interés:</div>
+        <div id="f-billing-lines-c" class="form-grid"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+          <span style="font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;font-weight:600">Total Facturado</span>
+          <span id="f-total-c" style="font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:800;color:var(--gold)">$0</span>
+        </div>
+      </div>
+      <div class="form-group"><label>Gestión Realizada / Notas</label>
+        <textarea id="f-obs-cliente" placeholder="Descripción de la gestión realizada, acuerdos, compromisos..."></textarea>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px;justify-content:flex-end;padding-top:20px;border-top:1px solid var(--border)">
+      <button class="btn btn-secondary" onclick="clearForm()">Limpiar</button>
+      <button class="btn btn-primary" onclick="saveRecord()">💾 Guardar Registro</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ========== PROSPECTOS ========== -->
+<div 

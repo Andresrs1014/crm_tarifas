@@ -48,3 +48,9 @@ backend/data/
 
 # ─── Referencia histórica — solo lectura local ─
 Ultima_versión/
+
+# ─── Cursor / scripts locales de análisis ────
+.cursor/
+docs/_analyze-html.js
+docs/_extract-html.js
+docs/_extract2.js

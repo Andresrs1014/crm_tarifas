@@ -118,6 +118,48 @@
   .badge-red    { @apply badge bg-danger/15 text-danger; }
   .badge-purple { @apply badge bg-purple/15 text-purple; }
   .badge-gray   { @apply badge bg-muted/15 text-muted; }
+  .badge-cyan   { @apply badge bg-cyan/15 text-cyan; }
+
+  /* ─── HTML v6 Dashboard ──────────────────────────────────── */
+  .html-stats-row {
+    @apply grid gap-4 mb-7;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+  .html-stat-card {
+    @apply relative overflow-hidden rounded-xl border border-border bg-surface p-5 transition-transform hover:-translate-y-0.5;
+  }
+  .html-stat-card::before {
+    content: '';
+    @apply absolute top-0 left-0 right-0 h-[3px];
+  }
+  .html-stat-card.blue::before   { @apply bg-accent; }
+  .html-stat-card.cyan::before   { background: #00ffcc; }
+  .html-stat-card.green::before  { @apply bg-success; }
+  .html-stat-card.gold::before   { @apply bg-gold; }
+  .html-stat-card.purple::before { @apply bg-purple; }
+  .html-stat-card.red::before    { @apply bg-danger; }
+  .html-stat-label {
+    @apply text-[11px] uppercase tracking-[1.5px] text-muted mb-2;
+  }
+  .html-stat-value {
+    font-family: 'Barlow Condensed', 'DM Sans', sans-serif;
+    @apply text-[38px] font-extrabold leading-none;
+  }
+  .html-stat-sub { @apply text-xs text-muted mt-1; }
+  .html-charts-grid {
+    @apply grid gap-5 mb-5;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+  .html-chart-card {
+    @apply rounded-xl border border-border bg-surface p-5;
+  }
+  .html-chart-title {
+    @apply text-sm font-semibold text-foreground mb-4;
+  }
+  .html-chart-wrap { @apply h-[220px]; }
+  .html-stag {
+    @apply inline-block text-[11px] px-2 py-0.5 rounded bg-surface2 text-muted mr-1 mb-1;
+  }
 
   /* ─── Status dot ─────────────────────────────────────────── */
   .status-dot {

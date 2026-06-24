@@ -9,6 +9,7 @@ export interface RecordFilters {
   comercialId?: string;
   search?: string;
   fecha?: string;
+  mes?: string;
 }
 
 export async function listRecords(filters: RecordFilters) {
@@ -45,6 +46,14 @@ export async function listRecords(filters: RecordFilters) {
     const end = new Date(filters.fecha);
     end.setHours(23, 59, 59, 999);
     where.fecha = { gte: start, lte: end };
+  }
+
+  if (filters.mes) {
+    const [year, month] = filters.mes.split('-').map(Number);
+    where.fecha = {
+      gte: new Date(year, month - 1, 1),
+      lt: new Date(year, month, 1),
+    };
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -117,11 +126,12 @@ export async function createRecord(data: {
     orden?: number;
     cumpleanos?: string;
     recibeRegalos?: boolean;
+    tipo?: string;
   }>;
 }) {
   const { contactos, ...recordData } = data;
 
-  return prisma.record.create({
+  const created = await prisma.record.create({
     data: {
       ...recordData,
       fecha: new Date(recordData.fecha),
@@ -139,6 +149,60 @@ export async function createRecord(data: {
       contactos: { orderBy: { orden: 'asc' } },
     },
   });
+
+  const actividades: Array<{ tipo: string; descripcion: string; fecha: Date }> = [];
+
+  if (recordData.tipo === 'prospecto') {
+    if (recordData.visita && recordData.visita !== 'no') {
+      actividades.push({
+        tipo: 'visita',
+        descripcion: `Visita/Contacto: ${recordData.visita}`,
+        fecha: recordData.fechaVisita ? new Date(recordData.fechaVisita) : new Date(recordData.fecha),
+      });
+    }
+    if ((recordData.valorP ?? 0) > 0) {
+      actividades.push({
+        tipo: 'seguimiento',
+        descripcion: `Facturación: $${Number(recordData.valorP).toLocaleString('es-CO')}`,
+        fecha: new Date(recordData.fecha),
+      });
+    }
+  } else if (recordData.tipo === 'cliente') {
+    if (recordData.visitaCliente && recordData.visitaCliente !== 'no') {
+      actividades.push({
+        tipo: 'visita',
+        descripcion: `Visita cliente: ${recordData.visitaCliente}`,
+        fecha: recordData.fechaVisitaCliente ? new Date(recordData.fechaVisitaCliente) : new Date(recordData.fecha),
+      });
+    }
+    if (recordData.nuevoServicio === 'si') {
+      actividades.push({
+        tipo: 'tarea',
+        descripcion: `Nuevo servicio: ${recordData.servicioNuevo || 'Sin especificar'}`,
+        fecha: new Date(recordData.fecha),
+      });
+    }
+    if ((recordData.valor ?? 0) > 0) {
+      actividades.push({
+        tipo: 'seguimiento',
+        descripcion: `Facturación: $${Number(recordData.valor).toLocaleString('es-CO')}`,
+        fecha: new Date(recordData.fecha),
+      });
+    }
+  }
+
+  if (actividades.length) {
+    await prisma.actividad.createMany({
+      data: actividades.map((a) => ({ ...a, recordId: created.id })),
+    });
+  }
+
+  if (recordData.tipo === 'cliente') {
+    const { getOrCreateMatriz } = await import('../matriz-riesgos/matriz-riesgos.service');
+    await getOrCreateMatriz(created.id);
+  }
+
+  return created;
 }
 
 export async function updateRecord(id: string, data: Partial<{
