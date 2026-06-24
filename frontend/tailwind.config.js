@@ -11,6 +11,7 @@ export default {
         surface3:   '#1e2d45',
         accent:     '#00c2ff',
         accent2:    '#0077ff',
+        cyan:       '#00ffcc',
         gold:       '#f5a623',
         success:    '#00e676',
         danger:     '#ff4444',
