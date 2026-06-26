@@ -11,6 +11,7 @@ __pycache__/
 .env
 .env.*
 !.env.example
+!.env.docker.local
 
 # ─── VSCode / IDE ────────────────────────────
 .vscode/
@@ -50,7 +51,9 @@ backend/data/
 Ultima_versión/
 
 # ─── Cursor / scripts locales de análisis ────
-.cursor/
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
 docs/_analyze-html.js
 docs/_extract-html.js
 docs/_extract2.js

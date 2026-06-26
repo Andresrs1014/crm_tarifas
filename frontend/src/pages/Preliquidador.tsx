@@ -5,6 +5,7 @@ import { getCotizaciones } from '../api/cotizaciones'
 import { getPreliqHistorial, savePreliqHistorial, deletePreliqEntry, PreliqEntry } from '../api/preliqHistorial'
 import { toast } from '../store/toastStore'
 import type { Cotizacion } from '../types'
+import { SVC_COLORS } from '../lib/htmlV6/domainConfig'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface PreliqItem {
@@ -262,12 +263,6 @@ function calcPreliq(selectedItems: PreliqItem[], form: FormState, allItemsByLine
     }
   }
   return result
-}
-
-// ─── SVC colors ───────────────────────────────────────────────────────────────
-const SVC_COLORS: Record<string, string> = {
-  'Zona Franca': '#00c2ff', 'CEDI': '#00e676', 'Depósito Aduanero': '#a78bfa',
-  'Transporte': '#f5a623', 'Paqueteo': '#ff6b6b', 'Aduana': '#ffd700',
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────

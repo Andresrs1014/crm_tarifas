@@ -6,15 +6,13 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-bg flex flex-col">
       <Header />
-      <div className="flex flex-1" style={{ marginTop: '70px' }}>
+      <div className="flex flex-1" style={{ marginTop: '60px' }}>
         <Sidebar />
         <main
-          className="flex-1 overflow-y-auto"
-          style={{ marginLeft: '220px' }}
+          className="main flex-1 overflow-y-auto"
+          style={{ marginLeft: '200px' }}
         >
-          <div className="p-7">
-            <Outlet />
-          </div>
+          <Outlet />
         </main>
       </div>
     </div>

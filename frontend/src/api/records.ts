@@ -22,6 +22,9 @@ export const updateRecord = (id: string, data: Partial<RecordCreate>) =>
 export const deleteRecord = (id: string) =>
   client.delete(`/api/records/${id}`).then((r) => r.data)
 
+export const convertToCliente = (id: string) =>
+  client.post<CRMRecord>(`/api/records/${id}/convert-to-cliente`).then((r) => r.data)
+
 export const importRecords = (file: File, tipo: string) => {
   const form = new FormData()
   form.append('file', file)

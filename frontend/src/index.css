@@ -3,13 +3,31 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --bg: #080c14;
+    --surface: #0e1320;
+    --surface2: #131a28;
+    --surface3: #18212f;
+    --accent: #38bdf8;
+    --accent2: #0ea5e9;
+    --gold: #f59e0b;
+    --green: #34d399;
+    --red: #f87171;
+    --purple: #a78bfa;
+    --text: #e2e8f0;
+    --text2: #64748b;
+    --border: #1e293b;
+    --shadow: 0 2px 16px rgba(0,0,0,0.4);
+  }
+
   html {
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Barlow', sans-serif;
     color-scheme: dark;
   }
 
   body {
     @apply bg-bg text-foreground;
+    font-family: 'Barlow', sans-serif;
     min-height: 100vh;
     overflow-x: hidden;
     /* Subtle grid texture */
@@ -142,7 +160,7 @@
     @apply text-[11px] uppercase tracking-[1.5px] text-muted mb-2;
   }
   .html-stat-value {
-    font-family: 'Barlow Condensed', 'DM Sans', sans-serif;
+    font-family: 'Barlow Condensed', sans-serif;
     @apply text-[38px] font-extrabold leading-none;
   }
   .html-stat-sub { @apply text-xs text-muted mt-1; }
@@ -249,7 +267,9 @@
 
   /* ─── Stat highlight (big numbers) ──────────────────────── */
   .stat-value {
-    @apply text-2xl font-bold tabular leading-none;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    @apply text-2xl tabular leading-none;
   }
 
   /* ─── Inline form row ────────────────────────────────────── */

@@ -6,24 +6,9 @@ import { getComercialesApi } from '../api/comerciales'
 import { toast } from '../store/toastStore'
 import { SERVICIOS } from '../types'
 import type { TipoRecord, RecordCreate, ContactoCreate, TipoCliente } from '../types'
+import { PROSPECTO_FORM_OPTIONS, TIPO_CONTACTO_OPTIONS } from '../lib/htmlV6/domainConfig'
 
-const ESTADOS_PROSPECTO = [
-  { value: 'prospecto', label: '🎯 Prospecto' },
-  { value: 'reconocimiento', label: '🏢 Visita' },
-  { value: 'propuesta', label: '📄 Propuesta Comercial' },
-  { value: 'aceptacion_propuesta', label: '🤝 Aceptación Propuesta Comercial' },
-  { value: 'creacion_sop', label: '📋 Creación Ficha Cliente' },
-  { value: 'facturado', label: '💰 Facturado' },
-]
-
-const TIPOS_CONTACTO = [
-  { value: '', label: '— Sin definir —' },
-  { value: 'principal', label: '⭐ Principal' },
-  { value: 'comercial', label: '💼 Comercial' },
-  { value: 'gestion-documental', label: '📁 Gestión Documental' },
-  { value: 'financiero', label: '💰 Financiero' },
-  { value: 'operativo', label: '⚙️ Operativo' },
-]
+const ESTADOS_PROSPECTO = PROSPECTO_FORM_OPTIONS
 
 type ContactoForm = ContactoCreate & {
   recibeRegalosSel: '' | 'si' | 'no'
@@ -240,22 +225,22 @@ export default function Registro() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="section-title text-2xl font-bold mb-6">
+    <div>
+      <div className="section-title">
         ➕ Nuevo <span className="text-accent">Registro</span>
       </div>
 
-      <div className="card p-6 space-y-6">
+      <div className="form-card">
         {/* Tipo — setTipo */}
-        <div>
-          <label className="block text-sm font-medium mb-2">Tipo de Registro</label>
-          <div className="flex gap-2">
+        <div className="form-group" style={{ marginBottom: 20 }}>
+          <label>Tipo de Registro</label>
+          <div className="type-toggle">
             <button
               type="button"
-              className={`type-btn px-5 py-2.5 rounded-lg font-semibold text-sm border transition-all ${
+              className={`type-btn ${
                 tipo === 'prospecto'
-                  ? 'bg-accent/15 border-accent text-accent'
-                  : 'border-border text-muted hover:text-foreground'
+                  ? 'active-prospecto'
+                  : ''
               }`}
               onClick={() => setTipo('prospecto')}
             >
@@ -263,10 +248,10 @@ export default function Registro() {
             </button>
             <button
               type="button"
-              className={`type-btn px-5 py-2.5 rounded-lg font-semibold text-sm border transition-all ${
+              className={`type-btn ${
                 tipo === 'cliente'
-                  ? 'bg-success/15 border-success text-success'
-                  : 'border-border text-muted hover:text-foreground'
+                  ? 'active-cliente'
+                  : ''
               }`}
               onClick={() => setTipo('cliente')}
             >
@@ -276,37 +261,31 @@ export default function Registro() {
         </div>
 
         {/* Datos básicos */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs text-muted mb-1">Nombre de la Empresa *</label>
-            <input className="input" placeholder="Ej: Comercial XYZ S.A.S." value={empresa} onChange={(e) => setEmpresa(e.target.value)} />
+        <div className="form-grid">
+          <div className="form-group"><label>Nombre de la Empresa *</label>
+            <input placeholder="Ej: Comercial XYZ S.A.S." value={empresa} onChange={(e) => setEmpresa(e.target.value)} />
           </div>
-          <div>
-            <label className="block text-xs text-muted mb-1">NIT / Identificación</label>
-            <input className="input" placeholder="Ej: 900.123.456-7" value={nit} onChange={(e) => setNit(e.target.value)} />
+          <div className="form-group"><label>NIT / Identificación</label>
+            <input placeholder="Ej: 900.123.456-7" value={nit} onChange={(e) => setNit(e.target.value)} />
           </div>
-          <div>
-            <label className="block text-xs text-muted mb-1">Ciudad</label>
-            <input className="input" placeholder="Ej: Bogotá" value={ciudad} onChange={(e) => setCiudad(e.target.value)} />
+          <div className="form-group"><label>Ciudad</label>
+            <input placeholder="Ej: Bogotá" value={ciudad} onChange={(e) => setCiudad(e.target.value)} />
           </div>
-          <div className="sm:col-span-2">
-            <label className="block text-xs text-muted mb-1">Dirección de la Empresa</label>
-            <input className="input" placeholder="Ej: Cra. 15 #93-75, Bogotá" value={direccion} onChange={(e) => setDireccion(e.target.value)} />
+          <div className="form-group full">
+            <label>Dirección de la Empresa</label>
+            <input placeholder="Ej: Cra. 15 #93-75, Bogotá" value={direccion} onChange={(e) => setDireccion(e.target.value)} />
           </div>
-          <div>
-            <label className="block text-xs text-muted mb-1">Comercial Responsable *</label>
-            <select className="input" value={comercialId} onChange={(e) => setComercialId(e.target.value)}>
+          <div className="form-group"><label>Comercial Responsable *</label>
+            <select value={comercialId} onChange={(e) => setComercialId(e.target.value)}>
               <option value="">— Seleccionar —</option>
               {comerciales.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
             </select>
           </div>
-          <div>
-            <label className="block text-xs text-muted mb-1">Fecha de Registro</label>
-            <input type="date" className="input" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+          <div className="form-group"><label>Fecha de Registro</label>
+            <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
           </div>
-          <div>
-            <label className="block text-xs text-muted mb-1">Categoría del Registro</label>
-            <select className="input" value={categoria} onChange={(e) => setCategoria(e.target.value as '' | 'A' | 'B' | 'C')}>
+          <div className="form-group"><label>Categoría del Registro</label>
+            <select value={categoria} onChange={(e) => setCategoria(e.target.value as '' | 'A' | 'B' | 'C')}>
               <option value="">— Sin categoría —</option>
               <option value="A">🏆 A — Más de $50M / mes</option>
               <option value="B">🥈 B — $10M a $50M / mes</option>
@@ -317,21 +296,19 @@ export default function Registro() {
 
         {/* Clasificación cliente — section-tipo-cliente */}
         {tipo === 'cliente' && (
-          <div className="rounded-lg border border-border p-4">
-            <div className="text-sm font-bold uppercase tracking-wider text-accent mb-3">🏷️ Clasificación del Cliente</div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs text-muted mb-1">Tipo de Cliente *</label>
-                <select className="input" value={tipoCliente} onChange={(e) => onTipoClienteChange(e.target.value as TipoCliente)}>
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--accent)", marginBottom: 12 }}>🏷️ Clasificación del Cliente</div>
+            <div className="form-grid">
+              <div className="form-group"><label>Tipo de Cliente *</label>
+                <select value={tipoCliente} onChange={(e) => onTipoClienteChange(e.target.value as TipoCliente)}>
                   <option value="directo">Directo</option>
                   <option value="indirecto">Intermediario</option>
                   <option value="referido">Referido</option>
                 </select>
               </div>
               {tipoCliente === 'referido' && (
-                <div>
-                  <label className="block text-xs text-muted mb-1">Cliente Indirecto que lo refiere</label>
-                  <select className="input" value={clienteIndirectoId} onChange={(e) => setClienteInd(e.target.value)}>
+                <div className="form-group"><label>Cliente Indirecto que lo refiere</label>
+                  <select value={clienteIndirectoId} onChange={(e) => setClienteInd(e.target.value)}>
                     <option value="">— Seleccionar aliado —</option>
                     {aliadosIndirectos.map((r) => (
                       <option key={r.id} value={r.id}>
@@ -347,56 +324,49 @@ export default function Registro() {
 
         {/* Contactos — antes de servicios (HTML v6) */}
         <div>
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-bold uppercase tracking-wider">👤 Contactos de la Empresa</span>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--text)" }}>👤 Contactos de la Empresa</span>
             <button type="button" className="btn-secondary btn-sm text-xs border-accent text-accent" onClick={agregarContacto}>
               + Agregar Contacto
             </button>
           </div>
-          <div className="space-y-4">
+          <div>
             {contactos.map((c, i) => (
-              <div key={i} className="rounded-xl border border-border bg-surface2 p-4">
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-xs font-semibold text-muted">
-                    {i === 0 ? '⭐ Principal' : `Contacto ${i + 1}`}
+              <div key={i} className="contact-card">
+                <div className="contact-card-header">
+                  <span className="contact-card-label">
+                    {i === 0 ? <span className="contact-principal-badge">Principal</span> : `Contacto ${i + 1}`}
                   </span>
                   {i > 0 && (
                     <button type="button" className="text-muted hover:text-danger text-lg leading-none" onClick={() => eliminarContacto(i)} title="Eliminar contacto">✕</button>
                   )}
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-muted mb-1">Nombre</label>
-                    <input className="input" placeholder="Nombre del contacto" value={c.nombre} onChange={(e) => updateContacto(i, 'nombre', e.target.value)} />
+                <div className="form-grid">
+                  <div className="form-group"><label>Nombre</label>
+                    <input placeholder="Nombre del contacto" value={c.nombre} onChange={(e) => updateContacto(i, 'nombre', e.target.value)} />
                   </div>
-                  <div>
-                    <label className="block text-xs text-muted mb-1">Cargo</label>
-                    <input className="input" placeholder="Ej: Gerente Logístico" value={c.cargo ?? ''} onChange={(e) => updateContacto(i, 'cargo', e.target.value)} />
+                  <div className="form-group"><label>Cargo</label>
+                    <input placeholder="Ej: Gerente Logístico" value={c.cargo ?? ''} onChange={(e) => updateContacto(i, 'cargo', e.target.value)} />
                   </div>
-                  <div>
-                    <label className="block text-xs text-muted mb-1">Teléfono</label>
-                    <input className="input" placeholder="+57 300 000 0000" value={c.telefono ?? ''} onChange={(e) => updateContacto(i, 'telefono', e.target.value)} />
+                  <div className="form-group"><label>Teléfono</label>
+                    <input placeholder="+57 300 000 0000" value={c.telefono ?? ''} onChange={(e) => updateContacto(i, 'telefono', e.target.value)} />
                   </div>
-                  <div>
-                    <label className="block text-xs text-muted mb-1">Email</label>
-                    <input type="email" className="input" placeholder="correo@empresa.com" value={c.email ?? ''} onChange={(e) => updateContacto(i, 'email', e.target.value)} />
+                  <div className="form-group"><label>Email</label>
+                    <input type="email" placeholder="correo@empresa.com" value={c.email ?? ''} onChange={(e) => updateContacto(i, 'email', e.target.value)} />
                   </div>
-                  <div>
-                    <label className="block text-xs text-muted mb-1">🎂 Fecha de Cumpleaños</label>
-                    <input type="date" className="input" value={c.cumpleanos ?? ''} onChange={(e) => updateContacto(i, 'cumpleanos', e.target.value)} />
+                  <div className="form-group"><label>🎂 Fecha de Cumpleaños</label>
+                    <input type="date" value={c.cumpleanos ?? ''} onChange={(e) => updateContacto(i, 'cumpleanos', e.target.value)} />
                   </div>
-                  <div>
-                    <label className="block text-xs text-muted mb-1">🎁 ¿Puede recibir regalos?</label>
-                    <select className="input" value={c.recibeRegalosSel} onChange={(e) => updateContacto(i, 'recibeRegalosSel', e.target.value)}>
+                  <div className="form-group"><label>🎁 ¿Puede recibir regalos?</label>
+                    <select value={c.recibeRegalosSel} onChange={(e) => updateContacto(i, 'recibeRegalosSel', e.target.value)}>
                       <option value="">— Sin definir —</option>
                       <option value="si">✅ Sí</option>
                       <option value="no">❌ No</option>
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-xs text-muted mb-1">🏷️ Tipo de Contacto</label>
-                    <select className="input" value={c.tipoContacto} onChange={(e) => updateContacto(i, 'tipoContacto', e.target.value)}>
-                      {TIPOS_CONTACTO.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  <div className="form-group"><label>🏷️ Tipo de Contacto</label>
+                    <select value={c.tipoContacto} onChange={(e) => updateContacto(i, 'tipoContacto', e.target.value)}>
+                      {TIPO_CONTACTO_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                     </select>
                   </div>
                 </div>
@@ -406,17 +376,16 @@ export default function Registro() {
         </div>
 
         {/* Servicios — buildServiceChips */}
-        <div>
-          <label className="block text-sm font-medium mb-2">Servicios de Interés *</label>
-          <div className="flex flex-wrap gap-2">
+        <div className="form-group"><label>Servicios de Interés *</label>
+          <div className="services-grid">
             {SERVICIOS.map((s) => (
               <button
                 key={s}
                 type="button"
-                className={`px-3 py-1.5 rounded-lg text-sm font-semibold border transition-all ${
+                className={`service-chip ${
                   servicios.includes(s)
-                    ? 'bg-accent/15 border-accent text-accent'
-                    : 'border-border text-muted hover:border-muted'
+                    ? 'selected'
+                    : ''
                 }`}
                 onClick={() => toggleServicio(s)}
               >
@@ -428,34 +397,30 @@ export default function Registro() {
 
         {/* Sección prospecto */}
         {tipo === 'prospecto' && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs text-muted mb-1">Estado del Prospecto</label>
-                <select className="input" value={estadoProspecto} onChange={(e) => setEstadoP(e.target.value)}>
+          <div>
+            <div className="form-grid">
+              <div className="form-group"><label>Estado del Prospecto</label>
+                <select value={estadoProspecto} onChange={(e) => setEstadoP(e.target.value)}>
                   {ESTADOS_PROSPECTO.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="block text-xs text-muted mb-1">¿Se realizó visita?</label>
-                <select className="input" value={visita} onChange={(e) => setVisita(e.target.value as typeof visita)}>
+              <div className="form-group"><label>¿Se realizó visita?</label>
+                <select value={visita} onChange={(e) => setVisita(e.target.value as typeof visita)}>
                   <option value="no">No</option>
                   <option value="si">Sí — Visita Presencial</option>
                   <option value="virtual">Sí — Visita Virtual</option>
                   <option value="llamada">Sí — Llamada Comercial</option>
                 </select>
               </div>
-              <div>
-                <label className="block text-xs text-muted mb-1">Fecha de Visita / Contacto</label>
-                <input type="date" className="input" value={fechaVisita} onChange={(e) => setFechaV(e.target.value)} />
+              <div className="form-group"><label>Fecha de Visita / Contacto</label>
+                <input type="date" value={fechaVisita} onChange={(e) => setFechaV(e.target.value)} />
               </div>
-              <div>
-                <label className="block text-xs text-muted mb-1">Próximo Seguimiento</label>
-                <input type="date" className="input" value={proxSeguimiento} onChange={(e) => setProxSeg(e.target.value)} />
+              <div className="form-group"><label>Próximo Seguimiento</label>
+                <input type="date" value={proxSeguimiento} onChange={(e) => setProxSeg(e.target.value)} />
               </div>
-              <div className="sm:col-span-2">
-                <label className="block text-xs text-muted mb-1">💵 Ingresos Esperados por Mes</label>
-                <input type="number" min={0} className="input" placeholder="Ej: 5000000" value={ingresosEsperados} onChange={(e) => setIngresos(e.target.value)} />
+              <div className="form-group full">
+                <label>💵 Ingresos Esperados por Mes</label>
+                <input type="number" min={0} placeholder="Ej: 5000000" value={ingresosEsperados} onChange={(e) => setIngresos(e.target.value)} />
                 {ingresosEsperados && (
                   <div className="mt-1 text-xl font-extrabold text-gold" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
                     {fmtMoneyPreview(ingresosEsperados)}
@@ -466,9 +431,8 @@ export default function Registro() {
 
             <div className="rounded-[10px] border border-gold/20 bg-gold/5 p-4">
               <div className="text-sm font-bold uppercase tracking-wider text-gold mb-3">💰 Facturación</div>
-              <div>
-                <label className="block text-xs text-muted mb-1">¿Se facturó?</label>
-                <select className="input max-w-xs" value={facturadoP} onChange={(e) => setFacturadoP(e.target.value as typeof facturadoP)}>
+              <div className="form-group"><label>¿Se facturó?</label>
+                <select style={{ maxWidth: 320 }} value={facturadoP} onChange={(e) => setFacturadoP(e.target.value as typeof facturadoP)}>
                   <option value="no">No</option>
                   <option value="si">Sí</option>
                   <option value="parcial">Parcial</option>
@@ -477,11 +441,11 @@ export default function Registro() {
               {facturadoP !== 'no' && servicios.length > 0 && (
                 <div className="mt-4 pt-3 border-t border-gold/20">
                   <p className="text-xs text-muted mb-3">Ingresa el valor facturado por cada servicio de interés:</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="form-grid">
                     {servicios.map((s) => (
                       <div key={s}>
-                        <label className="block text-xs text-muted mb-1">{s}</label>
-                        <input type="number" min={0} className="input text-right" placeholder="0" value={billingP[s] ?? ''}
+                        <label>{s}</label>
+                        <input type="number" min={0} style={{ textAlign: 'right' }} placeholder="0" value={billingP[s] ?? ''}
                           onChange={(e) => setBillingP((prev) => ({ ...prev, [s]: e.target.value }))} />
                       </div>
                     ))}
@@ -496,9 +460,8 @@ export default function Registro() {
               )}
             </div>
 
-            <div>
-              <label className="block text-xs text-muted mb-1">Observaciones del Prospecto</label>
-              <textarea className="input min-h-24 resize-none" placeholder="Necesidades específicas, notas de la visita, acuerdos preliminares..."
+            <div className="form-group"><label>Observaciones del Prospecto</label>
+              <textarea placeholder="Necesidades específicas, notas de la visita, acuerdos preliminares..."
                 value={obsProspecto} onChange={(e) => setObsProspecto(e.target.value)} />
             </div>
           </div>
@@ -506,50 +469,44 @@ export default function Registro() {
 
         {/* Sección cliente */}
         {tipo === 'cliente' && (
-          <div className="space-y-4">
-            <div className="text-base font-bold uppercase tracking-wider text-success border-b border-border pb-2">
+          <div>
+            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--green)", marginBottom: 16, paddingBottom: 10, borderBottom: "1px solid var(--border)" }}>
               📋 Gestión Cliente Activo
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs text-muted mb-1">Estado Relación</label>
-                <select className="input" value={estadoCliente} onChange={(e) => setEstadoC(e.target.value as typeof estadoCliente)}>
+            <div className="form-grid">
+              <div className="form-group"><label>Estado Relación</label>
+                <select value={estadoCliente} onChange={(e) => setEstadoC(e.target.value as typeof estadoCliente)}>
                   <option value="activo">✅ Activo</option>
                   <option value="en-riesgo">⚠️ En Riesgo</option>
                   <option value="inactivo">💤 Inactivo</option>
                 </select>
               </div>
-              <div>
-                <label className="block text-xs text-muted mb-1">¿Se realizó visita?</label>
-                <select className="input" value={visitaCliente} onChange={(e) => setVisitaC(e.target.value as typeof visitaCliente)}>
+              <div className="form-group"><label>¿Se realizó visita?</label>
+                <select value={visitaCliente} onChange={(e) => setVisitaC(e.target.value as typeof visitaCliente)}>
                   <option value="no">No</option>
                   <option value="si">Sí — Presencial</option>
                   <option value="virtual">Sí — Virtual</option>
                 </select>
               </div>
-              <div>
-                <label className="block text-xs text-muted mb-1">Fecha de Visita / Gestión</label>
-                <input type="date" className="input" value={fechaVisitaCliente} onChange={(e) => setFechaVC(e.target.value)} />
+              <div className="form-group"><label>Fecha de Visita / Gestión</label>
+                <input type="date" value={fechaVisitaCliente} onChange={(e) => setFechaVC(e.target.value)} />
               </div>
-              <div>
-                <label className="block text-xs text-muted mb-1">¿Se cerró un nuevo servicio?</label>
-                <select className="input" value={nuevoServicio} onChange={(e) => setNuevoServicio(e.target.value as 'no' | 'si')}>
+              <div className="form-group"><label>¿Se cerró un nuevo servicio?</label>
+                <select value={nuevoServicio} onChange={(e) => setNuevoServicio(e.target.value as 'no' | 'si')}>
                   <option value="no">No</option>
                   <option value="si">Sí</option>
                 </select>
               </div>
               {nuevoServicio === 'si' && (
-                <div>
-                  <label className="block text-xs text-muted mb-1">Servicio Cerrado</label>
-                  <select className="input" value={servicioNuevo} onChange={(e) => setServicioNuevo(e.target.value)}>
+                <div className="form-group"><label>Servicio Cerrado</label>
+                  <select value={servicioNuevo} onChange={(e) => setServicioNuevo(e.target.value)}>
                     <option value="">— Seleccionar —</option>
                     {SERVICIOS.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
               )}
-              <div>
-                <label className="block text-xs text-muted mb-1">¿Se facturó?</label>
-                <select className="input" value={facturado} onChange={(e) => setFacturado(e.target.value as typeof facturado)}>
+              <div className="form-group"><label>¿Se facturó?</label>
+                <select value={facturado} onChange={(e) => setFacturado(e.target.value as typeof facturado)}>
                   <option value="no">No</option>
                   <option value="si">Sí — Facturado</option>
                   <option value="parcial">Parcial</option>
@@ -561,11 +518,11 @@ export default function Registro() {
               <div className="rounded-[10px] border border-gold/20 bg-gold/5 p-4">
                 <div className="text-sm font-bold uppercase tracking-wider text-gold mb-1">💰 Facturación por Línea de Negocio</div>
                 <p className="text-xs text-muted mb-3">Ingresa el valor facturado por cada servicio de interés:</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="form-grid">
                   {servicios.map((s) => (
                     <div key={s}>
-                      <label className="block text-xs text-muted mb-1">{s}</label>
-                      <input type="number" min={0} className="input text-right" placeholder="0" value={billingC[s] ?? ''}
+                      <label>{s}</label>
+                      <input type="number" min={0} style={{ textAlign: 'right' }} placeholder="0" value={billingC[s] ?? ''}
                         onChange={(e) => setBillingC((prev) => ({ ...prev, [s]: e.target.value }))} />
                     </div>
                   ))}
@@ -579,9 +536,8 @@ export default function Registro() {
               </div>
             )}
 
-            <div>
-              <label className="block text-xs text-muted mb-1">Gestión Realizada / Notas</label>
-              <textarea className="input min-h-24 resize-none" placeholder="Descripción de la gestión realizada, acuerdos, compromisos..."
+            <div className="form-group"><label>Gestión Realizada / Notas</label>
+              <textarea placeholder="Descripción de la gestión realizada, acuerdos, compromisos..."
                 value={obsCliente} onChange={(e) => setObsCliente(e.target.value)} />
             </div>
           </div>

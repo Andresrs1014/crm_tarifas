@@ -26,6 +26,7 @@
 
 ## Ciberseguridad obligatoria
 - Nunca hardcodear secretos, tokens, passwords, NITs o datos sensibles en codigo fuente.
+- **Regla extendida:** ver `.cursor/rules/06-no-hardcode.mdc` — nada de datos de negocio, URLs, catalogos ni estilos dispersos en codigo; todo centralizado (env, API, `htmlV6/constants`, tokens CSS).
 - Usar variables de entorno para credenciales y configuracion sensible.
 - Mantener CORS estricto en produccion (sin comodines inseguros).
 - Mantener validacion de entrada en backend (tipos, formatos, permisos).
@@ -100,3 +101,10 @@ Un cambio se considera listo solo si:
 Si existe conflicto entre velocidad y calidad:
 - Gana seguridad y estabilidad.
 - Luego se optimiza velocidad de entrega.
+
+## Orquestacion multi-agente (reinicio paridad HTML v6 — solo este PC)
+- Fase 1 humano dice: `lee en docs/orquestacion/` → agentes escriben reportes, NO codifican
+- Fase 2 humano vuelve al lider Cursor → `Consolida reportes y propone TAREAS-SPRINT` → aval
+- Fase 3 humano dice en cada chat: `Ejecuta lo que tenga tu nombre`
+- Leer: `docs/orquestacion/PROMPT-INICIO.md`, `docs/orquestacion/README.md`
+- Docker local: `Copy-Item .env.docker.local .env` + `docker compose up --build -d` → http://localhost:82

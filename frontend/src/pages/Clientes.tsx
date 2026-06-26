@@ -5,37 +5,17 @@ import { getRecords, deleteRecord } from '../api/records'
 import { getComercialesApi } from '../api/comerciales'
 import { toast } from '../store/toastStore'
 import { exportRecordsExcel } from '../utils/exportExcel'
+import { fmtMoney } from '../utils/fmtMoney'
+import {
+  CATEGORIA_COLOR,
+  CLIENTE_BADGE,
+  CLIENTE_ESTADO_OPTIONS,
+  COMPANIAS_FILTER_OPTIONS,
+  FACTURADO_BADGE,
+  recordMatchesCompaniaFilter,
+} from '../lib/htmlV6/domainConfig'
 
-const ESTADOS_CLIENTE: { value: string; label: string }[] = [
-  { value: '',          label: 'Todos los estados' },
-  { value: 'activo',    label: 'Activo' },
-  { value: 'en-riesgo', label: 'En riesgo' },
-  { value: 'inactivo',  label: 'Inactivo' },
-]
-
-const ESTADO_BADGE: Record<string, string> = {
-  activo:    'badge-green',
-  'en-riesgo': 'badge-red',
-  inactivo:  'badge-gray',
-}
-
-const FACTURADO_BADGE: Record<string, string> = {
-  si:      'badge-green',
-  parcial: 'badge-gold',
-  no:      'badge-gray',
-}
-
-const CATEGORIA_COLOR: Record<string, string> = {
-  A: '#f5a623',
-  B: '#00c2ff',
-  C: '#8899b4',
-}
-
-function fmt(n: number) {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`
-  return `$${n}`
-}
+const ESTADOS_CLIENTE = CLIENTE_ESTADO_OPTIONS
 
 export default function Clientes() {
   const navigate = useNavigate()
@@ -44,7 +24,7 @@ export default function Clientes() {
   const [estado, setEstado]               = useState('')
   const [comercialId, setComercialId]     = useState('')
   const [facturadoFiltro, setFacturadoF]  = useState('')
-  const [lineaFiltro, setLineaFiltro]     = useState('')
+  const [companiaFiltro, setCompaniaFiltro] = useState('')
   const [confirmId, setConfirmId]         = useState<string | null>(null)
 
   const { data: clientesRaw = [], isLoading } = useQuery({
@@ -52,10 +32,15 @@ export default function Clientes() {
     queryFn: () => getRecords({ tipo: 'cliente', estado: estado || undefined, comercialId: comercialId || undefined, search: search || undefined }),
   })
 
-  // Filtros client-side (facturado + línea de negocio)
   const clientes = clientesRaw
     .filter((c) => !facturadoFiltro || (facturadoFiltro === 'no' ? (!c.facturado || c.facturado === 'no') : c.facturado === facturadoFiltro))
-    .filter((c) => !lineaFiltro || (c.servicios as string[]).includes(lineaFiltro))
+    .filter((c) =>
+      recordMatchesCompaniaFilter(
+        (c.servicios ?? []) as string[],
+        c.companias,
+        companiaFiltro,
+      ),
+    )
 
   const { data: comerciales = [] } = useQuery({
     queryKey: ['comerciales'],
@@ -72,180 +57,183 @@ export default function Clientes() {
     onError: () => toast.error('Error al eliminar'),
   })
 
-  // Totales rápidos
   const facturacionTotal = clientes.reduce((s, c) => s + (c.valor ?? 0), 0)
   const enRiesgo = clientes.filter((c) => c.estadoCliente === 'en-riesgo').length
 
   return (
-    <div className="p-6 space-y-5">
+    <div>
+      <div className="section-title">{'\uD83C\uDFE2'} Clientes <span>Activos</span></div>
+      {clientes.length > 0 && (
+        <p className="text-sm text-muted" style={{ marginBottom: 16, marginTop: -8 }}>
+          {clientes.length} clientes · {fmtMoney(facturacionTotal)} facturado
+          {enRiesgo > 0 && <span className="ml-2 text-danger font-semibold">{'\u26A0'} {enRiesgo} en riesgo</span>}
+        </p>
+      )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Clientes Activos</h1>
-          <p className="text-sm text-muted mt-0.5">
-            {clientes.length} clientes · {fmt(facturacionTotal)} facturado
-            {enRiesgo > 0 && <span className="ml-2 text-danger font-semibold">⚠ {enRiesgo} en riesgo</span>}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            className="btn-secondary btn-sm"
-            onClick={() => exportRecordsExcel(clientes, 'clientes.xlsx')}
-            disabled={clientes.length === 0}
-            title="Exportar a Excel"
-          >
-            ↓ Excel
-          </button>
-          <Link to="/registro" className="btn-primary btn-sm">
-            + Nuevo cliente
-          </Link>
-        </div>
-      </div>
-
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-3">
-        <input
-          className="filter-input flex-1 min-w-48"
-          placeholder="Buscar empresa o NIT..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <select className="filter-select" value={estado} onChange={(e) => setEstado(e.target.value)}>
-          {ESTADOS_CLIENTE.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
-        </select>
-        <select className="filter-select" value={facturadoFiltro} onChange={(e) => setFacturadoF(e.target.value)}>
-          <option value="">Facturación: Todos</option>
-          <option value="si">Facturado</option>
-          <option value="no">No Facturado</option>
-        </select>
-        <select className="filter-select" value={lineaFiltro} onChange={(e) => setLineaFiltro(e.target.value)}>
-          <option value="">Todas las líneas</option>
-          <option value="Zona Franca">Zona Franca</option>
-          <option value="Depósito Aduanero">Depósito Aduanero</option>
-          <option value="CEDI">CEDI</option>
-          <option value="Transporte">Transporte</option>
-          <option value="Paqueteo">Paqueteo</option>
-          <option value="Aduana">Aduana</option>
-        </select>
-        <select className="filter-select" value={comercialId} onChange={(e) => setComercialId(e.target.value)}>
-          <option value="">Todos los comerciales</option>
-          {comerciales.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-        </select>
-      </div>
-
-      {/* Tabla */}
       <div className="table-card">
-        {isLoading ? (
-          <div className="p-8 space-y-3">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-10 bg-surface2 rounded animate-pulse" />
-            ))}
+        <div className="table-header-2row">
+          <div className="table-header-top">
+            <div className="table-title">Lista de Clientes</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => exportRecordsExcel(clientes, 'clientes.xlsx')}
+                disabled={clientes.length === 0}
+                title="Exportar a Excel"
+                style={{ whiteSpace: 'nowrap' }}
+              >
+                {'\u2B07\uFE0F'} Exportar Excel
+              </button>
+              <Link
+                to="/registro/importar"
+                className="btn btn-secondary btn-sm"
+                style={{ whiteSpace: 'nowrap', borderColor: 'var(--green)', color: 'var(--green)' }}
+              >
+                {'\uD83D\uDCE4'} Carga Masiva
+              </Link>
+              <Link to="/registro" className="btn btn-primary btn-sm" style={{ whiteSpace: 'nowrap' }}>
+                {'\u2795'} Nuevo cliente
+              </Link>
+            </div>
           </div>
-        ) : clientes.length === 0 ? (
-          <div className="empty-state">
-            <div className="text-4xl mb-3">🏢</div>
-            <p className="font-semibold text-foreground mb-1">Sin clientes</p>
-            <p className="text-sm">Cambia los filtros o crea un nuevo cliente.</p>
-          </div>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Empresa</th>
-                <th>Contacto</th>
-                <th>Comercial</th>
-                <th>Servicios</th>
-                <th>Visita</th>
-                <th>Nuevo Servicio</th>
-                <th>Facturación</th>
-                <th>Estado</th>
-                <th>Cat.</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {clientes.map((c) => (
-                <tr key={c.id} className="cursor-pointer" onClick={() => navigate(`/detalle/${c.id}`)}>
-                  <td>
-                    <div className="font-semibold text-foreground">{c.empresa}</div>
-                    {c.nit && <div className="text-xs text-muted">NIT: {c.nit}</div>}
-                  </td>
-                  <td className="text-sm text-muted">
-                    {c.contactos?.[0]?.nombre || '—'}
-                    {c.contactos?.[0]?.cargo && (
-                      <div className="text-xs text-muted/60">{c.contactos[0].cargo}</div>
-                    )}
-                  </td>
-                  <td className="text-sm">{c.comercial?.nombre || '—'}</td>
-                  <td>
-                    <div className="flex flex-wrap gap-1">
-                      {(c.servicios as string[]).slice(0, 2).map((s) => (
-                        <span key={s} className="stag">{s}</span>
-                      ))}
-                      {(c.servicios as string[]).length > 2 && (
-                        <span className="stag">+{(c.servicios as string[]).length - 2}</span>
-                      )}
-                    </div>
-                  </td>
-                  <td>
-                    {c.visitaCliente && c.visitaCliente !== 'no'
-                      ? <span className="badge-green">{c.visitaCliente}</span>
-                      : <span className="text-muted text-xs">—</span>
-                    }
-                  </td>
-                  <td className="text-sm">
-                    {(c.nuevoServicio || c.servicioNuevo)
-                      ? <span className="badge-blue">{c.nuevoServicio || c.servicioNuevo}</span>
-                      : <span className="text-muted text-xs">—</span>
-                    }
-                  </td>
-                  <td>
-                    <div className="font-mono text-sm text-success">{fmt(c.valor ?? 0)}</div>
-                    <div className="mt-0.5">
-                      <span className={FACTURADO_BADGE[c.facturado ?? 'no'] ?? 'badge-gray'}>
-                        {c.facturado ?? 'no'}
-                      </span>
-                    </div>
-                  </td>
-                  <td>
-                    <span className={ESTADO_BADGE[c.estadoCliente ?? 'activo'] ?? 'badge-gray'}>
-                      {c.estadoCliente ?? 'activo'}
-                    </span>
-                  </td>
-                  <td>
-                    {c.categoria ? (
-                      <span
-                        className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
-                        style={{ background: `${CATEGORIA_COLOR[c.categoria]}20`, color: CATEGORIA_COLOR[c.categoria] }}
-                      >
-                        {c.categoria}
-                      </span>
-                    ) : <span className="text-muted text-xs">—</span>}
-                  </td>
-                  <td onClick={(e) => e.stopPropagation()}>
-                    <div className="flex gap-1">
-                      <button className="btn-ghost btn-sm px-2 py-1 text-xs" onClick={() => navigate(`/detalle/${c.id}`)}>Ver</button>
-                      <button className="btn-danger btn-sm px-2 py-1 text-xs" onClick={() => setConfirmId(c.id)}>×</button>
-                    </div>
-                  </td>
-                </tr>
+          <div className="table-filters">
+            <input
+              className="filter-input"
+              placeholder={'\uD83D\uDD0D Buscar empresa o NIT...'}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <select className="filter-select" value={estado} onChange={(e) => setEstado(e.target.value)}>
+              {ESTADOS_CLIENTE.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
+            </select>
+            <select className="filter-select" value={facturadoFiltro} onChange={(e) => setFacturadoF(e.target.value)}>
+              <option value="">Facturación: Todos</option>
+              <option value="si">Facturado</option>
+              <option value="no">No Facturado</option>
+            </select>
+            <select className="filter-select" value={companiaFiltro} onChange={(e) => setCompaniaFiltro(e.target.value)}>
+              {COMPANIAS_FILTER_OPTIONS.map((o) => (
+                <option key={o.value || 'all'} value={o.value}>{o.label}</option>
               ))}
-            </tbody>
-          </table>
-        )}
+            </select>
+            <select className="filter-select" value={comercialId} onChange={(e) => setComercialId(e.target.value)}>
+              <option value="">Todos los comerciales</option>
+              {comerciales.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div style={{ overflowX: 'auto' }}>
+          {isLoading ? (
+            <div className="p-8 space-y-3">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="h-10 bg-surface2 rounded animate-pulse" />
+              ))}
+            </div>
+          ) : clientes.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">{'\uD83C\uDFE2'}</div>
+              <div className="empty-title">Sin clientes</div>
+              <div>Cambia los filtros o crea un nuevo cliente.</div>
+            </div>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Empresa</th>
+                  <th>Contacto</th>
+                  <th>Comercial</th>
+                  <th>Servicios</th>
+                  <th>Visita</th>
+                  <th>Nuevo Servicio</th>
+                  <th>Facturación</th>
+                  <th>Estado</th>
+                  <th>Cat.</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {clientes.map((c) => (
+                  <tr key={c.id} className="cursor-pointer" onClick={() => navigate(`/detalle/${c.id}`)}>
+                    <td>
+                      <strong>{c.empresa}</strong>
+                      {c.nit && <><br /><span style={{ color: 'var(--text2)', fontSize: 11 }}>NIT: {c.nit}</span></>}
+                    </td>
+                    <td className="text-sm text-muted">
+                      {c.contactos?.[0]?.nombre || '\u2014'}
+                      {c.contactos?.[0]?.cargo && (
+                        <div className="text-xs text-muted/60">{c.contactos[0].cargo}</div>
+                      )}
+                    </td>
+                    <td className="text-sm">{c.comercial?.nombre || '\u2014'}</td>
+                    <td>
+                      <div className="service-tags">
+                        {(c.servicios as string[]).slice(0, 2).map((s) => (
+                          <span key={s} className="stag">{s}</span>
+                        ))}
+                        {(c.servicios as string[]).length > 2 && (
+                          <span className="stag">+{(c.servicios as string[]).length - 2}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      {c.visitaCliente && c.visitaCliente !== 'no'
+                        ? <span className="badge badge-green">{c.visitaCliente}</span>
+                        : <span className="text-muted text-xs">{'\u2014'}</span>
+                      }
+                    </td>
+                    <td className="text-sm">
+                      {(c.nuevoServicio || c.servicioNuevo)
+                        ? <span className="badge badge-blue">{c.nuevoServicio || c.servicioNuevo}</span>
+                        : <span className="text-muted text-xs">{'\u2014'}</span>
+                      }
+                    </td>
+                    <td>
+                      <div className="money-gold">{fmtMoney(c.valor ?? 0)}</div>
+                      <div className="mt-0.5">
+                        <span className={'badge ' + (FACTURADO_BADGE[c.facturado ?? 'no'] ?? 'badge-gray')}>
+                          {c.facturado ?? 'no'}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <span className={'badge ' + (CLIENTE_BADGE[c.estadoCliente ?? 'activo'] ?? 'badge-gray')}>
+                        {c.estadoCliente ?? 'activo'}
+                      </span>
+                    </td>
+                    <td>
+                      {c.categoria ? (
+                        <span
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
+                          style={{ background: `${CATEGORIA_COLOR[c.categoria]}20`, color: CATEGORIA_COLOR[c.categoria] }}
+                        >
+                          {c.categoria}
+                        </span>
+                      ) : <span className="text-muted text-xs">{'\u2014'}</span>}
+                    </td>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <div className="flex gap-1">
+                        <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/detalle/${c.id}`)}>Ver</button>
+                        <button className="btn btn-danger btn-sm" onClick={() => setConfirmId(c.id)} title="Eliminar cliente">{'\u00D7'}</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
 
-      {/* Modal confirm delete */}
       {confirmId && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setConfirmId(null)}>
           <div className="card p-6 w-80 space-y-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-bold text-foreground">¿Eliminar cliente?</h3>
-            <p className="text-sm text-muted">Esta acción no se puede deshacer.</p>
+            <h3 className="font-bold text-foreground">{'\u00BFEliminar cliente?'}</h3>
+            <p className="text-sm text-muted">Esta acci{'\u00F3'}n no se puede deshacer.</p>
             <div className="flex gap-2 justify-end">
-              <button className="btn-secondary btn-sm" onClick={() => setConfirmId(null)}>Cancelar</button>
+              <button className="btn btn-secondary btn-sm" onClick={() => setConfirmId(null)}>Cancelar</button>
               <button
-                className="btn-danger btn-sm"
+                className="btn btn-danger btn-sm"
                 disabled={deleteMut.isPending}
                 onClick={() => deleteMut.mutate(confirmId)}
               >

@@ -54,12 +54,12 @@ export default function Sidebar() {
 
   return (
     <aside
-      className="fixed left-0 flex flex-col z-40 overflow-y-auto pb-6 border-r border-border"
+      className="sidebar"
       style={{
-        top: '70px',
+        top: '60px',
         bottom: 0,
-        width: '220px',
-        background: '#111827',
+        width: '200px',
+        background: 'var(--surface)',
         boxShadow: '2px 0 16px rgba(0,0,0,0.25)',
       }}
     >
@@ -80,7 +80,7 @@ export default function Sidebar() {
 function NavSection({ label, items }: { label: string; items: NavItem[] }) {
   return (
     <>
-      <div className="px-5 pt-5 pb-1.5 text-2xs text-muted uppercase tracking-[2px] font-bold opacity-60">
+      <div className="sidebar-label">
         {label}
       </div>
       {items.map((item) => (
@@ -88,14 +88,7 @@ function NavSection({ label, items }: { label: string; items: NavItem[] }) {
           key={item.to}
           to={item.to}
           className={({ isActive }) =>
-            [
-              'flex items-center gap-2.5 px-5 py-2.5 text-sm font-medium',
-              'border-l-[3px] transition-[color,background,border-color] duration-150',
-              'hover:bg-white/[0.04]',
-              isActive
-                ? 'border-accent text-accent bg-accent/[0.07]'
-                : 'border-transparent text-muted hover:text-foreground',
-            ].join(' ')
+            ['nav-tab', isActive ? 'active' : ''].filter(Boolean).join(' ')
           }
         >
           <span className="flex-shrink-0 opacity-80">{item.icon}</span>

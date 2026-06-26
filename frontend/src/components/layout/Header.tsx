@@ -26,10 +26,10 @@ export default function Header() {
 
   return (
     <header
-      className="fixed top-0 left-0 right-0 z-50 h-[70px] flex items-center justify-between px-8 border-b border-border"
+      className="fixed top-0 left-0 right-0 z-50 h-[60px] flex items-center justify-between px-8 border-b border-border"
       style={{
-        background: 'linear-gradient(135deg, #0d1626 0%, #0a1930 50%, #061020 100%)',
-        boxShadow: '0 2px 30px rgba(0,194,255,0.12)',
+        background: 'var(--surface)',
+        boxShadow: 'var(--shadow)',
       }}
     >
       {/* Logo */}

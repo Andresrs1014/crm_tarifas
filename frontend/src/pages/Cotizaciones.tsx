@@ -10,8 +10,9 @@ import type { EstadoCotizacion } from '../types'
 import { exportCotizacionPDF } from '../utils/exportPDF'
 import { exportCotizacionesExcel } from '../utils/exportExcel'
 import { fmtEstado } from '../utils/fmtEstado'
+import { COTIZACION_BADGE, COTIZACION_ESTADO_OPTIONS } from '../lib/htmlV6/domainConfig'
 
-// ─── Helpers para preview de incremento ────────────────────────────────────────
+const ESTADOS = COTIZACION_ESTADO_OPTIONS
 
 function parseTarifaMoneda(tarifa: string): number | null {
   const cleaned = tarifa.replace(/\$/g, '').replace(/\./g, '').replace(/,/g, '.').trim()
@@ -52,23 +53,6 @@ function buildPreview(snapshot: Record<string, unknown>, pct: number): PreviewIt
 }
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
-
-const ESTADOS: { value: string; label: string }[] = [
-  { value: '',            label: 'Todos los estados' },
-  { value: 'borrador',    label: 'Borrador' },
-  { value: 'enviada',     label: 'Enviada' },
-  { value: 'negociacion', label: 'Negociación' },
-  { value: 'aprobada',    label: 'Aprobada' },
-  { value: 'rechazada',   label: 'Rechazada' },
-]
-
-const ESTADO_BADGE: Record<string, string> = {
-  borrador:    'badge-gray',
-  enviada:     'badge-blue',
-  negociacion: 'badge-gold',
-  aprobada:    'badge-green',
-  rechazada:   'badge-red',
-}
 
 const ESTADO_NEXT: Record<EstadoCotizacion, EstadoCotizacion | null> = {
   borrador:    'enviada',
@@ -281,7 +265,7 @@ export default function Cotizaciones() {
                     </td>
                     <td className="text-sm text-muted">{cot.comercial}</td>
                     <td>
-                      <span className={ESTADO_BADGE[cot.estado] ?? 'badge-gray'}>
+                      <span className={COTIZACION_BADGE[cot.estado] ?? 'badge-gray'}>
                         {fmtEstado(cot.estado, ESTADOS)}
                       </span>
                     </td>
