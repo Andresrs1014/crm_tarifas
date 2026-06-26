@@ -1,5 +1,8 @@
 # Estado actual — 2026-06-22 (Cursor líder)
 
+> **Checkpoint git:** `b536760` — sprint paridad HTML v6 + orquestación guardado en `soylabumba`.  
+> **Próxima sesión:** enfoque de trabajo a definir con el humano (fin modelo multi-agente distribuido).
+
 ## Fase del flujo
 
 | Paso | Estado |
