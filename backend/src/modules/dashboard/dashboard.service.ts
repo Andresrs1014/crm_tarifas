@@ -109,6 +109,35 @@ export async function getDashboardStats({ comercialId, mes, tipo }: DashboardPar
     .slice(0, 6)
     .map(([linea, count]) => ({ linea, count }));
 
+  const actividadWhere: Record<string, unknown> = { hecho: true };
+  if (mes) {
+    const [year, month] = mes.split('-').map(Number);
+    actividadWhere.fecha = {
+      gte: new Date(year, month - 1, 1),
+      lt: new Date(year, month, 1),
+    };
+  }
+  if (comercialId) {
+    actividadWhere.record = { comercialId };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const actividadesHechas = await prisma.actividad.findMany({
+    where: actividadWhere as any,
+    include: {
+      record: { include: { comercial: { select: { nombre: true } } } },
+    },
+  });
+
+  const actividadPorComercialMap = new Map<string, number>();
+  for (const act of actividadesHechas) {
+    const nombre = act.record.comercial?.nombre ?? 'Sin comercial';
+    actividadPorComercialMap.set(nombre, (actividadPorComercialMap.get(nombre) ?? 0) + 1);
+  }
+  const actividad_por_comercial = [...actividadPorComercialMap.entries()]
+    .map(([nombre, total]) => ({ nombre, total }))
+    .sort((a, b) => b.total - a.total);
+
   return {
     total_prospectos: totalProspectos,
     total_clientes: totalClientes,
@@ -124,7 +153,7 @@ export async function getDashboardStats({ comercialId, mes, tipo }: DashboardPar
     facturacion_por_linea: facturacionPorLinea,
     cotizaciones_por_estado: cotizacionesPorEstado,
     lineas_mas_cotizadas: lineasMasCotizadas,
-    actividad_por_comercial: [],
+    actividad_por_comercial,
   };
 }
 

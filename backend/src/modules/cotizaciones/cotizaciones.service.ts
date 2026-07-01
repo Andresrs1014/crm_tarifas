@@ -1,4 +1,5 @@
 import prisma from '../../database';
+import { advanceProspectoEstado } from '../records/records.service';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type JsonInput = any;
@@ -96,7 +97,7 @@ export async function updateCotizacion(id: string, data: {
   obsLibre?: string;
   htmlPreview?: string;
 }) {
-  return prisma.cotizacion.update({
+  const updated = await prisma.cotizacion.update({
     where: { id },
     data: {
       ...(data.recordId !== undefined && { recordId: data.recordId }),
@@ -116,6 +117,12 @@ export async function updateCotizacion(id: string, data: {
       ...(data.htmlPreview !== undefined && { htmlPreview: data.htmlPreview }),
     },
   });
+
+  if (data.estado === 'aprobada' && updated.recordId) {
+    await advanceProspectoEstado(updated.recordId, 'aceptacion_propuesta');
+  }
+
+  return updated;
 }
 
 export async function deleteCotizacion(id: string) {

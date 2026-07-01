@@ -154,38 +154,4 @@ router.put('/:id/meta', async (req: Request, res: Response, next: NextFunction) 
   }
 });
 
-// GET /api/crm/actividades/vencidas — visitas fecha<=hoy y hecho=false
-router.get('/actividades/vencidas', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { comercialId } = req.query;
-
-    const vencidas = await prisma.actividad.findMany({
-      where: {
-        tipo: 'visita',
-        hecho: false,
-        fecha: { lte: new Date() },
-        ...(comercialId
-          ? { record: { comercialId: comercialId as string } }
-          : {}),
-      },
-      include: {
-        record: {
-          select: {
-            id: true,
-            empresa: true,
-            comercialId: true,
-            comercial: { select: { nombre: true } },
-          },
-        },
-      },
-      orderBy: { fecha: 'asc' },
-      take: 20,
-    });
-
-    res.json(vencidas);
-  } catch (err) {
-    next(err);
-  }
-});
-
 export default router;
