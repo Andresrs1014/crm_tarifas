@@ -238,7 +238,7 @@ export default function SAC() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">🎂 SAC — Servicio al Cliente</h1>
+          <h2 className="section-title" style={{ marginBottom: 0 }}>SAC — Servicio al Cliente</h2>
           <p className="text-sm text-muted mt-0.5">
             {filtered.length} contactos con cumpleaños en {MESES[mes - 1]}
             {conRegalos.length > 0 && (
@@ -263,18 +263,16 @@ export default function SAC() {
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="crm-kpi-strip">
         {[
-          { label: 'Total cumpleaños', value: filtered.length, color: '#00c2ff' },
-          { label: 'Reciben regalo',   value: conRegalos.length,    color: '#f5a623' },
-          { label: 'FDA entregados',   value: fdaEntregados,         color: '#00e676' },
-          { label: 'FDA pendientes',   value: conRegalos.length - fdaEntregados, color: '#f87171' },
+          { label: 'Total cumpleaños', value: filtered.length,                    color: 'var(--accent)' },
+          { label: 'Reciben regalo',   value: conRegalos.length,                  color: 'var(--gold)'   },
+          { label: 'FDA entregados',   value: fdaEntregados,                      color: 'var(--green)'  },
+          { label: 'FDA pendientes',   value: conRegalos.length - fdaEntregados,  color: 'var(--red)'    },
         ].map((k) => (
-          <div key={k.label} className="card p-4">
-            <div className="text-xs text-muted uppercase tracking-widest mb-1">{k.label}</div>
-            <div className="font-bold text-3xl" style={{ color: k.color, fontFamily: "'Barlow Condensed', sans-serif" }}>
-              {k.value}
-            </div>
+          <div key={k.label} className="crm-kpi-cell" style={{ borderTopColor: k.color }}>
+            <div className="crm-kpi-label">{k.label}</div>
+            <div className="crm-kpi-value" style={{ color: k.color }}>{k.value}</div>
           </div>
         ))}
       </div>

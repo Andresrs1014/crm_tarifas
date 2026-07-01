@@ -1,62 +1,68 @@
-# Estado actual — 2026-06-22 (Cursor líder)
+# Estado actual — 2026-06-22 (Cursor orquestador)
 
-> **Checkpoint git:** `b536760` — sprint paridad HTML v6 + orquestación guardado en `soylabumba`.  
-> **Próxima sesión:** enfoque de trabajo a definir con el humano (fin modelo multi-agente distribuido).
+> **Docker:** http://localhost:82 · `admin_local` / `AdminLocal2026!`
 
-## Fase del flujo
+## Oleada actual — paralela C18 + B1–B6
 
-| Paso | Estado |
-|------|--------|
-| Fase 0–1 Dashboard + Registro | ✅ Aval humano OK |
-| Fase 2 (C5–C7 GAP + X6/X7/X8b) | ✅ |
-| Claude C8–C12 (GAP Fase 3) | ✅ |
-| **Codex Fase 3 (ciclo humano)** | ✅ **Cerrado** — entregó X1–X4, X6, **X9** |
-| Cursor hotfixes (Kanban, Detalle layout) | ✅ |
-| Minimax M8 + **M9** observaciones | ✅ |
-| **L5 aval humano ampliado** | ⬜ Pendiente revisión :82 |
-| **Backlog post-Fase 3** | X10–X12 · B1–B6 (ver abajo) |
+| Agente | Tarea | Estado |
+|--------|-------|--------|
+| **Claude** | **C18 / X11** Biblioteca Transporte + Paqueteo | 🟡 **ACTIVO** |
+| **Cursor** | **B1–B6** backend integración M8 | 🟡 **ACTIVO** |
+| **Codex** | X10 wizard paso 3 (tras C18) | ⏸ |
+| **MiniMax** | Sin tarea | ⏸ |
 
-## Quién hace qué ahora
+Brief Claude: [agentes/CLAUDE-C18-X11-BIBLIOTECA.md](./agentes/CLAUDE-C18-X11-BIBLIOTECA.md)  
+Brief Cursor: [referencia/SPEC-INTEGRACION-M8.md](./referencia/SPEC-INTEGRACION-M8.md)
 
-| Agente | Estado |
-|--------|--------|
-| **Codex** | ✅ **Cerrado** este sprint (reporte `REPORTE-CODEX-EJECUCION.md`) |
-| **Claude** | ✅ Cerrado (C1–C12) |
-| **Minimax** | ✅ M8 + **M9** cerrados |
-| **Cursor** | **Activo** — L5 QA · consolidar · I1/I2 cuando aplique · L4 commit si pides |
+---
 
-## Codex — entregado vs backlog
+## Cerrado recientemente
 
-**Entregado (verificado en repo + reporte):**
+| Oleada | Qué |
+|--------|-----|
+| **C16** | Matriz, GD, Equipo, Preliq, Cotizador, Fichas, Calendario, SAC — `section-title` / KPI |
+| **C13** | Cotizaciones lista — KPI strip, table-header-2row, domainConfig |
+| **M13** | Shell sidebar/header |
+| **X9** | Detalle (Codex) — parcial según GAP |
+| **Cursor** | Biblioteca: solo línea colapsable; grupos siempre visibles (HTML). Detalle servicios/reorden. Kanban. Modal tarifas. |
 
-| ID | Módulo |
-|----|--------|
-| X1–X4 | Design system, shell, Dashboard, Registro |
-| X6 | Prospectos HTML v6 |
-| X9 | Detalle GAP D-01–D-07, constantes centralizadas |
+---
 
-**Backlog (no en reporte / no en código aún):**
+## Pendiente para “completo vs HTML”
 
-| ID | Tarea |
-|----|-------|
-| X10 | Cotizaciones + wizard |
-| X11 | Biblioteca |
-| X12 | Matriz + Gestión documental UI |
-| X8 | chartTheme otros módulos |
-| B1 | `convertProspectToCliente` → `getOrCreateGD` |
-| B2 | Cotización aprobada → avanzar pipeline |
-| B3 | Import Excel transaccional |
-| B4 | Dashboard `actividad_por_comercial` |
-| B5 | CORS prod sin `*` |
-| B6 | `getCotizacionById` include record |
+### Visual / funcional (post-C17 → Codex)
 
-## Docker local
+| ID | Módulo | Brecha principal |
+|----|--------|------------------|
+| **X11** | Biblioteca | Transporte, Paqueteo (`PAQUETEO_SCHEMA`), renombrar columnas |
+| **X10** | Cotizaciones wizard | Paso 3 = tablas HTML (`renderCotItemsStep`), import PDF |
+| **X12** | Matriz + GD | Export Excel, pulido residual GAP |
+| — | Detalle | Formulario completo `page-detalle` vs panel compacto |
+| — | Fichas | `FichaDetalle` profundo (GAP-HERRAMIENTAS H3) |
 
-- http://localhost:82 · `admin_local` / `AdminLocal2026!`
+### Backend integración (Cursor B1–B6, spec M8)
 
-## Próximo paso (Cursor + humano)
+| ID | Qué |
+|----|-----|
+| **B2** | Convertir cliente → crear Gestión Documental |
+| **B3** | Crear/import prospecto → CrmMeta (Kanban) |
+| **B4** | Cotización aprobada → avanzar `estadoProspecto` |
+| **B5** | Dashboard `actividad_por_comercial` |
+| **B6** | Cotización ↔ record en detalle (si aplica) |
 
-1. **Humano:** revisar :82 (Detalle, Prospectos, CRM Kanban, Clientes)
-2. **Minimax M9** ✅ — observaciones inline en Detalle
-3. **Cursor:** L5 checklist · decidir backlog X10–B6
-4. **L4 commit** cuando pidas
+### QA humano
+
+| ID | Qué |
+|----|-----|
+| **L5** | Checklist rutas en :82 (ver `TAREAS-SPRINT.md`) |
+| **G-01** | Fuente body Barlow global (opcional) |
+| **L4** | Git commit cuando humano pida |
+
+---
+
+## Próximo paso
+
+1. **Claude:** C18/X11 Biblioteca (frontend).
+2. **Cursor:** B1–B6 backend (paralelo).
+3. **Tras merge:** L10 Docker rebuild + **X10** wizard.
+4. **Humano:** L5 QA en :82.

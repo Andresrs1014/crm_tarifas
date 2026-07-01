@@ -269,6 +269,7 @@ textarea { resize: vertical; min-height: 80px; width: 100%; box-sizing: border-b
 }
 .type-btn.active-prospecto { background: rgba(0,194,255,0.15); color: var(--accent); }
 .type-btn.active-cliente { background: rgba(0,230,118,0.15); color: var(--green); }
+.type-btn.active { background: rgba(0,194,255,0.15); color: var(--accent); }
 
 .contact-card { background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;position:relative; }
 .contact-card-header { display:flex;align-items:center;justify-content:space-between;margin-bottom:12px; }
@@ -994,5 +995,577 @@ tbody td { padding: 12px 16px; font-size: 13px; }
 .detalle-tab--active {
   color: var(--accent);
   border-bottom-color: var(--accent);
+}
+
+/* ── Cotizaciones wizard + lista ── */
+.cot-wizard-page {
+  max-width: none;
+}
+.cot-wizard-step .form-grid {
+  margin-bottom: 0;
+}
+.step-bar {
+  display: flex;
+  gap: 0;
+  margin-bottom: 8px;
+}
+.step-item {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  min-width: 0;
+}
+.step-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface2);
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text2);
+  flex-shrink: 0;
+  cursor: default;
+}
+.step-dot.done {
+  background: var(--accent2);
+  border-color: var(--accent2);
+  color: #fff;
+  cursor: pointer;
+}
+.step-dot.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #000;
+  box-shadow: 0 0 12px rgba(0, 194, 255, 0.5);
+}
+.step-line {
+  flex: 1;
+  height: 2px;
+  background: var(--border);
+  margin: 0 4px;
+  align-self: center;
+}
+.step-line.done {
+  background: var(--accent2);
+}
+.step-label {
+  font-size: 11px;
+  color: var(--text2);
+  margin-top: 6px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.svc-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+.svc-selector-card {
+  background: var(--surface2);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+.svc-selector-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+.svc-selector-card.selected {
+  border-color: var(--accent);
+  background: rgba(0, 194, 255, 0.08);
+  box-shadow: 0 0 16px rgba(0, 194, 255, 0.2);
+}
+.svc-selector-card .svc-icon {
+  font-size: 22px;
+  margin-bottom: 8px;
+}
+.svc-selector-card .svc-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+.cot-empresa-dropdown {
+  position: absolute;
+  z-index: 30;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  max-height: 280px;
+  overflow-y: auto;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+.cot-empresa-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.cot-empresa-option:hover {
+  background: var(--surface2);
+}
+.cot-empresa-option:last-child {
+  border-bottom: none;
+}
+.cot-row-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  justify-content: flex-end;
+}
+.cot-action-btn {
+  min-width: 32px;
+  padding: 4px 6px !important;
+  font-size: 13px !important;
+  line-height: 1;
+}
+.cot-action-danger:hover {
+  border-color: var(--red) !important;
+  color: var(--red) !important;
+}
+.table-card table td:last-child {
+  white-space: nowrap;
+  width: 1%;
+}
+
+/* Modales globales (portal → body, sobre header z-100) */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.modal-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 42rem;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
+}
+.modal-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+.modal-panel-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+}
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text2);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.modal-close-btn:hover {
+  color: var(--text);
+}
+
+/* ── Biblioteca (page-biblioteca) ── */
+.bib-linea-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.bib-linea-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  cursor: pointer;
+  background: var(--surface3);
+  border-bottom: 1px solid transparent;
+}
+.bib-linea-header--open {
+  border-bottom-color: var(--border);
+}
+.bib-linea-body {
+  padding: 18px;
+}
+.bib-grupo-row {
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.bib-grupo-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+}
+.bib-grupo-title-row--open {
+  border-bottom: 1px solid var(--border);
+}
+.bib-grupo-body {
+  padding: 0 14px 14px;
+  overflow-x: auto;
+}
+.bib-grupo-add-item {
+  margin-top: 8px;
+}
+.bib-columnas-panel {
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  background: var(--surface3);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.bib-columnas-panel-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+.bib-grupo-drag {
+  cursor: grab;
+  color: var(--border);
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+  user-select: none;
+}
+.bib-grupo-name {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  outline: none;
+}
+.bib-items-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.bib-items-table th {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-align: left;
+  font-weight: 600;
+}
+.bib-items-table td {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  vertical-align: middle;
+}
+.bib-items-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+.bib-cell-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  border-bottom: 1px solid transparent;
+  padding: 2px 0;
+}
+.bib-cell-input:focus {
+  border-bottom-color: var(--accent);
+}
+.bib-cell-input--tarifa {
+  color: var(--gold);
+  font-weight: 600;
+  max-width: 120px;
+}
+.bib-cell-input--tarifa:focus {
+  border-bottom-color: var(--gold);
+}
+.bib-cell-input--muted {
+  color: var(--text2);
+  font-size: 12px;
+}
+
+/* ── Detalle: facturación por línea ── */
+.detalle-billing-wrap {
+  background: rgba(245, 166, 35, 0.06);
+  border: 1px solid rgba(245, 166, 35, 0.2);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+.detalle-billing-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 12px;
+}
+.detalle-billing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px 20px;
+}
+.detalle-billing-field label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text2);
+  margin-bottom: 6px;
+}
+.detalle-billing-svc-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.detalle-billing-input {
+  width: 100%;
+  text-align: right;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 600;
+}
+.detalle-billing-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.detalle-billing-total-label {
+  font-size: 12px;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+}
+.detalle-billing-total-value {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--gold);
+}
+.detalle-servicios-orden {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.detalle-servicio-orden-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: grab;
+}
+.detalle-servicio-orden-row--over {
+  border-color: var(--accent);
+  background: rgba(56, 189, 248, 0.08);
+}
+.detalle-servicio-orden-row--drag {
+  opacity: 0.55;
+}
+.detalle-servicio-orden-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.detalle-servicio-orden-btn {
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  border-radius: 4px;
+  width: 22px;
+  height: 18px;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.detalle-servicio-orden-btn:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.detalle-servicio-orden-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ── Detalle acordeones (servicios, facturación) ── */
+.detalle-accordion {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface2);
+}
+.detalle-accordion--billing {
+  background: rgba(245, 166, 35, 0.06);
+  border-color: rgba(245, 166, 35, 0.2);
+}
+.detalle-accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--surface3);
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+.detalle-accordion--billing .detalle-accordion-header {
+  background: transparent;
+}
+.detalle-accordion-header--open {
+  border-bottom: 1px solid var(--border);
+}
+.detalle-accordion--billing .detalle-accordion-header--open {
+  border-bottom-color: rgba(245, 166, 35, 0.2);
+}
+.detalle-accordion-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.detalle-accordion--billing .detalle-accordion-title {
+  color: var(--gold);
+}
+.detalle-accordion-sub {
+  font-size: 12px;
+  color: var(--text2);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.detalle-accordion-arrow {
+  color: var(--text2);
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.detalle-accordion-body {
+  padding: 14px 16px;
+}
+.detalle-servicios-orden-wrap {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.detalle-orden-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  color: inherit;
+}
+.detalle-orden-toggle--open {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom-color: transparent;
+}
+.detalle-orden-toggle + .detalle-servicios-orden {
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  padding: 8px 10px 10px;
+}
+
+/* ── Wizard cotización — grupos colapsables ── */
+.grupo-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.grupo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 18px;
+  background: var(--surface3);
+  border: none;
+  text-align: left;
+  color: inherit;
+}
+.grupo-header--open {
+  border-bottom: 1px solid var(--border);
+}
+.grupo-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.grupo-body {
+  padding: 12px 14px 14px;
 }
 

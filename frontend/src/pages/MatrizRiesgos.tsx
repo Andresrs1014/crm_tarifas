@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ShieldAlert, Search, RefreshCw, CheckCircle2, Clock, BookOpen } from 'lucide-react'
+import { ShieldAlert, RefreshCw, CheckCircle2, Clock, BookOpen } from 'lucide-react'
 import { listMatriz, upsertMatriz, MatrizRiesgoRow, MatrizRiesgoUpsert } from '../api/matrizRiesgos'
 import { useToastStore } from '../store/toastStore'
 
@@ -63,9 +63,9 @@ function RiesgoBadge({ riesgo }: { riesgo: string }) {
 // ─── KPI card ─────────────────────────────────────────────────────────────────
 function KpiCard({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div className="card-glass rounded-xl p-4 flex flex-col gap-1 border border-border">
-      <div className="text-[10px] uppercase tracking-[1.5px] text-muted font-semibold">{label}</div>
-      <div className="text-3xl font-display font-bold" style={{ color }}>{value}</div>
+    <div className="crm-kpi-cell" style={{ borderTopColor: color }}>
+      <div className="crm-kpi-label">{label}</div>
+      <div className="crm-kpi-value" style={{ color }}>{value}</div>
     </div>
   )
 }
@@ -142,13 +142,10 @@ export default function MatrizRiesgos() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <ShieldAlert size={22} className="text-accent" />
-          <div>
-            <h1 className="text-xl font-display font-bold text-foreground tracking-wide">Matriz de Riesgos</h1>
-            <p className="text-xs text-muted">FR-002-GC · Solo clientes activos</p>
-          </div>
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="section-title" style={{ marginBottom: 4 }}>Matriz de Riesgos</h2>
+          <p className="text-xs text-muted">FR-002-GC · Solo clientes activos</p>
         </div>
         <div className="flex items-center gap-2">
           {/* Tabs */}
@@ -189,44 +186,30 @@ export default function MatrizRiesgos() {
       )}
 
       {/* KPI row */}
-      <div className="grid grid-cols-5 gap-3">
+      <div className="crm-kpi-strip">
         {kpis.map(k => <KpiCard key={k.label} label={k.label} value={k.value} color={k.color} />)}
       </div>
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-center">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar empresa o NIT..."
-            className="w-full pl-8 pr-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground placeholder:text-muted focus:outline-none focus:border-accent"
-          />
-        </div>
-        <select
-          value={filtRiesgo}
-          onChange={e => setFiltRiesgo(e.target.value)}
-          className="px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent"
-        >
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Buscar empresa o NIT..."
+          className="filter-input flex-1 min-w-48"
+        />
+        <select value={filtRiesgo} onChange={e => setFiltRiesgo(e.target.value)} className="filter-select">
           <option value="">Todos los riesgos</option>
           {RIESGO_ORDER.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
-        <select
-          value={filtCia}
-          onChange={e => setFiltCia(e.target.value)}
-          className="px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent"
-        >
+        <select value={filtCia} onChange={e => setFiltCia(e.target.value)} className="filter-select">
           <option value="">Todas las compañías</option>
           <option value="Logimat">Logimat</option>
           <option value="IMC Cargo">IMC Cargo</option>
           <option value="IMC Depósito">IMC Depósito</option>
+          <option value="Aduana">Aduana</option>
         </select>
-        <select
-          value={filtComp}
-          onChange={e => setFiltComp(e.target.value)}
-          className="px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent"
-        >
+        <select value={filtComp} onChange={e => setFiltComp(e.target.value)} className="filter-select">
           <option value="">Todos</option>
           <option value="completa">Completas</option>
           <option value="pendiente">Pendientes</option>
@@ -234,7 +217,7 @@ export default function MatrizRiesgos() {
       </div>
 
       {/* Table */}
-      <div className="card-glass rounded-xl border border-border overflow-x-auto">
+      <div className="table-card overflow-x-auto">
         <table className="w-full text-xs min-w-[1100px]">
           <thead>
             <tr className="border-b border-border text-muted uppercase tracking-[1px] text-[10px]">

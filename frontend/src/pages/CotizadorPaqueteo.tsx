@@ -211,7 +211,7 @@ export default function CotizadorPaqueteo() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">📦 Cotizador Paqueteo</h1>
+          <h2 className="section-title" style={{ marginBottom: 0 }}>Cotizador Paqueteo</h2>
           <p className="text-sm text-muted mt-0.5">Calcula el costo de tu envío con las principales paqueteras</p>
         </div>
       </div>

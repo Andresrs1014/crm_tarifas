@@ -58,7 +58,7 @@ export default function FichaCliente() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">📋 Fichas de Cliente</h1>
+          <h2 className="section-title" style={{ marginBottom: 0 }}>Fichas de Cliente</h2>
           <p className="text-sm text-muted mt-0.5">Documentación SOP — Creación y seguimiento de fichas</p>
         </div>
       </div>

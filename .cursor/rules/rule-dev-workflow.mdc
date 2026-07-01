@@ -38,13 +38,14 @@ alwaysApply: true
 - Mensajes de commit detallados.
 - Formato conventional commits: `<type>: <descripción>`.
 - Types: `feat` `fix` `refactor` `docs` `test` `chore` `perf` `ci`.
+- **Rama:** trabajo solo → **`main`** (ver `.cursor/rules/07-git-main-solo.mdc`). No crear ramas feature salvo petición explícita.
 
 ### 5. Pre-Review Checks
 
 - Verificar que CI/CD pasa.
 - Resolver merge conflicts.
-- Branch actualizado con rama target.
-- Solo solicitar review después de estos checks.
+- Rama `main` actualizada con `git pull origin main` antes de push.
+- Solo solicitar review después de estos checks (si aplica trabajo en equipo).
 
 ## Git workflow
 

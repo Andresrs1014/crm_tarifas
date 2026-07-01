@@ -97,6 +97,7 @@ export default function Detalle() {
     valor: '',
     ingresosEsperados: '',
     servicios: [] as string[],
+    facturacionLineas: {} as Record<string, string>,
   })
 
   function startEdit() {
@@ -116,6 +117,9 @@ export default function Detalle() {
       valor: record.valor?.toString() ?? '',
       ingresosEsperados: record.ingresosEsperados?.toString() ?? '',
       servicios: [...record.servicios],
+      facturacionLineas: Object.fromEntries(
+        Object.entries(record.facturacionLineas ?? {}).map(([k, v]) => [k, String(v)])
+      ),
     })
     setEditing(true)
   }
@@ -123,7 +127,16 @@ export default function Detalle() {
   // â”€â”€ Mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const updateMut = useMutation({
-    mutationFn: () => updateRecord(id!, {
+    mutationFn: () => {
+      const facturadoActivo = edit.facturado && edit.facturado !== 'no'
+      const lineasFacturacion = facturadoActivo
+        ? Object.fromEntries(
+            edit.servicios.map((s) => [s, Number(edit.facturacionLineas[s]) || 0])
+          )
+        : {}
+      const totalFacturado = Object.values(lineasFacturacion).reduce((s, v) => s + v, 0)
+
+      return updateRecord(id!, {
       empresa: edit.empresa,
       nit: edit.nit || undefined,
       ciudad: edit.ciudad || undefined,
@@ -136,10 +149,13 @@ export default function Detalle() {
       visitaCliente: edit.visitaCliente || undefined,
       facturado: edit.facturado || undefined,
       facturadoP: record?.tipo === 'prospecto' ? edit.facturado || undefined : undefined,
-      valor: edit.valor ? Number(edit.valor) : undefined,
+      valor: record?.tipo === 'cliente' && facturadoActivo ? totalFacturado : edit.valor ? Number(edit.valor) : undefined,
+      valorP: record?.tipo === 'prospecto' && facturadoActivo ? totalFacturado : undefined,
       ingresosEsperados: edit.ingresosEsperados ? Number(edit.ingresosEsperados) : undefined,
       servicios: edit.servicios,
-    }),
+      facturacionLineas: facturadoActivo ? lineasFacturacion : {},
+    })
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['record', id] })
       qc.invalidateQueries({ queryKey: ['records'] })

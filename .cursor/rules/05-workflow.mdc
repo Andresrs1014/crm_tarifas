@@ -24,6 +24,14 @@ Formato:
 ```
 Types: `feat` `fix` `refactor` `docs` `test` `chore` `perf` `ci`
 
+## Git — rama principal (trabajo solo)
+
+Ver **`.cursor/rules/07-git-main-solo.mdc`**.
+
+- Trabajo solo del humano → **`main`** (no ramas feature por defecto).
+- Antes de cambios: `git checkout main && git pull origin main`.
+- Push: `git push origin main` cuando el humano lo pida.
+
 ## Seguridad — triggers de revisión obligatoria
 
 Detener e inspeccionar si el cambio toca:

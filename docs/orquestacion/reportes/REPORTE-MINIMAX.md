@@ -152,3 +152,98 @@ No lo toqué (PROHIBIDO para Minimax). El `.env` parece basado en `.env.docker.l
 6. Toast éxito → recargar página → texto persistido
 ```
 
+
+
+---
+
+## M10 — Biblioteca paridad HTML v6
+
+**Fecha:** 2026-06-30  
+**Estado:** ✅ Implementado  
+**Build:** ✅ `npm run build` pasa (2772 módulos, sin errores)
+
+### Archivos tocados
+
+| Archivo | Cambio |
+|---------|--------|
+| `frontend/src/constants.ts` | **Nuevo** — exporta `TIPO_TARIFA_OPTIONS` |
+| `frontend/src/pages/Biblioteca.tsx` | 3 fixes: `section-title`, `table-card`, `TIPO_TARIFA_OPTIONS` de constants |
+
+### Checklist GAP cerrado
+
+| ID | Brecha | Fix aplicado |
+|----|--------|-------------|
+| **BIB-01** 🔴 | `<h1 className="text-2xl font-bold">` sin `section-title` | → `<h2 className="section-title">Biblioteca de Tarifas</h2>` |
+| **BIB-02** 🟡 | LineaSection usaba `card overflow-hidden` | → `table-card overflow-hidden` (clase CSS v6 ya existía) |
+| **BIB-04** | `TIPO_TARIFA_OPTIONS` hardcodeado inline (2 selects) | → importado de `frontend/src/constants.ts` |
+
+**BIB-03** (preview WYSIWYG de obs) — skipped, bajo ROI según GAP.
+
+### Qué no se tocó
+
+Cotizaciones, wizard, Equipo, backend, Docker, `.env`.
+
+### Cómo probar en `:82`
+
+```
+1. docker compose up
+2. Login: admin_local / AdminLocal2026!
+3. Ir a /biblioteca
+4. Verificar: título con fuente Barlow Condensed (estilo v6) · cards de línea con borde y fondo surface
+5. Crear línea → verificar que la card usa table-card
+6. En item inline: cambiar tipo de tarifa → usa constantes de constants.ts
+```
+
+
+---
+
+## M13 — Shell paridad HTML v6 (Sidebar + Header + Layout)
+
+**Fecha:** 2026-06-30  
+**Estado:** ✅ Implementado  
+**Build:** ✅ `npm run build` pasa (2772 módulos, sin errores)
+
+### Archivos tocados
+
+| Archivo | Cambio |
+|---------|--------|
+| `frontend/src/components/layout/Sidebar.tsx` | Eliminados estilos inline redundantes (`.sidebar` CSS ya los tiene) · NavLink usa `nav-tab` class (CSS v6) |
+
+### Estado antes/después (medidas clave)
+
+| Elemento | Antes | Después | Archivo |
+|----------|-------|---------|---------|
+| Header altura | `60px` ✅ ya correcto | `60px` | Header.tsx L29 |
+| Header bg | `var(--surface)` ✅ ya correcto | `var(--surface)` | Header.tsx L31 |
+| Sidebar top | `top: 60px` en CSS ✅ ya correcto | `top: 60px` | html-v6.css L17 |
+| Sidebar ancho | `200px` en CSS ✅ ya correcto | `200px` | html-v6.css L20 |
+| Sidebar bg | `var(--surface)` ✅ ya correcto | `var(--surface)` | html-v6.css L21 |
+| Nav-tab fuente | `.nav-tab` en CSS (Barlow Condensed 14px uppercase) ✅ ya correcto | `.nav-tab` (aplicado vía className) | Sidebar.tsx NavLink |
+| Sidebar label | `'Servicios'` ✅ ya correcto | `'Servicios'` | Sidebar.tsx L39 |
+| Main padding | `20px 24px` vía `.main` CSS ✅ ya correcto | `20px 24px` | html-v6.css L72 |
+| Layout marginLeft | `200px` ✅ ya correcto | `200px` | Layout.tsx L13 |
+
+### Hallazgo
+
+**El shell ya estaba prácticamente correcto** al momento de esta revisión — Header 60px, Sidebar 200px, `.nav-tab` con Barlow Condensed, padding 20px/24px en `.main`, todo gobernado por `html-v6.css`. El único cambio realizado fue **eliminar estilos inline redundantes** del `<aside>` en `Sidebar.tsx` (`top`, `width`, `background`, `boxShadow` — todos ya definidos en la clase `.sidebar` del CSS).
+
+### Qué NO se tocó (G-01…G-26 fuera de scope M13)
+
+- Fuente global body (`DM Sans` → `Barlow`) — G-01 — afecta `index.css`
+- `.chart-title ::before` faltante — G-06
+- `.html-charts-grid` 2-col fijo — G-07
+- Registro full-width / toggle pill — G-09, G-12
+- Labels uppercase en formularios — G-11
+- Los gaps G-14…G-25 (dashboard, charts, Registro)
+
+### Cómo probar en `:82`
+
+```
+1. docker compose up
+2. Login: admin_local / AdminLocal2026!
+3. Abrir DevTools → Elements → inspeccionar <aside class="sidebar">
+   → verificar: top:60px, width:200px, background:var(--surface)
+4. En navegación lateral: texto en Barlow Condensed, uppercase, 14px
+5. Item activo: borde izquierdo cyan + fondo semi-transparente
+6. Header: altura 60px, fondo sólido #0e1320
+```

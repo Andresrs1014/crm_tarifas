@@ -209,3 +209,35 @@ Severidad: 🔴 ALTA · 🟡 MEDIA · 🟢 BAJA
 - [ ] Mover `MANEJO_OPTIONS`, `SECTOR_OPTIONS`, `ALMACENAMIENTO_OPTIONS`, `FACTURACION_OPTIONS`, `PALLET_OPTIONS`, `FORMA_FACT_LG_OPTIONS`, `CANT_FACT_LG_OPTIONS`, `CANT_FACT_IC_OPTIONS` a `constants.ts`
 - [ ] Mover `COMPROMISOS` a `constants.ts`
 - [ ] Reemplazar inline `fontFamily: 'Barlow Condensed'` por `font-display` class
+
+---
+
+## Estado post-C17
+
+**Auditoría 2026-07-01 — Claude C17**
+
+### Brechas actualizadas
+
+| ID | Brecha | Estado post-C17 | Agente |
+|----|--------|-----------------|--------|
+| H-01 | Preliquidador `section-title` ausente | **✅ C16** | — |
+| H-02 | CotizadorPaqueteo `section-title` + emoji | **✅ C16** | — |
+| H-03 | FichaCliente `section-title` + emoji | **✅ C16** | — |
+| H-04 | Preliquidador `card-glass` → `card` | **✅ C16** (→ `card`). Pendiente → `table-card` exacto | Codex X12 |
+| H-05 | CotizadorPaqueteo gold gradient inline | 🟡 Abierto | Codex X12 |
+| H-06 | FichaDetalle Barlow inline | 🟡 Abierto | Codex X12 |
+| H-07 | `COURIERS`, `COL_DEPTS`, etc. inline | 🟡 Abierto | Codex X12 |
+| H-08 | `ESTADO_BADGE/LABEL` FichaCliente inline | 🟡 Abierto | Codex X12 |
+| H-09 | 9 arrays + `COMPROMISOS` en FichaDetalle | 🟡 Abierto | Codex X12 |
+| **H-10** | **SAC: KPI strip (`crm-kpi-strip`)** | **✅ C16** | — |
+| **H-11** | **Calendario: KPI strip + `filter-select`** | **✅ C16** | — |
+| **MR-06** | **Export Excel MatrizRiesgos** | 🔴 Abierto — feature nueva, no presente en HTML v6 pero requerida | Cursor L5 |
+| **FD-01** | **FichaDetalle: profundidad de campos por tab** | 🟡 Por auditar en :82 — 5 tabs implementados pero no verificados contra HTML `page-ficha-detalle` | Cursor QA |
+
+### Nota FichaDetalle (FD-01)
+
+El HTML `page-ficha-detalle` tiene 5 tabs: Info General, Contactos, Facturación, Operación, Kick Off. React los implementa. La brecha está en si los **campos de cada tab** son equivalentes. Requiere QA visual en :82 tab por tab antes de cerrar.
+
+### Módulos con paridad visual completa (post-C16)
+
+Preliquidador, CotizadorPaqueteo, FichaCliente, CalendarioVisitas, SAC — paridad visual ✅ por C16. Pendientes solo anti-hardcode y table-card exacto.

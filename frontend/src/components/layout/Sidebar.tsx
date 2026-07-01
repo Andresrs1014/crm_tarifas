@@ -55,13 +55,7 @@ export default function Sidebar() {
   return (
     <aside
       className="sidebar"
-      style={{
-        top: '60px',
-        bottom: 0,
-        width: '200px',
-        background: 'var(--surface)',
-        boxShadow: '2px 0 16px rgba(0,0,0,0.25)',
-      }}
+      style={{ bottom: 0 }}
     >
       <NavSection label="Principal" items={NAV_PRINCIPAL} />
       <NavSection label="Comercial" items={NAV_COMERCIAL} />

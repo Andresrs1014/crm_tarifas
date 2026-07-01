@@ -4,9 +4,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getCotizacion, createCotizacion, updateCotizacion } from '../../api/cotizaciones'
 import { getBiblioteca } from '../../api/biblioteca'
 import { getComercialesApi } from '../../api/comerciales'
-import { getRecords } from '../../api/records'
+import { getRecords, getRecord } from '../../api/records'
 import { toast } from '../../store/toastStore'
-import type { BibliotecaLinea, EstadoCotizacion } from '../../types'
+import type { BibliotecaLinea, CRMRecord, EstadoCotizacion } from '../../types'
 
 // ─── Tipos wizard ──────────────────────────────────────────────────────────────
 
@@ -42,9 +42,28 @@ const EMPTY: WizardData = {
 
 const STEPS = ['Datos básicos', 'Servicios', 'Tarifas', 'Observaciones', 'Resumen']
 
+function applyRecordToWizard(record: CRMRecord): Partial<WizardData> {
+  const contact =
+    record.contactos?.find((c) => c.cargo?.toLowerCase().includes('comercial'))
+    ?? record.contactos?.[0]
+  return {
+    recordId: record.id,
+    empresa: record.empresa,
+    nit: record.nit ?? '',
+    ciudad: record.ciudad ?? '',
+    contacto: contact?.nombre ?? '',
+    email: contact?.email ?? '',
+    comercial: record.comercial?.nombre ?? '',
+    paqueteadora: record.servicios?.includes('Paqueteo') ? 'Paqueteo' : (record.servicios?.[0] ?? ''),
+  }
+}
+
 // ─── Paso 1: Datos básicos ─────────────────────────────────────────────────────
 
 function Paso1({ data, onChange }: { data: WizardData; onChange: (d: Partial<WizardData>) => void }) {
+  const [empresaQuery, setEmpresaQuery] = useState(data.empresa)
+  const [showEmpresaList, setShowEmpresaList] = useState(false)
+
   const { data: comerciales = [] } = useQuery({
     queryKey: ['comerciales'],
     queryFn: getComercialesApi,
@@ -54,57 +73,102 @@ function Paso1({ data, onChange }: { data: WizardData; onChange: (d: Partial<Wiz
     queryFn: () => getRecords({}),
   })
 
+  useEffect(() => {
+    setEmpresaQuery(data.empresa)
+  }, [data.empresa])
+
+  const empresaMatches = empresaQuery.trim().length >= 1
+    ? records.filter((r) => {
+        const q = empresaQuery.toLowerCase()
+        return r.empresa.toLowerCase().includes(q)
+          || (r.nit ?? '').toLowerCase().includes(q)
+      }).slice(0, 12)
+    : []
+
+  function selectRecord(record: CRMRecord) {
+    onChange(applyRecordToWizard(record))
+    setEmpresaQuery(record.empresa)
+    setShowEmpresaList(false)
+  }
+
+  function onEmpresaInput(value: string) {
+    setEmpresaQuery(value)
+    setShowEmpresaList(true)
+    const exact = records.find((r) => r.empresa.toLowerCase() === value.toLowerCase())
+    if (exact) {
+      onChange(applyRecordToWizard(exact))
+    } else {
+      onChange({ empresa: value, recordId: '' })
+    }
+  }
+
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="text-xs text-muted block mb-1">Empresa <span className="text-danger">*</span></label>
-          <input className="input w-full" value={data.empresa}
-            onChange={(e) => onChange({ empresa: e.target.value })} placeholder="Nombre de la empresa" />
-        </div>
-        <div>
-          <label className="text-xs text-muted block mb-1">NIT</label>
-          <input className="input w-full" value={data.nit}
-            onChange={(e) => onChange({ nit: e.target.value })} placeholder="900.123.456-7" />
-        </div>
-        <div>
-          <label className="text-xs text-muted block mb-1">Ciudad</label>
-          <input className="input w-full" value={data.ciudad}
-            onChange={(e) => onChange({ ciudad: e.target.value })} placeholder="Bogotá" />
-        </div>
-        <div>
-          <label className="text-xs text-muted block mb-1">Contacto</label>
-          <input className="input w-full" value={data.contacto}
-            onChange={(e) => onChange({ contacto: e.target.value })} placeholder="Nombre del contacto" />
-        </div>
-        <div>
-          <label className="text-xs text-muted block mb-1">Email</label>
-          <input type="email" className="input w-full" value={data.email}
-            onChange={(e) => onChange({ email: e.target.value })} placeholder="correo@empresa.com" />
-        </div>
-        <div>
-          <label className="text-xs text-muted block mb-1">Paqueteadora</label>
-          <input className="input w-full" value={data.paqueteadora}
-            onChange={(e) => onChange({ paqueteadora: e.target.value })} placeholder="Nombre paqueteadora" />
-        </div>
-        <div>
-          <label className="text-xs text-muted block mb-1">Comercial <span className="text-danger">*</span></label>
-          <select className="filter-select w-full" value={data.comercial}
-            onChange={(e) => onChange({ comercial: e.target.value })}>
-            <option value="">Seleccionar comercial</option>
-            {comerciales.map((c) => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="text-xs text-muted block mb-1">Vincular a registro CRM</label>
-          <select className="filter-select w-full" value={data.recordId}
-            onChange={(e) => onChange({ recordId: e.target.value })}>
-            <option value="">Sin vincular</option>
-            {records.map((r) => (
-              <option key={r.id} value={r.id}>{r.empresa} ({r.tipo})</option>
+    <div className="form-grid">
+      <div className="form-group full relative">
+        <label>Empresa / Cliente <span className="text-danger">*</span></label>
+        <input
+          className="filter-input w-full"
+          value={empresaQuery}
+          onChange={(e) => onEmpresaInput(e.target.value)}
+          onFocus={() => setShowEmpresaList(true)}
+          onBlur={() => setTimeout(() => setShowEmpresaList(false), 150)}
+          placeholder="Buscar prospecto o cliente..."
+          autoComplete="off"
+        />
+        {showEmpresaList && empresaMatches.length > 0 && (
+          <div className="cot-empresa-dropdown">
+            {empresaMatches.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                className="cot-empresa-option"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => selectRecord(r)}
+              >
+                <span className="font-semibold">{r.empresa}</span>
+                <span className="text-xs text-muted">
+                  {r.tipo}{r.nit ? ` · ${r.nit}` : ''}{r.ciudad ? ` · ${r.ciudad}` : ''}
+                </span>
+              </button>
             ))}
-          </select>
-        </div>
+          </div>
+        )}
+        {data.recordId && (
+          <p className="text-2xs text-accent mt-1">Vinculado al registro CRM</p>
+        )}
+      </div>
+      <div className="form-group">
+        <label>NIT</label>
+        <input className="filter-input w-full" value={data.nit}
+          onChange={(e) => onChange({ nit: e.target.value })} placeholder="900.123.456-7" />
+      </div>
+      <div className="form-group">
+        <label>Ciudad</label>
+        <input className="filter-input w-full" value={data.ciudad}
+          onChange={(e) => onChange({ ciudad: e.target.value })} placeholder="Bogotá" />
+      </div>
+      <div className="form-group">
+        <label>Contacto</label>
+        <input className="filter-input w-full" value={data.contacto}
+          onChange={(e) => onChange({ contacto: e.target.value })} placeholder="Nombre del contacto" />
+      </div>
+      <div className="form-group">
+        <label>Email</label>
+        <input type="email" className="filter-input w-full" value={data.email}
+          onChange={(e) => onChange({ email: e.target.value })} placeholder="correo@empresa.com" />
+      </div>
+      <div className="form-group">
+        <label>Paqueteadora</label>
+        <input className="filter-input w-full" value={data.paqueteadora}
+          onChange={(e) => onChange({ paqueteadora: e.target.value })} placeholder="Nombre paqueteadora" />
+      </div>
+      <div className="form-group">
+        <label>Comercial <span className="text-danger">*</span></label>
+        <select className="filter-select w-full" value={data.comercial}
+          onChange={(e) => onChange({ comercial: e.target.value })}>
+          <option value="">Seleccionar comercial</option>
+          {comerciales.map((c) => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
+        </select>
       </div>
     </div>
   )
@@ -130,20 +194,16 @@ function Paso2({
   }
 
   return (
-    <div className="space-y-5">
-      <div>
-        <label className="text-xs text-muted block mb-3">Tipo de tarifa</label>
-        <div className="flex gap-3">
+    <div className="space-y-6">
+      <div className="form-group">
+        <label>Tipo de tarifa</label>
+        <div className="type-toggle max-w-md">
           {(['biblioteca', 'especial'] as const).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => onChange({ tarifaTipo: t })}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all ${
-                data.tarifaTipo === t
-                  ? 'bg-accent/15 border-accent text-accent'
-                  : 'border-border text-muted hover:border-muted'
-              }`}
+              className={`type-btn ${data.tarifaTipo === t ? 'active' : ''}`}
             >
               {t === 'biblioteca' ? 'Biblioteca de tarifas' : 'Tarifa especial'}
             </button>
@@ -151,29 +211,24 @@ function Paso2({
         </div>
       </div>
 
-      <div>
-        <label className="text-xs text-muted block mb-3">
+      <div className="form-group">
+        <label>
           Líneas de servicio <span className="text-danger">*</span>
         </label>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <p className="text-xs text-muted mb-3">
+          Selecciona las líneas configuradas en <strong>Biblioteca de Tarifas</strong> (sidebar).
+        </p>
+        <div className="svc-selector-grid">
           {lineasDisponibles.map((linea) => (
             <button
               key={linea.id}
               type="button"
               onClick={() => toggleLinea(linea.nombre)}
-              className={`p-3 rounded-xl border text-sm font-semibold text-left transition-all ${
-                data.lineas.includes(linea.nombre)
-                  ? 'bg-accent/10 border-accent text-accent'
-                  : 'border-border text-muted hover:border-muted hover:text-foreground'
-              }`}
+              className={`svc-selector-card ${data.lineas.includes(linea.nombre) ? 'selected' : ''}`}
             >
-              <div className="text-base mb-1">
-                {data.lineas.includes(linea.nombre) ? '✓' : '○'}
-              </div>
-              {linea.nombre}
-              <div className="text-2xs font-normal mt-0.5">
-                {linea.grupos.length} grupos
-              </div>
+              <div className="svc-icon">{data.lineas.includes(linea.nombre) ? '✓' : '○'}</div>
+              <div className="svc-name">{linea.nombre}</div>
+              <div className="text-2xs text-muted mt-1">{linea.grupos.length} grupos</div>
             </button>
           ))}
         </div>
@@ -242,9 +297,12 @@ function Paso3({
       {linea ? (
         <div className="space-y-4">
           {linea.grupos.map((grupo) => (
-            <div key={grupo.id} className="card p-4 space-y-3">
-              <h4 className="text-sm font-bold text-foreground">{grupo.nombre}</h4>
-              <div className="space-y-1">
+            <div key={grupo.id} className="grupo-card">
+              <div className="grupo-header grupo-header--open">
+                <div className="grupo-title">{grupo.nombre}</div>
+                <div className="text-xs text-muted flex-shrink-0">{grupo.items.length} ítems</div>
+              </div>
+              <div className="grupo-body space-y-1">
                 {grupo.items.map((item) => {
                   const selected = isSelected(activeLinea, grupo.nombre, item.id)
                   return (
@@ -450,10 +508,17 @@ export default function WizardLayout() {
   const qc = useQueryClient()
   const isEdit = !!id
 
+  const initialRecordId = searchParams.get('recordId') ?? ''
   const [step, setStep] = useState(0)
   const [data, setData] = useState<WizardData>({
     ...EMPTY,
-    recordId: searchParams.get('recordId') ?? '',
+    recordId: initialRecordId,
+  })
+
+  const { data: recordPrefill } = useQuery({
+    queryKey: ['record', initialRecordId],
+    queryFn: () => getRecord(initialRecordId),
+    enabled: !!initialRecordId && !isEdit,
   })
 
   // Cargar cotización existente para editar
@@ -462,6 +527,12 @@ export default function WizardLayout() {
     queryFn: () => getCotizacion(id!),
     enabled: isEdit,
   })
+
+  useEffect(() => {
+    if (recordPrefill && !isEdit && !cotExistente) {
+      setData((prev) => ({ ...prev, ...applyRecordToWizard(recordPrefill) }))
+    }
+  }, [recordPrefill, isEdit, cotExistente])
 
   useEffect(() => {
     if (cotExistente) {
@@ -541,54 +612,44 @@ export default function WizardLayout() {
   ]
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
+    <div className="p-6 space-y-6 cot-wizard-page">
 
-      {/* Header */}
       <div>
-        <button onClick={() => navigate('/cotizaciones')} className="text-xs text-muted hover:text-foreground mb-2">
+        <button type="button" onClick={() => navigate('/cotizaciones')} className="text-xs text-muted hover:text-foreground mb-2">
           ← Volver a cotizaciones
         </button>
-        <h1 className="text-2xl font-bold text-foreground">
-          {isEdit ? 'Editar cotización' : 'Nueva cotización'}
-        </h1>
+        <h2 className="section-title">{isEdit ? 'Editar cotización' : 'Nueva cotización'}</h2>
       </div>
 
-      {/* Stepper */}
-      <div className="flex items-center gap-0">
+      <div className="step-bar">
         {STEPS.map((label, i) => (
-          <div key={i} className="flex items-center flex-1 last:flex-none">
-            <button
-              onClick={() => i < step && setStep(i)}
-              className={`flex items-center gap-2 text-xs font-semibold transition-colors ${
-                i === step ? 'text-accent' : i < step ? 'text-success cursor-pointer' : 'text-muted'
-              }`}
-            >
-              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs border-2 flex-shrink-0 ${
-                i === step ? 'border-accent bg-accent/10 text-accent'
-                : i < step ? 'border-success bg-success/10 text-success'
-                : 'border-border text-muted'
-              }`}>
-                {i < step ? '✓' : i + 1}
-              </span>
-              <span className="hidden sm:block">{label}</span>
-            </button>
-            {i < STEPS.length - 1 && (
-              <div className={`flex-1 h-0.5 mx-2 ${i < step ? 'bg-success/40' : 'bg-border'}`} />
-            )}
+          <div key={label} className="step-item">
+            <div className="flex flex-col items-center flex-1 min-w-0">
+              <div className="flex items-center w-full">
+                <button
+                  type="button"
+                  onClick={() => i < step && setStep(i)}
+                  className={`step-dot ${i === step ? 'active' : i < step ? 'done' : ''}`}
+                  disabled={i > step}
+                >
+                  {i < step ? '✓' : i + 1}
+                </button>
+                {i < STEPS.length - 1 && (
+                  <div className={`step-line flex-1 ${i < step ? 'done' : ''}`} />
+                )}
+              </div>
+              <span className="step-label">{label}</span>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Contenido del paso */}
-      <div className="card p-6">
-        <h2 className="text-sm font-bold text-foreground mb-4 uppercase tracking-widest">
-          {STEPS[step]}
-        </h2>
+      <div className="form-card cot-wizard-step">
+        <h3 className="table-title mb-5">{STEPS[step]}</h3>
         {stepComponents[step]}
       </div>
 
-      {/* Navegación */}
-      <div className="flex justify-between">
+      <div className="flex justify-between cot-wizard-nav">
         <button
           className="btn-secondary btn-sm"
           onClick={() => step === 0 ? navigate('/cotizaciones') : setStep((s) => s - 1)}

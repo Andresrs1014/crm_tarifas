@@ -48,7 +48,9 @@
 | C11 | `GAP-MATRIZ-RIESGOS.md` + `GAP-GESTION-DOCUMENTAL.md` | ✅ |
 | C12 | `GAP-HERRAMIENTAS.md` | ✅ |
 
-**Claude cerrado** hasta nuevo sprint. Codex implementa X9–X12.
+**C17 activo** — auditoría + specs (solo docs). Ver [CLAUDE-C17-CIERRE-PARIDAD.md](./CLAUDE-C17-CIERRE-PARIDAD.md).
+
+Codex paró en X9; X10–X12 esperan specs C17.
 
 Tareas históricas Fase 0:
 
@@ -60,3 +62,23 @@ Tareas históricas Fase 0:
 ## Rol
 
 Análisis profundo, arquitectura, módulos complejos. No tareas de una línea → @MINIMAX.
+
+---
+
+## Metodología v2 (2026-06-22)
+
+Orquestación **Claude + MiniMax** en paralelo. Ver [METODOLOGIA-V2.md](../METODOLOGIA-V2.md).
+
+### Tarea activa — C17 🟡 auditoría de cierre
+
+**Brief:** [CLAUDE-C17-CIERRE-PARIDAD.md](./CLAUDE-C17-CIERRE-PARIDAD.md)  
+**Entregables:** GAP refresh · `SPEC-BIBLIOTECA-WIZARD.md` · `SPEC-INTEGRACION-M8.md` · Roadmap · reporte § C17  
+**⛔ Sin código** en frontend/backend.
+
+### Histórico — C16 ✅ cerrado
+
+Ver `REPORTE-CLAUDE-CODE.md` § C16.
+
+### Histórico — C13 Cotizaciones ✅
+
+**Brief:** [CLAUDE-C13-COTIZACIONES.md](./CLAUDE-C13-COTIZACIONES.md)

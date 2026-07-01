@@ -67,3 +67,22 @@ Permitir editar y guardar **observaciones** inline en `/detalle/:id` sin activar
 ## Regla
 
 Un problema = un cambio pequeño. No refactorizar módulos enteros.
+
+---
+
+## Metodología v2 (2026-06-22)
+
+Orquestación **Claude + MiniMax** en paralelo. Ver [METODOLOGIA-V2.md](../METODOLOGIA-V2.md).
+
+### Tarea activa — M13 Shell (paridad HTML v6)
+
+**Brief:** [MINIMAX-M13-SHELL-PARIDAD.md](./MINIMAX-M13-SHELL-PARIDAD.md)  
+**GAP:** `referencia/GAP-DASHBOARD-REGISTRO.md` (G-02, G-03, G-13)  
+Header 60px · Sidebar 200px · nav Barlow Condensed. **Paralelo a Claude C16** — no tocar páginas de módulos.
+
+Comando:
+```
+Ejecuta lo que tenga tu nombre — tarea M13 Shell paridad HTML v6.
+```
+
+### Histórico — M10 Biblioteca ✅

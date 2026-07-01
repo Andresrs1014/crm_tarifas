@@ -1,4 +1,4 @@
-import type { Dispatch, ReactNode, SetStateAction } from 'react'
+import { useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
 import type { ActividadTipo, CRMRecord, EstadoCliente, EstadoProspecto, TipoFacturado, TipoVisita } from '../../types'
 import {
   ACTIVIDAD_TIPO_ICON,
@@ -12,7 +12,145 @@ import {
   PROSPECTO_STAGE_COLOR,
   VISITA_OPTIONS,
 } from '../../lib/htmlV6/domainConfig'
+import { SVC_COLORS } from '../../lib/htmlV6/constants'
 import { fmtMoney } from '../../utils/fmtMoney'
+
+function billingTotal(lines: Record<string, string | number>): number {
+  return Object.values(lines).reduce((sum: number, v) => sum + (Number(v) || 0), 0)
+}
+
+function moveInList<T>(list: T[], from: number, direction: -1 | 1): T[] {
+  const to = from + direction
+  if (to < 0 || to >= list.length) return list
+  const next = [...list]
+  ;[next[from], next[to]] = [next[to], next[from]]
+  return next
+}
+
+function moveServicioToIndex(list: string[], from: number, to: number): string[] {
+  if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) return list
+  const next = [...list]
+  const [moved] = next.splice(from, 1)
+  next.splice(to, 0, moved)
+  return next
+}
+
+function DetalleServiciosEditor({
+  servicios,
+  setEdit,
+}: {
+  servicios: string[]
+  setEdit: Dispatch<SetStateAction<DetalleEditState>>
+}) {
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [overIndex, setOverIndex] = useState<number | null>(null)
+
+  function toggleServicio(s: string) {
+    setEdit((prev) => {
+      const selected = prev.servicios.includes(s)
+      const nextServicios = selected
+        ? prev.servicios.filter((x) => x !== s)
+        : [...prev.servicios, s]
+      const facturacionLineas = { ...prev.facturacionLineas }
+      if (selected) delete facturacionLineas[s]
+      return { ...prev, servicios: nextServicios, facturacionLineas }
+    })
+  }
+
+  function reorderServicios(from: number, to: number) {
+    setEdit((prev) => ({
+      ...prev,
+      servicios: moveServicioToIndex(prev.servicios, from, to),
+    }))
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="services-grid services-grid--compact">
+        {HTML_SERVICES.map((s: string) => (
+          <button
+            key={s}
+            type="button"
+            className={`service-chip${servicios.includes(s) ? ' selected' : ''}`}
+            onClick={() => toggleServicio(s)}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+      {servicios.length > 0 && (
+        <div className="detalle-servicios-orden">
+          <div className="detalle-field-label">
+            Orden de servicios — arrastra ⠿ o usa ▲ ▼
+          </div>
+          {servicios.map((s, index) => (
+            <div
+              key={s}
+              className={`detalle-servicio-orden-row${overIndex === index ? ' detalle-servicio-orden-row--over' : ''}${dragIndex === index ? ' detalle-servicio-orden-row--drag' : ''}`}
+              draggable
+              onDragStart={(e) => {
+                setDragIndex(index)
+                e.dataTransfer.effectAllowed = 'move'
+                e.dataTransfer.setData('text/plain', String(index))
+              }}
+              onDragEnd={() => {
+                setDragIndex(null)
+                setOverIndex(null)
+              }}
+              onDragOver={(e) => {
+                e.preventDefault()
+                e.dataTransfer.dropEffect = 'move'
+                setOverIndex(index)
+              }}
+              onDragLeave={() => {
+                if (overIndex === index) setOverIndex(null)
+              }}
+              onDrop={(e) => {
+                e.preventDefault()
+                const from = dragIndex ?? Number(e.dataTransfer.getData('text/plain'))
+                if (!Number.isNaN(from) && from !== index) reorderServicios(from, index)
+                setDragIndex(null)
+                setOverIndex(null)
+              }}
+            >
+              <span className="bib-grupo-drag" title="Arrastrar para reordenar">⠿</span>
+              <div className="detalle-servicio-orden-actions">
+                <button
+                  type="button"
+                  className="detalle-servicio-orden-btn"
+                  disabled={index === 0}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setEdit((prev) => ({ ...prev, servicios: moveInList(prev.servicios, index, -1) }))
+                  }}
+                >
+                  ▲
+                </button>
+                <button
+                  type="button"
+                  className="detalle-servicio-orden-btn"
+                  disabled={index === servicios.length - 1}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setEdit((prev) => ({ ...prev, servicios: moveInList(prev.servicios, index, 1) }))
+                  }}
+                >
+                  ▼
+                </button>
+              </div>
+              <span
+                className="detalle-billing-svc-dot"
+                style={{ background: SVC_COLORS[s] ?? 'var(--accent)' }}
+              />
+              <span className="text-sm font-medium flex-1">{s}</span>
+              <span className="text-2xs text-muted">#{index + 1}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function comercialInitials(nombre: string): string {
   return nombre.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase()
@@ -32,6 +170,7 @@ export interface DetalleEditState {
   ingresosEsperados: string
   valor: string
   servicios: string[]
+  facturacionLineas: Record<string, string>
 }
 
 export interface ActFormState {
@@ -260,23 +399,7 @@ export default function DetalleCrmPanel({
 
           <DetalleField label="Servicios" fullWidth>
             {editing ? (
-              <div className="services-grid services-grid--compact">
-                {HTML_SERVICES.map((s: string) => (
-                  <button
-                    key={s}
-                    type="button"
-                    className={`service-chip${edit.servicios.includes(s) ? ' selected' : ''}`}
-                    onClick={() => setEdit((prev) => ({
-                      ...prev,
-                      servicios: prev.servicios.includes(s)
-                        ? prev.servicios.filter((x) => x !== s)
-                        : [...prev.servicios, s],
-                    }))}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
+              <DetalleServiciosEditor servicios={edit.servicios} setEdit={setEdit} />
             ) : (
               <div className="detalle-tags">
                 {record.servicios.length > 0
@@ -352,6 +475,73 @@ export default function DetalleCrmPanel({
             </DetalleField>
           )}
         </div>
+
+        {(editing ? edit.facturado && edit.facturado !== 'no' : (record.facturadoP ?? record.facturado) && (record.facturadoP ?? record.facturado) !== 'no') && (
+          <div className="detalle-billing-wrap">
+            <div className="detalle-billing-title">💰 Facturación por línea</div>
+            {editing ? (
+              edit.servicios.length === 0 ? (
+                <p className="text-sm text-muted">Selecciona servicios de interés primero.</p>
+              ) : (
+                <>
+                  <div className="detalle-billing-grid">
+                    {edit.servicios.map((s) => (
+                      <div key={s} className="detalle-billing-field">
+                        <label>
+                          <span className="detalle-billing-svc-dot" style={{ background: SVC_COLORS[s] ?? 'var(--accent)' }} />
+                          {s}
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          className="filter-input detalle-billing-input"
+                          placeholder="0"
+                          value={edit.facturacionLineas[s] ?? ''}
+                          onChange={(e) => setEdit((prev) => ({
+                            ...prev,
+                            facturacionLineas: { ...prev.facturacionLineas, [s]: e.target.value },
+                          }))}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="detalle-billing-total-row">
+                    <span className="detalle-billing-total-label">Total</span>
+                    <span className="detalle-billing-total-value">
+                      ${billingTotal(edit.facturacionLineas).toLocaleString('es-CO')}
+                    </span>
+                  </div>
+                </>
+              )
+            ) : (
+              <>
+                <div className="detalle-billing-grid">
+                  {(record.servicios.length > 0 ? record.servicios : Object.keys(record.facturacionLineas ?? {})).map((s) => {
+                    const val = record.facturacionLineas?.[s] ?? 0
+                    if (!val && !record.servicios.includes(s)) return null
+                    return (
+                      <div key={s} className="detalle-billing-field">
+                        <label>
+                          <span className="detalle-billing-svc-dot" style={{ background: SVC_COLORS[s] ?? 'var(--accent)' }} />
+                          {s}
+                        </label>
+                        <div className="detalle-field-value detalle-field-value--money" style={{ textAlign: 'right' }}>
+                          {fmtMoney(val)}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="detalle-billing-total-row">
+                  <span className="detalle-billing-total-label">Total</span>
+                  <span className="detalle-billing-total-value">
+                    {fmtMoney(billingTotal(record.facturacionLineas ?? {}))}
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         <div className="detalle-observaciones">
           <div className="detalle-observaciones-header">

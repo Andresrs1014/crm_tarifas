@@ -189,3 +189,37 @@ Severidad: 🔴 ALTA · 🟡 MEDIA · 🟢 BAJA
 - [ ] Mover `ESTADO_NEXT` y `ESTADO_NEXT_LABEL` a `domainConfig.ts`
 - [ ] Reemplazar `#0a0e1a` / `#111827` en CotPublica.tsx por vars CSS
 - [ ] Investigar si aprobar cotización debe avanzar `estadoProspecto` automáticamente (CO-05)
+
+---
+
+## Estado post-C17
+
+**Auditoría 2026-07-01 — Claude C17**
+
+### Brechas actualizadas
+
+| ID | Brecha | Estado post-C17 | Agente |
+|----|--------|-----------------|--------|
+| CO-01 | `section-title` ausente | **✅ C13** | — |
+| CO-02 | `.table-header-2row` ausente | **✅ C13** | — |
+| CO-03 | `.table-title` ausente | **✅ C13** | — |
+| CO-04 | KPI strip es texto inline | **✅ C13** (4 celdas `crm-kpi-cell`) | — |
+| CO-05 | Aprobar cotización NO avanza `estadoProspecto` | 🔴 **Abierto** → backend gap C4 de M8 | Cursor B4 |
+| CO-06 | Texto botón "Nueva" corto | **✅ C13** ("+  Nueva Cotización") | — |
+| CO-07 | `ESTADO_NEXT` hardcoded | **✅ C13** (movido a domainConfig) | — |
+| CO-08 | Colores hardcoded CotPublica | **✅ C13** (vars CSS) | — |
+| **CO-09** | **Wizard paso 3: Transporte usa campos especiales** | 🟡 Abierto — React puede tratar Transporte como checkboxes simples; HTML renderiza tabla con TRANSP_SCHEMA por grupo | Codex X10 |
+| **CO-10** | **Wizard paso 3: Paqueteo filtra por paqueteadora seleccionada** | 🟡 Abierto — HTML filtra grupos por `cotWizard.paqueteadora`; verificar si React lo hace | Codex X10 |
+| **CO-11** | **Wizard: cotización sin `recordId` queda huérfana** | 🟡 Abierto — `recordId` es opcional en backend; wizard debería forzar o advertir | Codex X10 / Cursor |
+
+### Aclaración CO-05 (semántica business)
+
+El HTML v6 en `PUT cotizacion { estado: 'aprobada' }` NO llamaba un endpoint separado — el update de estado del Record era inline en el mismo handler de guardar. En React, `updateCotizacion` solo actualiza `Cotizacion`, no tiene side-effect sobre `Record.estadoProspecto`. Fix propuesto en `SPEC-INTEGRACION-M8.md § B4`.
+
+### Aclaración Wizard paso 3 (CO-09, CO-10)
+
+Según `renderCotItemsStep()`:
+- Si `svc === 'Transporte'`: renderiza tabla con `TRANSP_SCHEMA[g.tipo].cols` (no checkboxes por ítem sino filas editables de tarifa)
+- Si `svc === 'Paqueteo'`: renderiza grupos filtrados por `cotWizard.paqueteadora`, con columnas del `PAQUETEO_SCHEMA[g.tipo].cols`
+- El `itemsSnapshot` guarda el estado completo (`campos`, `tiposCampo`) — no solo qué ítems están seleccionados
+- Verificar que el React Wizard step 3 maneje estos dos casos correctamente antes de X10

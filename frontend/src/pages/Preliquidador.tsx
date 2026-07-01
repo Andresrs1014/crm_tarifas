@@ -393,16 +393,13 @@ export default function Preliquidador() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Calculator size={22} className="text-accent" />
-        <div>
-          <h1 className="text-xl font-display font-bold text-foreground tracking-wide">Preliquidador</h1>
-          <p className="text-xs text-muted">Estimación de costos a partir de una cotización existente</p>
-        </div>
+      <div>
+        <h2 className="section-title" style={{ marginBottom: 4 }}>Preliquidador</h2>
+        <p className="text-xs text-muted">Estimación de costos a partir de una cotización existente</p>
       </div>
 
       {/* Step 1: Select cotizacion + items */}
-      <div className="card-glass rounded-xl border border-border p-5 space-y-5">
+      <div className="card p-5 space-y-5">
         <div className="text-xs font-semibold text-muted uppercase tracking-wider flex items-center gap-2">
           <span className="w-5 h-5 rounded-full bg-accent/20 text-accent flex items-center justify-center text-[10px] font-bold">1</span>
           Seleccionar cotización
@@ -496,7 +493,7 @@ export default function Preliquidador() {
 
       {/* Step 2: Dynamic form */}
       {step >= 2 && checkedItems.length > 0 && (
-        <div className="card-glass rounded-xl border border-border p-5 space-y-5">
+        <div className="card p-5 space-y-5">
           <div className="text-xs font-semibold text-muted uppercase tracking-wider flex items-center gap-2">
             <span className="w-5 h-5 rounded-full bg-accent/20 text-accent flex items-center justify-center text-[10px] font-bold">3</span>
             Datos para el cálculo
@@ -690,7 +687,7 @@ export default function Preliquidador() {
         ) : (
           <div className="space-y-2.5">
             {historial.map(entry => (
-              <div key={entry.id} className="card-glass rounded-xl border border-border px-5 py-4 flex items-center justify-between flex-wrap gap-4">
+              <div key={entry.id} className="card px-5 py-4 flex items-center justify-between flex-wrap gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2.5 flex-wrap mb-1">
                     <span className="font-semibold text-foreground text-sm">{entry.empresa}</span>

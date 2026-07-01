@@ -166,3 +166,31 @@ Cursor implementó la página de Detalle con clases CSS propias (`detalle-*`). L
 - [ ] Crear `utils/fmt.ts` y eliminar las 4 copias de `fmt()`
 - [ ] Mover `DETALLE_PIPELINE_STAGES` a `constants.ts` (unificar con `STAGES` de CRMKanban)
 - [ ] Mover `TIPO_ACT_ICON` a `constants.ts`
+
+---
+
+## Estado post-C17
+
+**Auditoría 2026-07-01 — Claude C17**
+
+### Brechas actualizadas
+
+| ID | Brecha | Estado post-C17 | Quién cerró / Agente |
+|----|--------|-----------------|----------------------|
+| D-01 | Campos sin UI de edición (estadoProspecto, visita, facturado, etc.) | **✅ Codex X9** — UI añadida en DetalleCrmPanel | — |
+| D-02 | `ESTADOS_COT` / `ESTADOS_CLIENTE_DETALLE` duplicados | **✅ Codex X9** | — |
+| D-03 | `DETALLE_PIPELINE_STAGES` hardcoded | **✅ Codex X9** → movido a `constants.ts` | — |
+| D-04 | `TIPO_ACT_ICON` hardcoded | **✅ Codex X9** → `constants.ts` | — |
+| D-05 | `fmt()` duplicada 4 veces | **✅ Codex X9** → `utils/fmtMoney.ts` | — |
+| D-06 | `ESTADOS_COT` duplica `COTIZACION_ESTADO_OPTIONS` | **✅ Codex X9** | — |
+| D-07 | `ESTADOS_CLIENTE_DETALLE` duplica `CLIENTE_ESTADO_OPTIONS` | **✅ Codex X9** | — |
+| **D-08** | **`buildDetBillingHTML` — vista Facturación en Detalle** | 🟡 No auditada — HTML genera tabla `facturacion-lineas` en tab Detalle; verificar si tab Facturación existe en React Detalle | Cursor QA |
+| **D-09** | **Conversión prospecto → cliente no crea GD automáticamente** | 🔴 Abierto — backend gap C2 de M8; `convertProspectToCliente` llama `getOrCreateMatriz` pero NO `getOrCreateGD` | Cursor B2 |
+
+### Nota QA (D-08)
+
+El HTML v6 tiene `buildDetBillingHTML` que renderiza filas de facturación por línea dentro de la página de Detalle. Si React Detalle no tiene este tab/sección, es un gap funcional relevante para el equipo comercial (muestra lo que ya facturó el cliente por servicio). Validar en :82 antes de cerrar.
+
+### Resumen visual post-X9
+
+Todos los campos de edición del formulario Detalle están cerrados. Los gaps restantes son de backend (B2, B4) y de QA (D-08).

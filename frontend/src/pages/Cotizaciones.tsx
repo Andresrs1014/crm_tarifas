@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import {
@@ -8,9 +9,13 @@ import {
 import { toast } from '../store/toastStore'
 import type { EstadoCotizacion } from '../types'
 import { exportCotizacionPDF } from '../utils/exportPDF'
-import { exportCotizacionesExcel } from '../utils/exportExcel'
 import { fmtEstado } from '../utils/fmtEstado'
-import { COTIZACION_BADGE, COTIZACION_ESTADO_OPTIONS } from '../lib/htmlV6/domainConfig'
+import {
+  COTIZACION_BADGE,
+  COTIZACION_ESTADO_OPTIONS,
+  COTIZACION_ESTADO_NEXT,
+  COTIZACION_ESTADO_NEXT_LABEL,
+} from '../lib/htmlV6/domainConfig'
 
 const ESTADOS = COTIZACION_ESTADO_OPTIONS
 
@@ -30,18 +35,37 @@ interface PreviewItem {
   despues: string
 }
 
+function normalizeSnapshot(raw: unknown): Record<string, unknown> {
+  if (!raw) return {}
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw) as Record<string, unknown>
+    } catch {
+      return {}
+    }
+  }
+  if (typeof raw === 'object' && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>
+  }
+  return {}
+}
+
 function buildPreview(snapshot: Record<string, unknown>, pct: number): PreviewItem[] {
   const items: PreviewItem[] = []
   const factor = 1 + pct / 100
   for (const grupos of Object.values(snapshot)) {
+    if (!grupos || typeof grupos !== 'object' || Array.isArray(grupos)) continue
     for (const arr of Object.values(grupos as Record<string, unknown>)) {
-      for (const item of arr as Array<Record<string, unknown>>) {
-        if (item.tipoTarifa === 'moneda' && typeof item.tarifa === 'string') {
-          const val = parseTarifaMoneda(item.tarifa)
+      if (!Array.isArray(arr)) continue
+      for (const item of arr) {
+        if (!item || typeof item !== 'object') continue
+        const row = item as Record<string, unknown>
+        if (row.tipoTarifa === 'moneda' && typeof row.tarifa === 'string') {
+          const val = parseTarifaMoneda(row.tarifa)
           if (val !== null) {
             items.push({
-              descripcion: (item.descripcion as string) || '—',
-              antes: item.tarifa,
+              descripcion: (row.nombre as string) || (row.descripcion as string) || '—',
+              antes: row.tarifa,
               despues: fmtMoneda(val * factor),
             })
           }
@@ -50,22 +74,6 @@ function buildPreview(snapshot: Record<string, unknown>, pct: number): PreviewIt
     }
   }
   return items
-}
-
-// ─── Constantes ────────────────────────────────────────────────────────────────
-
-const ESTADO_NEXT: Record<EstadoCotizacion, EstadoCotizacion | null> = {
-  borrador:    'enviada',
-  enviada:     'negociacion',
-  negociacion: 'aprobada',
-  aprobada:    null,
-  rechazada:   null,
-}
-
-const ESTADO_NEXT_LABEL: Record<string, string> = {
-  borrador:    'Marcar enviada',
-  enviada:     'En negociación',
-  negociacion: 'Aprobar',
 }
 
 // ─── Componente ────────────────────────────────────────────────────────────────
@@ -79,6 +87,20 @@ export default function Cotizaciones() {
   const [pdfLoading, setPdfLoading] = useState<string | null>(null)
   const [actualizarId, setActualizarId] = useState<string | null>(null)
   const [incremento, setIncremento] = useState('')
+
+  const closeActualizarModal = useCallback(() => {
+    setActualizarId(null)
+    setIncremento('')
+  }, [])
+
+  useEffect(() => {
+    if (!actualizarId) return
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') closeActualizarModal()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [actualizarId, closeActualizarModal])
 
   const [comercialFiltro, setComercialFiltro] = useState('')
 
@@ -135,7 +157,7 @@ export default function Cotizaciones() {
   })
 
   // ── Actualizar Tarifas ──────────────────────────────────────────────────────
-  const { data: cotActualizar, isLoading: loadingActualizar } = useQuery({
+  const { data: cotActualizar, isLoading: loadingActualizar, isError: errorActualizar } = useQuery({
     queryKey: ['cotizacion-detail', actualizarId],
     queryFn: () => getCotizacion(actualizarId!),
     enabled: !!actualizarId,
@@ -144,7 +166,7 @@ export default function Cotizaciones() {
   const pct = parseFloat(incremento) || 0
   const previewItems = useMemo(() => {
     if (!cotActualizar?.itemsSnapshot) return []
-    return buildPreview(cotActualizar.itemsSnapshot as Record<string, unknown>, pct)
+    return buildPreview(normalizeSnapshot(cotActualizar.itemsSnapshot), pct)
   }, [cotActualizar, pct])
 
   const actualizarMut = useMutation({
@@ -152,8 +174,7 @@ export default function Cotizaciones() {
     onSuccess: ({ cotizacion, itemsActualizados }) => {
       qc.invalidateQueries({ queryKey: ['cotizaciones'] })
       toast.success(`Nueva cotización ${cotizacion.numero} creada · ${itemsActualizados} ítems actualizados`)
-      setActualizarId(null)
-      setIncremento('')
+      closeActualizarModal()
       navigate(`/cotizaciones/${cotizacion.id}/editar`)
     },
     onError: () => toast.error('Error al actualizar tarifas'),
@@ -180,51 +201,56 @@ export default function Cotizaciones() {
   return (
     <div className="p-6 space-y-5">
 
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Cotizaciones</h1>
-          <p className="text-sm text-muted mt-0.5">
-            {cotizacionesFiltradas.length} registros ·{' '}
-            <span className="text-success">{aprobadas} aprobadas</span> ·{' '}
-            <span className="text-accent">{enviadas} enviadas</span>
-            {rechazadas > 0 && <span className="text-danger"> · {rechazadas} rechazadas</span>}
-          </p>
+      {/* CO-01: section-title */}
+      <h2 className="section-title">Cotizaciones</h2>
+
+      {/* CO-04: KPI strip */}
+      <div className="crm-kpi-strip">
+        <div className="crm-kpi-cell" style={{ borderTopColor: 'var(--accent)' }}>
+          <div className="crm-kpi-label">Total</div>
+          <div className="crm-kpi-value">{cotizacionesFiltradas.length}</div>
         </div>
-        <div className="flex gap-2">
-          <button
-            className="btn-secondary btn-sm"
-            onClick={() => exportCotizacionesExcel(cotizaciones, 'cotizaciones.xlsx')}
-            disabled={cotizaciones.length === 0}
-            title="Exportar a Excel"
-          >
-            ↓ Excel
-          </button>
-          <Link to="/cotizaciones/nueva" className="btn-primary btn-sm">
-            + Nueva cotización
-          </Link>
+        <div className="crm-kpi-cell" style={{ borderTopColor: 'var(--green)' }}>
+          <div className="crm-kpi-label">Aprobadas</div>
+          <div className="crm-kpi-value" style={{ color: 'var(--green)' }}>{aprobadas}</div>
+        </div>
+        <div className="crm-kpi-cell" style={{ borderTopColor: 'var(--accent)' }}>
+          <div className="crm-kpi-label">Enviadas</div>
+          <div className="crm-kpi-value text-accent">{enviadas}</div>
+        </div>
+        <div className="crm-kpi-cell" style={{ borderTopColor: 'var(--red)' }}>
+          <div className="crm-kpi-label">Rechazadas</div>
+          <div className="crm-kpi-value" style={{ color: 'var(--red)' }}>{rechazadas}</div>
         </div>
       </div>
 
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-3">
-        <input
-          className="filter-input flex-1 min-w-48"
-          placeholder="Buscar empresa, número..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <select className="filter-select" value={estado} onChange={(e) => setEstado(e.target.value)}>
-          {ESTADOS.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
-        </select>
-        <select className="filter-select" value={comercialFiltro} onChange={(e) => setComercialFiltro(e.target.value)}>
-          <option value="">Todos los comerciales</option>
-          {comercialesUnicos.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </div>
-
-      {/* Tabla */}
+      {/* CO-02/CO-03: table-card con table-header-2row */}
       <div className="table-card">
+        <div className="table-header-2row">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <span className="table-title">Lista de Cotizaciones</span>
+            <div className="flex gap-2">
+              <Link to="/cotizaciones/nueva" className="btn-primary btn-sm">
+                + Nueva Cotización
+              </Link>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <input
+              className="filter-input flex-1 min-w-48"
+              placeholder="Buscar empresa, número..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <select className="filter-select" value={estado} onChange={(e) => setEstado(e.target.value)}>
+              {ESTADOS.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
+            </select>
+            <select className="filter-select" value={comercialFiltro} onChange={(e) => setComercialFiltro(e.target.value)}>
+              <option value="">Todos los comerciales</option>
+              {comercialesUnicos.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+        </div>
         {isLoading ? (
           <div className="p-8 space-y-3">
             {[...Array(5)].map((_, i) => (
@@ -253,7 +279,7 @@ export default function Cotizaciones() {
             </thead>
             <tbody>
               {cotizacionesFiltradas.map((cot) => {
-                const nextEstado = ESTADO_NEXT[cot.estado]
+                const nextEstado = COTIZACION_ESTADO_NEXT[cot.estado] as EstadoCotizacion | null
                 return (
                   <tr key={cot.id}>
                     <td>
@@ -286,72 +312,74 @@ export default function Cotizaciones() {
                       {new Date(cot.createdAt).toLocaleDateString('es-CO')}
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
-                      <div className="flex gap-1 flex-wrap">
-                        {/* Ver / Editar */}
+                      <div className="cot-row-actions">
                         {cot.estado === 'borrador' ? (
                           <button
-                            className="btn-ghost btn-sm px-2 py-1 text-xs"
+                            type="button"
+                            className="btn-secondary btn-sm cot-action-btn"
                             onClick={() => navigate(`/cotizaciones/${cot.id}/editar`)}
+                            title="Editar"
                           >
-                            Editar
+                            ✏️
                           </button>
                         ) : (
                           <a
                             href={`/cot/${cot.numero}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="btn-ghost btn-sm px-2 py-1 text-xs"
+                            className="btn-secondary btn-sm cot-action-btn"
+                            title="Ver cotización"
                           >
-                            Ver
+                            👁
                           </a>
                         )}
 
-                        {/* PDF */}
                         <button
-                          className="btn-ghost btn-sm px-2 py-1 text-xs"
+                          type="button"
+                          className="btn-secondary btn-sm cot-action-btn"
                           disabled={pdfLoading === cot.id}
                           onClick={() => handlePDF(cot.id, cot.numero)}
                           title="Descargar PDF"
                         >
-                          {pdfLoading === cot.id ? '...' : '↓ PDF'}
+                          {pdfLoading === cot.id ? '…' : '⬇'}
                         </button>
 
-                        {/* Avanzar estado */}
                         {nextEstado && (
                           <button
-                            className="btn-ghost btn-sm px-2 py-1 text-xs text-success"
+                            type="button"
+                            className="btn-secondary btn-sm cot-action-btn"
                             disabled={avanzarMut.isPending}
                             onClick={() => avanzarMut.mutate({ id: cot.id, estado: nextEstado })}
-                            title={ESTADO_NEXT_LABEL[cot.estado]}
+                            title={COTIZACION_ESTADO_NEXT_LABEL[cot.estado]}
                           >
-                            {ESTADO_NEXT_LABEL[cot.estado] ?? '→'}
+                            →
                           </button>
                         )}
 
-                        {/* Rechazar (si no está rechazada/aprobada) */}
                         {cot.estado !== 'rechazada' && cot.estado !== 'aprobada' && (
                           <button
-                            className="btn-ghost btn-sm px-2 py-1 text-xs text-danger"
+                            type="button"
+                            className="btn-secondary btn-sm cot-action-btn cot-action-danger"
                             disabled={rechazarMut.isPending}
                             onClick={() => rechazarMut.mutate(cot.id)}
-                            title="Marcar rechazada"
+                            title="Rechazar"
                           >
-                            Rechazar
+                            ✕
                           </button>
                         )}
 
-                        {/* Actualizar Tarifas */}
                         <button
-                          className="btn-ghost btn-sm px-2 py-1 text-xs text-gold"
+                          type="button"
+                          className="btn-secondary btn-sm cot-action-btn"
                           onClick={() => { setActualizarId(cot.id); setIncremento('') }}
-                          title="Actualizar tarifas con incremento %"
+                          title="Actualizar tarifas"
                         >
                           📈
                         </button>
 
-                        {/* Copiar link */}
                         <button
-                          className="btn-ghost btn-sm px-2 py-1 text-xs"
+                          type="button"
+                          className="btn-secondary btn-sm cot-action-btn"
                           title="Copiar link público"
                           onClick={() => {
                             const url = `${window.location.origin}/cot/${cot.numero}`
@@ -361,23 +389,24 @@ export default function Cotizaciones() {
                           🔗
                         </button>
 
-                        {/* Duplicar */}
                         <button
-                          className="btn-ghost btn-sm px-2 py-1 text-xs"
+                          type="button"
+                          className="btn-secondary btn-sm cot-action-btn"
                           disabled={duplicarMut.isPending}
                           onClick={() => duplicarMut.mutate(cot.id)}
-                          title="Duplicar cotización"
+                          title="Duplicar"
                         >
                           ⧉
                         </button>
 
-                        {/* Eliminar (solo borrador) */}
                         {cot.estado === 'borrador' && (
                           <button
-                            className="btn-danger btn-sm px-2 py-1 text-xs"
+                            type="button"
+                            className="btn-secondary btn-sm cot-action-btn cot-action-danger"
                             onClick={() => setConfirmId(cot.id)}
+                            title="Eliminar"
                           >
-                            ×
+                            🗑
                           </button>
                         )}
                       </div>
@@ -390,20 +419,24 @@ export default function Cotizaciones() {
         )}
       </div>
 
-      {/* Modal actualizar tarifas */}
-      {actualizarId && (
+      {/* Modal actualizar tarifas — portal sobre todo el layout (z-index header/sidebar) */}
+      {actualizarId && createPortal(
         <div
-          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
-          onClick={() => { setActualizarId(null); setIncremento('') }}
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cot-actualizar-title"
+          onClick={closeActualizarModal}
         >
           <div
-            className="card w-full max-w-2xl max-h-[90vh] flex flex-col"
+            className="modal-panel cot-actualizar-modal"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between p-5 border-b border-border">
+            <div className="modal-panel-header">
               <div>
-                <h3 className="font-bold text-foreground text-lg">📈 Actualizar Tarifas</h3>
+                <h3 id="cot-actualizar-title" className="font-bold text-foreground text-lg">
+                  📈 Actualizar Tarifas
+                </h3>
                 {cotActualizar && (
                   <p className="text-sm text-muted mt-0.5">
                     Base: <span className="font-mono text-accent">{cotActualizar.numero}</span>
@@ -412,97 +445,102 @@ export default function Cotizaciones() {
                 )}
               </div>
               <button
-                className="text-muted hover:text-foreground text-xl leading-none"
-                onClick={() => { setActualizarId(null); setIncremento('') }}
+                type="button"
+                className="modal-close-btn"
+                aria-label="Cerrar"
+                onClick={closeActualizarModal}
               >
                 ×
               </button>
             </div>
 
-            {/* Body */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-4">
-              {/* % input */}
-              <div className="flex items-center gap-4">
-                <label className="text-xs text-muted uppercase tracking-widest font-semibold whitespace-nowrap">
-                  % Incremento
-                </label>
-                <input
-                  type="number"
-                  className="filter-input w-32 font-mono text-lg text-center"
-                  placeholder="Ej: 5"
-                  min="0"
-                  max="200"
-                  step="0.1"
-                  value={incremento}
-                  onChange={(e) => setIncremento(e.target.value)}
-                  autoFocus
-                />
-                <span className="text-gold font-bold text-2xl">%</span>
-                <p className="text-xs text-muted">
-                  La cotización original queda intacta. Se crea una nueva con número nuevo.
-                </p>
-              </div>
-
-              {/* Preview */}
-              {loadingActualizar ? (
-                <div className="space-y-2">
-                  {[...Array(4)].map((_, i) => (
-                    <div key={i} className="h-8 bg-surface2 rounded animate-pulse" />
-                  ))}
-                </div>
-              ) : previewItems.length === 0 ? (
-                <div className="text-center py-6 text-muted text-sm">
-                  {pct === 0
-                    ? 'Ingresa un porcentaje para ver el preview'
-                    : 'Esta cotización no tiene ítems de tipo moneda para actualizar'}
+            <div className="modal-panel-body">
+              {errorActualizar ? (
+                <div className="text-center py-6 text-danger text-sm">
+                  No se pudo cargar la cotización. Cierra e intenta de nuevo.
                 </div>
               ) : (
-                <div>
-                  <p className="text-xs text-muted uppercase tracking-widest font-semibold mb-2">
-                    Preview · {previewItems.length} ítem{previewItems.length !== 1 ? 's' : ''} monetarios
-                  </p>
-                  <div className="rounded-lg border border-border overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-border bg-surface2">
-                          <th className="text-left px-3 py-2 text-xs text-muted font-semibold">Ítem</th>
-                          <th className="text-right px-3 py-2 text-xs text-muted font-semibold">Antes</th>
-                          <th className="text-right px-3 py-2 text-xs text-muted font-semibold">Después</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {previewItems.map((item, i) => (
-                          <tr key={i} className="border-b border-border/50 last:border-0">
-                            <td className="px-3 py-2 text-foreground truncate max-w-xs">{item.descripcion}</td>
-                            <td className="px-3 py-2 text-right font-mono text-muted line-through">{item.antes}</td>
-                            <td className="px-3 py-2 text-right font-mono text-gold font-semibold">{item.despues}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                <>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <label className="text-xs text-muted uppercase tracking-widest font-semibold whitespace-nowrap">
+                      % Incremento
+                    </label>
+                    <input
+                      type="number"
+                      className="filter-input w-32 font-mono text-lg text-center"
+                      placeholder="Ej: 5"
+                      min="0"
+                      max="200"
+                      step="0.1"
+                      value={incremento}
+                      onChange={(e) => setIncremento(e.target.value)}
+                      autoFocus
+                    />
+                    <span className="text-gold font-bold text-2xl">%</span>
+                    <p className="text-xs text-muted flex-1 min-w-[200px]">
+                      La cotización original queda intacta. Se crea una nueva con número nuevo.
+                    </p>
                   </div>
-                </div>
+
+                  {loadingActualizar ? (
+                    <div className="space-y-2 mt-4">
+                      {[...Array(4)].map((_, i) => (
+                        <div key={i} className="h-8 bg-surface2 rounded animate-pulse" />
+                      ))}
+                    </div>
+                  ) : previewItems.length === 0 ? (
+                    <div className="text-center py-6 text-muted text-sm">
+                      {pct === 0
+                        ? 'Ingresa un porcentaje para ver el preview'
+                        : 'Esta cotización no tiene ítems de tipo moneda para actualizar'}
+                    </div>
+                  ) : (
+                    <div className="mt-4">
+                      <p className="text-xs text-muted uppercase tracking-widest font-semibold mb-2">
+                        Preview · {previewItems.length} ítem{previewItems.length !== 1 ? 's' : ''} monetarios
+                      </p>
+                      <div className="rounded-lg border border-border overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-border bg-surface2">
+                              <th className="text-left px-3 py-2 text-xs text-muted font-semibold">Ítem</th>
+                              <th className="text-right px-3 py-2 text-xs text-muted font-semibold">Antes</th>
+                              <th className="text-right px-3 py-2 text-xs text-muted font-semibold">Después</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {previewItems.map((item, i) => (
+                              <tr key={i} className="border-b border-border/50 last:border-0">
+                                <td className="px-3 py-2 text-foreground truncate max-w-xs">{item.descripcion}</td>
+                                <td className="px-3 py-2 text-right font-mono text-muted line-through">{item.antes}</td>
+                                <td className="px-3 py-2 text-right font-mono text-gold font-semibold">{item.despues}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
-            {/* Footer */}
-            <div className="flex justify-end gap-2 p-4 border-t border-border">
-              <button
-                className="btn-secondary btn-sm"
-                onClick={() => { setActualizarId(null); setIncremento('') }}
-              >
+            <div className="modal-panel-footer">
+              <button type="button" className="btn-secondary btn-sm" onClick={closeActualizarModal}>
                 Cancelar
               </button>
               <button
+                type="button"
                 className="btn-primary btn-sm"
-                disabled={pct <= 0 || previewItems.length === 0 || actualizarMut.isPending}
+                disabled={errorActualizar || pct <= 0 || previewItems.length === 0 || actualizarMut.isPending}
                 onClick={() => actualizarMut.mutate({ id: actualizarId, inc: pct })}
               >
                 {actualizarMut.isPending ? 'Creando...' : '✅ Aplicar y crear nueva cotización'}
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       {/* Modal confirm delete */}

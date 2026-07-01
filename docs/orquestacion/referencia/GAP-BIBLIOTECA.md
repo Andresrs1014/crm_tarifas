@@ -117,3 +117,41 @@ Severidad: 🔴 ALTA · 🟡 MEDIA · 🟢 BAJA
 - [ ] Cambiar `className="card overflow-hidden"` de LineaSection a `className="table-card overflow-hidden"`
 - [ ] Extraer `TIPO_TARIFA_OPTIONS` a `constants.ts`
 - [ ] (Opcional) Mini-preview de observaciones predefinidas usando `dangerouslySetInnerHTML`
+
+---
+
+## Estado post-C17
+
+**Auditoría 2026-07-01 — Claude C17**
+
+El GAP generado en C10 tenía como referencia solo las líneas estándar (Zona Franca, CEDI, Depósito). El HTML v6 tiene **tres renderizadores distintos** según el tipo de línea. Los gaps reales son más amplios que lo documentado originalmente.
+
+### Brechas actualizadas
+
+| ID | Brecha | HTML v6 | React actual | Sev | Agente |
+|----|--------|---------|--------------|-----|--------|
+| BIB-01 | `section-title` ausente | `<h2 class="section-title">` | ❌ | 🔴 | **✅ C16** |
+| BIB-02 | Card línea usa `card` vs `table-card` | `.table-card` | `card overflow-hidden` | 🟡 | Codex X11 |
+| BIB-03 | Sin preview WYSIWYG observaciones | mini-preview inline | ❌ | 🟢 | Codex X11 opcional |
+| BIB-04 | `TIPO_TARIFA_OPTIONS` inline | `constants.ts` | inline en select | 🟢 | Codex X11 |
+| **BIB-05** | **Línea Transporte: renderizador especial ausente** | `renderBibGrupoTransporte` con `TRANSP_SCHEMA` (local/otros), 2 botones "+ Nuevo grupo Transporte Local/Otros", celdas tarifa/tarifa-mixta/tarifa-texto con $+% toggle | ❌ React trata Transporte como línea estándar | 🔴 | Codex X11 |
+| **BIB-06** | **Línea Paqueteo: tabs por paqueteadora ausentes** | `renderBibGrupoPaqueteo` con tabs COORDINADORA / TCC / SERVIENTREGA, grupos precargados de `PAQUETEO_SCHEMA`, `colspanGroups` en headers | ❌ React trata Paqueteo como línea estándar | 🔴 | Codex X11 |
+| **BIB-07** | **Grupos son siempre visibles (no colapsables)** | `renderBibGrupo` genera tabla inline sin toggle. Solo la línea tiene toggle | Si React tiene grupos expand/collapse → divergencia | 🟡 | Codex X11 |
+| **BIB-08** | **Renombrar col1/col2/col3 ausente** | Inputs de texto en panel columnas para renombrar "Servicio"/"Tarifa"/"Observaciones" | ❌ Sin UI para renombrar cabeceras | 🟡 | Codex X11 |
+| **BIB-09** | **Observaciones "ricas" por línea** | `addBibObsRich` → textarea + preview HTML por obs; lista de obs por línea | Solo textarea sin preview ni múltiples obs | 🟡 | Codex X11 |
+
+### Módulos cerrados por sesiones anteriores
+
+| ID | Quién |
+|----|-------|
+| BIB-01 (`section-title`) | ✅ Claude C16 |
+
+### Orden de implementación recomendado (Codex X11)
+
+1. BIB-05 — Transporte (TRANSP_SCHEMA) → ver `SPEC-BIBLIOTECA-WIZARD.md § Transporte`
+2. BIB-06 — Paqueteo (PAQUETEO_SCHEMA + tabs) → ver `SPEC-BIBLIOTECA-WIZARD.md § Paqueteo`
+3. BIB-02 — table-card wrapper
+4. BIB-07 — Confirmar grupos no colapsables
+5. BIB-08 — Renombrar col1/col2/col3
+6. BIB-04 — Mover TIPO_TARIFA_OPTIONS
+7. BIB-09 — Obs ricas (opcional)

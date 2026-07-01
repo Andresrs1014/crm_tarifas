@@ -1,4 +1,16 @@
-# Reglas del equipo (4 agentes)
+# Reglas del equipo — Metodología v2
+
+## Equipo activo
+
+| Agente | Rol |
+|--------|-----|
+| **Cursor** | Orquestador, Docker, integración |
+| **Claude Code** | Módulos grandes |
+| **MiniMax** | Módulos pequeños / fixes |
+
+Codex **fuera de ciclo**. GAP ya en `referencia/` — agentes **implementan**.
+
+Ver [METODOLOGIA-V2.md](./METODOLOGIA-V2.md).
 
 ## Objetivo único
 
@@ -51,6 +63,14 @@ Ver detalle: [agentes/CURSOR-COMPOSER.md](./agentes/CURSOR-COMPOSER.md) § Feedb
 - **No** modificar código ajeno para corregirlo
 - **Sí** documentar objeciones en `reportes/OBJECIONES-<AGENTE>.md` o en tu reporte
 - Seguir con tus propias tareas
+
+---
+
+## Git (trabajo solo)
+
+- **Rama por defecto: `main`** — ver [.cursor/rules/07-git-main-solo.mdc](../../.cursor/rules/07-git-main-solo.mdc).
+- No crear ramas feature ni PRs salvo que el humano lo pida.
+- Push directo a `main` cuando el humano autorice.
 
 ---
 

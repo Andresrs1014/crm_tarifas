@@ -39,8 +39,8 @@ function DayPanel({
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-end bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="relative h-full w-full max-w-md bg-[#111827] border-l border-border overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="sticky top-0 z-10 bg-[#111827] border-b border-border px-5 py-4 flex items-center justify-between">
+      <div className="relative h-full w-full max-w-md bg-surface border-l border-border overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="sticky top-0 z-10 bg-surface border-b border-border px-5 py-4 flex items-center justify-between">
           <div>
             <div className="text-sm font-display font-bold text-accent">{label}</div>
             <div className="text-xs text-muted">{visitas.length} visita{visitas.length !== 1 ? 's' : ''}</div>
@@ -288,7 +288,7 @@ export default function CalendarioVisitas() {
         <div className="flex items-center gap-3">
           <CalendarDays size={22} className="text-accent" />
           <div>
-            <h1 className="text-xl font-display font-bold text-foreground tracking-wide">Calendario de Visitas</h1>
+            <h2 className="section-title" style={{ marginBottom: 0 }}>Calendario de Visitas</h2>
             <p className="text-xs text-muted">Actividades con tipo "visita" de todos los registros</p>
           </div>
         </div>
@@ -297,9 +297,9 @@ export default function CalendarioVisitas() {
           <select
             value={filtComercial}
             onChange={e => setFiltComercial(e.target.value)}
-            className="px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent"
+            className="filter-select"
           >
-            <option value="">👥 Todos los comerciales</option>
+            <option value="">Todos los comerciales</option>
             {comerciales.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
           </select>
 
@@ -322,15 +322,15 @@ export default function CalendarioVisitas() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="crm-kpi-strip">
         {[
-          { label: 'Total visitas', value: total,   color: '#94a3b8' },
-          { label: 'Realizadas',    value: hechas,  color: '#64748b' },
-          { label: 'Pendientes',    value: pending, color: '#34d399' },
+          { label: 'Total visitas', value: total,   color: 'var(--text2)' },
+          { label: 'Realizadas',    value: hechas,  color: 'var(--accent)' },
+          { label: 'Pendientes',    value: pending, color: 'var(--green)' },
         ].map(k => (
-          <div key={k.label} className="card-glass rounded-xl p-4 border border-border flex flex-col gap-1">
-            <div className="text-[10px] uppercase tracking-[1.5px] text-muted font-semibold">{k.label}</div>
-            <div className="text-3xl font-display font-bold" style={{ color: k.color }}>{k.value}</div>
+          <div key={k.label} className="crm-kpi-cell" style={{ borderTopColor: k.color }}>
+            <div className="crm-kpi-label">{k.label}</div>
+            <div className="crm-kpi-value" style={{ color: k.color }}>{k.value}</div>
           </div>
         ))}
       </div>

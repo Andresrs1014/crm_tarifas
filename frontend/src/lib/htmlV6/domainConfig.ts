@@ -158,6 +158,20 @@ export const COTIZACION_BADGE: Record<string, string> = {
   rechazada: 'badge-red',
 }
 
+export const COTIZACION_ESTADO_NEXT: Record<string, string | null> = {
+  borrador:    'enviada',
+  enviada:     'negociacion',
+  negociacion: 'aprobada',
+  aprobada:    null,
+  rechazada:   null,
+}
+
+export const COTIZACION_ESTADO_NEXT_LABEL: Record<string, string> = {
+  borrador:    'Marcar enviada',
+  enviada:     'En negociación',
+  negociacion: 'Aprobar',
+}
+
 export const COT_PIPELINE_CHART = [
   { key: 'aprobadas' as const, name: 'Aprobada', fill: 'rgba(0,230,118,0.8)' },
   { key: 'borradores' as const, name: 'Borrador', fill: 'rgba(136,153,180,0.5)' },

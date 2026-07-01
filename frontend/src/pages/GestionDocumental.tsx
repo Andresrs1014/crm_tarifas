@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { FolderOpen, Search, X, ChevronRight, RefreshCw, AlertTriangle, Clock, CheckCircle, Circle, Download } from 'lucide-react'
+import { FolderOpen, X, ChevronRight, RefreshCw, AlertTriangle, Clock, CheckCircle, Circle, Download } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { listGD, upsertGD, GD_DOCS, GDRow, DocEstado } from '../api/gestionDocumental'
 import { useToastStore } from '../store/toastStore'
@@ -28,9 +28,9 @@ function pctColor(pct: number): string {
 
 function StatBadge({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div className="card-glass rounded-xl p-4 border border-border flex flex-col gap-1">
-      <div className="text-[10px] uppercase tracking-[1.5px] text-muted font-semibold">{label}</div>
-      <div className="text-3xl font-display font-bold" style={{ color }}>{value}</div>
+    <div className="crm-kpi-cell" style={{ borderTopColor: color }}>
+      <div className="crm-kpi-label">{label}</div>
+      <div className="crm-kpi-value" style={{ color }}>{value}</div>
     </div>
   )
 }
@@ -129,11 +129,11 @@ function DocModal({ row, onClose }: { row: GDRow; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-end bg-black/50 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="relative h-full w-full max-w-2xl bg-[#111827] border-l border-border overflow-y-auto"
+        className="relative h-full w-full max-w-2xl bg-surface border-l border-border overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 z-10 bg-[#111827] border-b border-border px-6 py-4 flex items-start justify-between">
+        <div className="sticky top-0 z-10 bg-surface border-b border-border px-6 py-4 flex items-start justify-between">
           <div>
             <div className="text-lg font-display font-bold text-foreground">{row.empresa}</div>
             {row.nit && <div className="text-xs text-muted">NIT: {row.nit}</div>}
@@ -343,12 +343,9 @@ export default function GestionDocumental() {
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <FolderOpen size={22} className="text-accent" />
-          <div>
-            <h1 className="text-xl font-display font-bold text-foreground tracking-wide">Gestión Documental</h1>
-            <p className="text-xs text-muted">BASC · 18 documentos · Solo clientes activos</p>
-          </div>
+        <div>
+          <h2 className="section-title" style={{ marginBottom: 4 }}>Gestión Documental</h2>
+          <p className="text-xs text-muted">BASC · 18 documentos · Solo clientes activos</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -388,63 +385,44 @@ export default function GestionDocumental() {
       )}
 
       {/* KPIs */}
-      <div className="grid grid-cols-4 gap-3">
-        <StatBadge label="Total clientes" value={total}     color="#94a3b8" />
-        <StatBadge label="Completos"       value={completos} color="#34d399" />
-        <StatBadge label="Por vencer"      value={porVencer} color="#f59e0b" />
-        <StatBadge label="Vencidos"        value={vencidos}  color="#f87171" />
+      <div className="crm-kpi-strip">
+        <StatBadge label="Total clientes" value={total}     color="var(--text2)" />
+        <StatBadge label="Completos"       value={completos} color="var(--green)" />
+        <StatBadge label="Por vencer"      value={porVencer} color="var(--gold)" />
+        <StatBadge label="Vencidos"        value={vencidos}  color="var(--red)" />
       </div>
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-center">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar empresa o NIT..."
-            className="w-full pl-8 pr-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground placeholder:text-muted focus:outline-none focus:border-accent"
-          />
-        </div>
-        <select
-          value={filtTipo}
-          onChange={e => setFiltTipo(e.target.value)}
-          className="px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent"
-        >
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Buscar empresa o NIT..."
+          className="filter-input flex-1 min-w-48"
+        />
+        <select value={filtTipo} onChange={e => setFiltTipo(e.target.value)} className="filter-select">
           <option value="">Todos los tipos</option>
           <option value="directo">Directo</option>
           <option value="indirecto">Intermediario</option>
           <option value="referido">Referido</option>
         </select>
-        <select
-          value={filtCia}
-          onChange={e => setFiltCia(e.target.value)}
-          className="px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent"
-        >
-          <option value="">🏢 Todas las compañías</option>
+        <select value={filtCia} onChange={e => setFiltCia(e.target.value)} className="filter-select">
+          <option value="">Todas las compañías</option>
           <option value="Logimat">Logimat</option>
           <option value="IMC Depósito">IMC Depósito</option>
           <option value="IMC Cargo">IMC Cargo</option>
           <option value="Aduana">Aduana</option>
         </select>
-        <select
-          value={filtPct}
-          onChange={e => setFiltPct(e.target.value)}
-          className="px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent"
-        >
+        <select value={filtPct} onChange={e => setFiltPct(e.target.value)} className="filter-select">
           <option value="">% Cumplimiento: Todos</option>
           <option value="80">≥ 80% — Gestionados</option>
           <option value="50-79">50–79% — En proceso</option>
           <option value="0-49">&lt; 50% — Críticos</option>
         </select>
-        <select
-          value={filtVenc}
-          onChange={e => setFiltVenc(e.target.value)}
-          className="px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent"
-        >
+        <select value={filtVenc} onChange={e => setFiltVenc(e.target.value)} className="filter-select">
           <option value="">Todos los vencimientos</option>
           <option value="con-tiempo">Al día</option>
-          <option value="por-vencer">⚠️ Por vencer (≤60 días)</option>
+          <option value="por-vencer">Por vencer (≤60 días)</option>
           <option value="vencido">Vencido</option>
           <option value="sin-fecha">Sin fecha</option>
         </select>
@@ -461,7 +439,7 @@ export default function GestionDocumental() {
       </div>
 
       {/* Table */}
-      <div className="card-glass rounded-xl border border-border overflow-x-auto">
+      <div className="table-card overflow-x-auto">
         <table className="w-full text-sm min-w-[1100px]">
           <thead>
             <tr className="border-b border-border text-muted uppercase tracking-[1px] text-[10px]">

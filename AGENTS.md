@@ -24,6 +24,8 @@ Ejecuta lo que tenga tu nombre
 
 **Nada hardcoded** — [.cursor/rules/06-no-hardcode.mdc](.cursor/rules/06-no-hardcode.mdc) (datos, URLs, catálogos, colores; env + API + `htmlV6/constants`).
 
+**Git en `main`** — [.cursor/rules/07-git-main-solo.mdc](.cursor/rules/07-git-main-solo.mdc) (trabajo solo: sin ramas feature; commit y push a `main`).
+
 ## Equipo
 
 | Agente | Informe | Rol |
