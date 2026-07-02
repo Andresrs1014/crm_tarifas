@@ -1,112 +1,240 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  getBiblioteca,
-  createLinea, updateLinea, deleteLinea,
+  getBiblioteca, createLinea, updateLinea, deleteLinea,
   createGrupo, updateGrupo, deleteGrupo,
   createItem, updateItem, deleteItem,
   createObs, updateObs, deleteObs,
 } from '../api/biblioteca'
 import { toast } from '../store/toastStore'
 import type { BibliotecaLinea, BibliotecaGrupo, BibliotecaItem, BibliotecaObs } from '../types'
+import { TIPO_TARIFA_OPTIONS } from '../constants'
+import { TableScrollArea } from '../components/ui/DataListPanel'
+import {
+  TRANSP_SCHEMA, PAQUETEO_SCHEMA,
+  PAQUETEO_GRUPOS_COORD, PAQUETEO_GRUPOS_TCC, PAQUETEO_GRUPOS_SERVIENTREGA,
+  PAQUETEO_PAQUETEADORAS,
+  type BibSchemaCol, type PaqueteoTab,
+} from '../lib/htmlV6/constants'
 
-// ─── Item inline editor ────────────────────────────────────────────────────────
+// ─── Helpers ───────────────────────────────────────────────────────────────────
 
-function ItemRow({
-  item, grupoId, columnas, onDelete,
+const COL_DEFAULTS: [string, string, string] = ['Servicio', 'Tarifa', 'Observación']
+
+function encodeGrupoNombre(tipo: string, display: string) { return `${tipo}|${display}` }
+function parseGrupoNombre(nombre: string) {
+  const idx = nombre.indexOf('|')
+  return idx < 0 ? { tipo: '', display: nombre } : { tipo: nombre.slice(0, idx), display: nombre.slice(idx + 1) }
+}
+function isTransporteLine(nombre: string) { return nombre.toLowerCase().includes('transporte') }
+function isPaqueteoLine(nombre: string) { return nombre.toLowerCase().includes('paqueteo') }
+
+function parseColumnas(raw: string[]): { headers: [string, string, string]; extra: string[] } {
+  const headers: [string, string, string] = [...COL_DEFAULTS] as [string, string, string]
+  const extra: string[] = []
+  for (const c of raw) {
+    if (c.startsWith('__h1:')) headers[0] = c.slice(5)
+    else if (c.startsWith('__h2:')) headers[1] = c.slice(5)
+    else if (c.startsWith('__h3:')) headers[2] = c.slice(5)
+    else extra.push(c)
+  }
+  return { headers, extra }
+}
+
+function encodeColumnas(headers: [string, string, string], extra: string[]): string[] {
+  const out: string[] = []
+  if (headers[0] !== COL_DEFAULTS[0]) out.push(`__h1:${headers[0]}`)
+  if (headers[1] !== COL_DEFAULTS[1]) out.push(`__h2:${headers[1]}`)
+  if (headers[2] !== COL_DEFAULTS[2]) out.push(`__h3:${headers[2]}`)
+  return [...out, ...extra]
+}
+
+async function persistOrden(ids: string[], updateFn: (id: string, orden: number) => Promise<unknown>) {
+  await Promise.all(ids.map((id, orden) => updateFn(id, orden)))
+}
+
+// ─── Schema cell ───────────────────────────────────────────────────────────────
+
+function SchemaCell({
+  col, value, toggleVal, onChange, onToggleChange,
 }: {
-  item: BibliotecaItem
-  grupoId: string
-  columnas: string[]
-  onDelete: () => void
+  col: BibSchemaCol
+  value: string
+  toggleVal?: string
+  onChange: (v: string) => void
+  onToggleChange?: (v: string) => void
 }) {
-  const qc = useQueryClient()
-  const [editing, setEditing] = useState(false)
-  const [nombre, setNombre] = useState(item.nombre)
-  const [tarifa, setTarifa] = useState(item.tarifa)
-  const [obs, setObs] = useState(item.obs ?? '')
-  const [tipoTarifa, setTipoTarifa] = useState(item.tipoTarifa)
+  const isMixta = col.tipo === 'tarifa-mixta' || col.tipo === 'mixta'
+  const isTarifaTexto = col.tipo === 'tarifa-texto'
 
-  const saveMut = useMutation({
-    mutationFn: () => updateItem(item.id, { nombre, tarifa, obs: obs || undefined, tipoTarifa }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['biblioteca'] }); setEditing(false) },
-    onError: () => toast.error('Error al guardar'),
-  })
-
-  if (!editing) {
+  if (isMixta || isTarifaTexto) {
+    const current = toggleVal ?? 'moneda'
+    const isMoneda = current !== 'porcentaje' && current !== 'texto'
+    const toggleTo = isMixta ? (isMoneda ? 'porcentaje' : 'moneda') : (isMoneda ? 'texto' : 'moneda')
+    const label = isMixta ? (isMoneda ? '$' : '%') : (isMoneda ? '$' : 'T')
     return (
-      <div className="flex items-center gap-3 py-1.5 px-2 rounded-lg hover:bg-surface2 group transition-colors">
-        <div className="flex-1 text-sm text-foreground">{item.nombre}</div>
-        {columnas.map((col) => (
-          <div key={col} className="text-xs text-muted w-20 text-right">{item.extraCols?.[col] ?? ''}</div>
-        ))}
-        <div className="w-24 text-right">
-          <span className="text-sm font-mono font-semibold text-accent">{item.tarifa}</span>
-          {item.tipoTarifa === 'porcentaje' && <span className="text-2xs text-muted ml-0.5">%</span>}
-        </div>
-        {item.obs && <span className="text-2xs text-muted max-w-28 truncate" title={item.obs}>{item.obs}</span>}
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button className="btn-ghost btn-sm px-1.5 py-0.5 text-xs" onClick={() => setEditing(true)}>✏️</button>
-          <button className="btn-danger btn-sm px-1.5 py-0.5 text-xs" onClick={onDelete}>×</button>
-        </div>
+      <div className="flex items-center gap-0.5">
+        <button type="button" className="bib-toggle-btn" title="Cambiar tipo" onClick={() => onToggleChange?.(toggleTo)}>
+          {label}
+        </button>
+        <input
+          className="bib-cell-input bib-cell-input--tarifa"
+          defaultValue={value}
+          onBlur={(e) => onChange(e.target.value.trim())}
+        />
       </div>
     )
   }
 
   return (
-    <div className="p-3 rounded-lg border border-accent/30 bg-accent/5 space-y-2">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <div>
-          <label className="text-2xs text-muted block mb-0.5">Nombre</label>
-          <input className="input w-full text-sm" value={nombre} onChange={(e) => setNombre(e.target.value)} />
-        </div>
-        <div>
-          <label className="text-2xs text-muted block mb-0.5">Tarifa</label>
-          <input className="input w-full text-sm font-mono" value={tarifa} onChange={(e) => setTarifa(e.target.value)} />
-        </div>
-        <div>
-          <label className="text-2xs text-muted block mb-0.5">Tipo</label>
-          <select className="filter-select w-full text-sm" value={tipoTarifa}
-            onChange={(e) => setTipoTarifa(e.target.value as 'moneda' | 'porcentaje')}>
-            <option value="moneda">Moneda ($)</option>
-            <option value="porcentaje">Porcentaje (%)</option>
-          </select>
-        </div>
-        <div>
-          <label className="text-2xs text-muted block mb-0.5">Obs.</label>
-          <input className="input w-full text-sm" value={obs} onChange={(e) => setObs(e.target.value)} />
-        </div>
-      </div>
-      <div className="flex gap-2 justify-end">
-        <button className="btn-secondary btn-sm text-xs" onClick={() => setEditing(false)}>Cancelar</button>
-        <button className="btn-primary btn-sm text-xs" disabled={saveMut.isPending}
-          onClick={() => saveMut.mutate()}>
-          {saveMut.isPending ? 'Guardando...' : 'Guardar'}
-        </button>
-      </div>
-    </div>
+    <input
+      className={`bib-cell-input${col.tipo !== 'texto' && col.tipo !== 'numero' ? ' bib-cell-input--tarifa' : ''}`}
+      defaultValue={value}
+      onBlur={(e) => onChange(e.target.value.trim())}
+    />
   )
 }
 
-// ─── Grupo ─────────────────────────────────────────────────────────────────────
+// ─── Schema item row ──────────────────────────────────────────────────────────
 
-function GrupoSection({
-  grupo, lineaId, columnas,
+function SchemaItemRow({
+  item, cols, canMoveUp, canMoveDown, onMoveUp, onMoveDown, onDelete,
 }: {
-  grupo: BibliotecaGrupo
-  lineaId: string
-  columnas: string[]
+  item: BibliotecaItem
+  cols: BibSchemaCol[]
+  canMoveUp: boolean
+  canMoveDown: boolean
+  onMoveUp: () => void
+  onMoveDown: () => void
+  onDelete: () => void
 }) {
   const qc = useQueryClient()
-  const [expanded, setExpanded] = useState(true)
-  const [editingName, setEditingName] = useState(false)
+
+  function saveCampo(colId: string, value: string) {
+    updateItem(item.id, { extraCols: { ...item.extraCols, [colId]: value } })
+      .then(() => qc.invalidateQueries({ queryKey: ['biblioteca'] }))
+      .catch(() => toast.error('Error al guardar'))
+  }
+
+  function saveToggle(colId: string, toggleVal: string) {
+    updateItem(item.id, { extraCols: { ...item.extraCols, [`_tc_${colId}`]: toggleVal } })
+      .then(() => qc.invalidateQueries({ queryKey: ['biblioteca'] }))
+      .catch(() => toast.error('Error al guardar'))
+  }
+
+  return (
+    <tr>
+      <td style={{ width: 36, padding: '4px 6px' }}>
+        <div className="detalle-servicio-orden-actions">
+          <button type="button" className="detalle-servicio-orden-btn" disabled={!canMoveUp} onClick={onMoveUp} title="Subir">▲</button>
+          <button type="button" className="detalle-servicio-orden-btn" disabled={!canMoveDown} onClick={onMoveDown} title="Bajar">▼</button>
+        </div>
+      </td>
+      {cols.map((col) => (
+        <td key={col.id}>
+          <SchemaCell
+            col={col}
+            value={item.extraCols?.[col.id] ?? ''}
+            toggleVal={item.extraCols?.[`_tc_${col.id}`]}
+            onChange={(v) => saveCampo(col.id, v)}
+            onToggleChange={(v) => saveToggle(col.id, v)}
+          />
+        </td>
+      ))}
+      <td style={{ width: 40, textAlign: 'center' }}>
+        <button type="button" className="btn-ghost btn-sm px-1 py-0 text-xs" onClick={onDelete} title="Eliminar fila">✕</button>
+      </td>
+    </tr>
+  )
+}
+
+// ─── Standard item row ─────────────────────────────────────────────────────────
+
+function ItemRow({
+  item, extraCols, headers, onDelete, canMoveUp, canMoveDown, onMoveUp, onMoveDown,
+}: {
+  item: BibliotecaItem
+  extraCols: string[]
+  headers: [string, string, string]
+  onDelete: () => void
+  canMoveUp: boolean
+  canMoveDown: boolean
+  onMoveUp: () => void
+  onMoveDown: () => void
+}) {
+  const qc = useQueryClient()
+
+  function saveField(field: 'nombre' | 'tarifa' | 'obs' | 'tipoTarifa', value: string) {
+    const current = field === 'obs' ? (item.obs ?? '') : String(item[field] ?? '')
+    if (value === current) return
+    updateItem(item.id, { [field]: value || undefined })
+      .then(() => qc.invalidateQueries({ queryKey: ['biblioteca'] }))
+      .catch(() => toast.error('Error al guardar'))
+  }
+
+  return (
+    <tr>
+      <td style={{ width: 36, padding: '4px 6px' }}>
+        <div className="detalle-servicio-orden-actions">
+          <button type="button" className="detalle-servicio-orden-btn" disabled={!canMoveUp} onClick={onMoveUp} title="Subir">▲</button>
+          <button type="button" className="detalle-servicio-orden-btn" disabled={!canMoveDown} onClick={onMoveDown} title="Bajar">▼</button>
+        </div>
+      </td>
+      <td>
+        <input className="bib-cell-input" defaultValue={item.nombre}
+          onBlur={(e) => saveField('nombre', e.target.value.trim())} />
+      </td>
+      <td style={{ width: 150 }}>
+        <div className="flex items-center gap-1">
+          <select className="filter-select text-xs py-0.5" style={{ width: 44, minWidth: 44 }}
+            defaultValue={item.tipoTarifa}
+            onChange={(e) => saveField('tipoTarifa', e.target.value)}>
+            {TIPO_TARIFA_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.value === 'moneda' ? '$' : '%'}</option>
+            ))}
+          </select>
+          <input className="bib-cell-input bib-cell-input--tarifa" defaultValue={item.tarifa}
+            onBlur={(e) => saveField('tarifa', e.target.value.trim())} />
+        </div>
+      </td>
+      <td>
+        <input className="bib-cell-input bib-cell-input--muted" defaultValue={item.obs ?? ''} placeholder="—"
+          onBlur={(e) => saveField('obs', e.target.value.trim())} />
+      </td>
+      {extraCols.map((col) => (
+        <td key={col} className="text-xs text-muted">{item.extraCols?.[col] ?? ''}</td>
+      ))}
+      <td style={{ width: 40, textAlign: 'center' }}>
+        <button type="button" className="btn-ghost btn-sm px-1 py-0 text-xs" onClick={onDelete} title="Eliminar">✕</button>
+      </td>
+    </tr>
+  )
+}
+
+// ─── Standard grupo section ────────────────────────────────────────────────────
+
+function GrupoSection({
+  grupo, headers, extraCols, canMoveUp, canMoveDown, onMoveUp, onMoveDown, onDropReorder,
+}: {
+  grupo: BibliotecaGrupo
+  headers: [string, string, string]
+  extraCols: string[]
+  canMoveUp: boolean
+  canMoveDown: boolean
+  onMoveUp: () => void
+  onMoveDown: () => void
+  onDropReorder: (fromId: string, toId: string) => void
+}) {
+  const qc = useQueryClient()
   const [nombre, setNombre] = useState(grupo.nombre)
   const [showAddItem, setShowAddItem] = useState(false)
   const [newItem, setNewItem] = useState({ nombre: '', tarifa: '', tipoTarifa: 'moneda', obs: '' })
 
+  const sortedItems = [...grupo.items].sort((a, b) => a.orden - b.orden)
+
   const updateGrupoMut = useMutation({
     mutationFn: () => updateGrupo(grupo.id, { nombre }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['biblioteca'] }); setEditingName(false) },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
     onError: () => toast.error('Error al guardar'),
   })
 
@@ -118,10 +246,8 @@ function GrupoSection({
 
   const addItemMut = useMutation({
     mutationFn: () => createItem(grupo.id, {
-      nombre: newItem.nombre,
-      tarifa: newItem.tarifa,
-      tipoTarifa: newItem.tipoTarifa,
-      obs: newItem.obs || undefined,
+      nombre: newItem.nombre, tarifa: newItem.tarifa,
+      tipoTarifa: newItem.tipoTarifa, obs: newItem.obs || undefined, orden: sortedItems.length,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['biblioteca'] })
@@ -138,107 +264,123 @@ function GrupoSection({
     onError: () => toast.error('Error al eliminar'),
   })
 
+  const reorderItemMut = useMutation({
+    mutationFn: async ({ index, direction }: { index: number; direction: -1 | 1 }) => {
+      const j = index + direction
+      if (j < 0 || j >= sortedItems.length) return
+      const ids = sortedItems.map((i) => i.id)
+      const [moved] = ids.splice(index, 1)
+      ids.splice(j, 0, moved)
+      await persistOrden(ids, (id, orden) => updateItem(id, { orden }))
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
+    onError: () => toast.error('Error al reordenar'),
+  })
+
   return (
-    <div className="border border-border rounded-xl overflow-hidden">
-      {/* Header grupo */}
-      <div className="flex items-center gap-2 px-4 py-2.5 bg-surface2">
-        <button onClick={() => setExpanded((x) => !x)} className="text-muted hover:text-foreground">
-          {expanded ? '▼' : '▶'}
-        </button>
-        {editingName ? (
-          <div className="flex items-center gap-2 flex-1">
-            <input className="input flex-1 text-sm py-1" value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && updateGrupoMut.mutate()} />
-            <button className="btn-primary btn-sm text-xs py-1" onClick={() => updateGrupoMut.mutate()}>OK</button>
-            <button className="btn-secondary btn-sm text-xs py-1" onClick={() => setEditingName(false)}>✕</button>
-          </div>
-        ) : (
-          <span
-            className="flex-1 text-sm font-semibold text-foreground cursor-pointer hover:text-accent"
-            onDoubleClick={() => setEditingName(true)}
-            title="Doble clic para editar"
-          >
-            {grupo.nombre}
-          </span>
-        )}
-        <span className="text-2xs text-muted">{grupo.items.length} items</span>
-        <div className="flex gap-1">
-          <button className="btn-ghost btn-sm px-1.5 py-0.5 text-xs" onClick={() => { setShowAddItem(true); setExpanded(true) }}>
-            + Item
-          </button>
-          <button className="btn-danger btn-sm px-1.5 py-0.5 text-xs"
-            onClick={() => { if (confirm(`¿Eliminar grupo "${grupo.nombre}"?`)) deleteGrupoMut.mutate() }}>
-            ×
-          </button>
+    <div className="bib-grupo-row" draggable
+      onDragStart={(e) => { e.dataTransfer.setData('text/plain', grupo.id); e.dataTransfer.effectAllowed = 'move' }}
+      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+      onDrop={(e) => { e.preventDefault(); const fid = e.dataTransfer.getData('text/plain'); if (fid && fid !== grupo.id) onDropReorder(fid, grupo.id) }}>
+      <div className="bib-grupo-title-row bib-grupo-title-row--open">
+        <span className="bib-grupo-drag" title="Reordenar">⠿</span>
+        <div className="detalle-servicio-orden-actions">
+          <button type="button" className="detalle-servicio-orden-btn" disabled={!canMoveUp} onClick={onMoveUp} title="Subir">▲</button>
+          <button type="button" className="detalle-servicio-orden-btn" disabled={!canMoveDown} onClick={onMoveDown} title="Bajar">▼</button>
         </div>
+        <input className="bib-grupo-name" value={nombre} onChange={(e) => setNombre(e.target.value)}
+          onBlur={() => { if (nombre.trim() && nombre !== grupo.nombre) updateGrupoMut.mutate() }}
+          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
+        <button type="button" className="btn-danger btn-sm px-2 py-0.5 text-xs flex-shrink-0"
+          onClick={() => { if (confirm(`¿Eliminar grupo "${grupo.nombre}"?`)) deleteGrupoMut.mutate() }}>
+          🗑 Grupo
+        </button>
       </div>
 
-      {/* Items */}
-      {expanded && (
-        <div className="p-3 space-y-1">
-          {grupo.items.length === 0 && !showAddItem && (
-            <p className="text-xs text-muted text-center py-2">Sin items. Haz clic en "+ Item" para agregar.</p>
-          )}
-          {grupo.items.map((item) => (
-            <ItemRow
-              key={item.id}
-              item={item}
-              grupoId={grupo.id}
-              columnas={columnas}
-              onDelete={() => deleteItemMut.mutate(item.id)}
-            />
-          ))}
+      <div className="bib-grupo-body">
+        {(grupo.items.length > 0 || showAddItem) && (
+          <TableScrollArea>
+          <table className="bib-items-table">
+            <thead>
+              <tr>
+                <th style={{ width: 36 }} />
+                <th>{headers[0]}</th>
+                <th>{headers[1]}</th>
+                <th>{headers[2]}</th>
+                {extraCols.map((col) => <th key={col}>{col}</th>)}
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {sortedItems.map((item, index) => (
+                <ItemRow key={item.id} item={item} extraCols={extraCols} headers={headers}
+                  canMoveUp={index > 0} canMoveDown={index < sortedItems.length - 1}
+                  onMoveUp={() => reorderItemMut.mutate({ index, direction: -1 })}
+                  onMoveDown={() => reorderItemMut.mutate({ index, direction: 1 })}
+                  onDelete={() => deleteItemMut.mutate(item.id)} />
+              ))}
+            </tbody>
+          </table>
+          </TableScrollArea>
+        )}
+        {grupo.items.length === 0 && !showAddItem && (
+          <p className="text-xs text-muted text-center py-3">Sin ítems. Usa &quot;+ Ítem&quot; para agregar.</p>
+        )}
 
-          {/* Formulario nuevo item */}
-          {showAddItem && (
-            <div className="p-3 rounded-lg border border-accent/30 bg-accent/5 space-y-2 mt-2">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <div>
-                  <label className="text-2xs text-muted block mb-0.5">Nombre</label>
-                  <input className="input w-full text-sm" placeholder="Descripción" value={newItem.nombre}
-                    onChange={(e) => setNewItem((s) => ({ ...s, nombre: e.target.value }))} autoFocus />
-                </div>
-                <div>
-                  <label className="text-2xs text-muted block mb-0.5">Tarifa</label>
-                  <input className="input w-full text-sm font-mono" placeholder="$559.900" value={newItem.tarifa}
-                    onChange={(e) => setNewItem((s) => ({ ...s, tarifa: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="text-2xs text-muted block mb-0.5">Tipo</label>
-                  <select className="filter-select w-full text-sm" value={newItem.tipoTarifa}
-                    onChange={(e) => setNewItem((s) => ({ ...s, tipoTarifa: e.target.value }))}>
-                    <option value="moneda">Moneda ($)</option>
-                    <option value="porcentaje">Porcentaje (%)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-2xs text-muted block mb-0.5">Obs.</label>
-                  <input className="input w-full text-sm" placeholder="Opcional" value={newItem.obs}
-                    onChange={(e) => setNewItem((s) => ({ ...s, obs: e.target.value }))} />
-                </div>
+        {showAddItem && (
+          <div className="p-3 rounded-lg border border-accent/30 bg-accent/5 space-y-2 mt-2 mx-3 mb-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div>
+                <label className="text-2xs text-muted block mb-0.5">Nombre</label>
+                <input className="input w-full text-sm" placeholder="Descripción" value={newItem.nombre} autoFocus
+                  onChange={(e) => setNewItem((s) => ({ ...s, nombre: e.target.value }))} />
               </div>
-              <div className="flex gap-2 justify-end">
-                <button className="btn-secondary btn-sm text-xs" onClick={() => setShowAddItem(false)}>Cancelar</button>
-                <button className="btn-primary btn-sm text-xs"
-                  disabled={!newItem.nombre || !newItem.tarifa || addItemMut.isPending}
-                  onClick={() => addItemMut.mutate()}>
-                  {addItemMut.isPending ? 'Guardando...' : 'Agregar'}
-                </button>
+              <div>
+                <label className="text-2xs text-muted block mb-0.5">Tarifa</label>
+                <input className="input w-full text-sm font-mono" placeholder="$559.900" value={newItem.tarifa}
+                  onChange={(e) => setNewItem((s) => ({ ...s, tarifa: e.target.value }))} />
+              </div>
+              <div>
+                <label className="text-2xs text-muted block mb-0.5">Tipo</label>
+                <select className="filter-select w-full text-sm" value={newItem.tipoTarifa}
+                  onChange={(e) => setNewItem((s) => ({ ...s, tipoTarifa: e.target.value }))}>
+                  {TIPO_TARIFA_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-2xs text-muted block mb-0.5">Obs.</label>
+                <input className="input w-full text-sm" placeholder="Opcional" value={newItem.obs}
+                  onChange={(e) => setNewItem((s) => ({ ...s, obs: e.target.value }))} />
               </div>
             </div>
-          )}
-        </div>
-      )}
+            <div className="flex gap-2 justify-end">
+              <button type="button" className="btn-secondary btn-sm text-xs" onClick={() => setShowAddItem(false)}>Cancelar</button>
+              <button type="button" className="btn-primary btn-sm text-xs"
+                disabled={!newItem.nombre || !newItem.tarifa || addItemMut.isPending}
+                onClick={() => addItemMut.mutate()}>
+                {addItemMut.isPending ? 'Guardando...' : 'Agregar'}
+              </button>
+            </div>
+          </div>
+        )}
+        <button type="button" className="btn-secondary btn-sm text-xs bib-grupo-add-item" onClick={() => setShowAddItem(true)}>
+          + Ítem
+        </button>
+      </div>
     </div>
   )
 }
 
-// ─── Columnas section ─────────────────────────────────────────────────────────
+// ─── ColumnasSection (BIB-08) ─────────────────────────────────────────────────
 
 function ColumnasSection({ linea }: { linea: BibliotecaLinea }) {
   const qc = useQueryClient()
+  const raw: string[] = (linea.columnas as string[]) ?? []
+  const parsed = parseColumnas(raw)
+  const [headers, setHeaders] = useState<[string, string, string]>(parsed.headers)
   const [nueva, setNueva] = useState('')
+
+  const extra = parsed.extra
 
   const saveMut = useMutation({
     mutationFn: (cols: string[]) => updateLinea(linea.id, { columnas: cols }),
@@ -246,61 +388,439 @@ function ColumnasSection({ linea }: { linea: BibliotecaLinea }) {
     onError: () => toast.error('Error al guardar columnas'),
   })
 
-  const cols: string[] = (linea.columnas as string[]) ?? []
+  function saveHeader(idx: 0 | 1 | 2, value: string) {
+    const trimmed = value.trim() || COL_DEFAULTS[idx]
+    const next: [string, string, string] = [...headers] as [string, string, string]
+    next[idx] = trimmed
+    setHeaders(next)
+    saveMut.mutate(encodeColumnas(next, extra))
+  }
 
   function addCol() {
     const trimmed = nueva.trim()
-    if (!trimmed || cols.includes(trimmed)) return
-    saveMut.mutate([...cols, trimmed])
+    if (!trimmed || extra.includes(trimmed)) return
+    saveMut.mutate(encodeColumnas(headers, [...extra, trimmed]))
     setNueva('')
   }
 
   function removeCol(col: string) {
-    saveMut.mutate(cols.filter((c) => c !== col))
+    saveMut.mutate(encodeColumnas(headers, extra.filter((c) => c !== col)))
   }
 
   return (
-    <div className="rounded-xl border border-border p-4 space-y-3">
-      <div className="flex items-center gap-2 mb-1">
-        <span className="text-xs font-bold text-accent uppercase tracking-widest">🗂 Columnas extra en cotización</span>
-        <span className="text-2xs text-muted">(se muestran como columnas adicionales en la tabla de tarifas)</span>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {cols.length === 0 && (
-          <span className="text-xs text-muted">Sin columnas extra. Las columnas por defecto son: Servicio, Tarifa, Observaciones.</span>
-        )}
-        {cols.map((col) => (
-          <div key={col} className="flex items-center gap-1 bg-surface2 rounded-lg px-2 py-1">
-            <span className="text-xs font-semibold text-foreground">{col}</span>
-            <button
-              className="text-muted hover:text-danger text-xs leading-none ml-1"
-              onClick={() => removeCol(col)}
-              title="Eliminar columna"
-            >×</button>
+    <div className="bib-columnas-panel">
+      <div className="bib-columnas-panel-title">🗂 Columnas de la tabla en cotización</div>
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        {(['col1', 'col2', 'col3'] as const).map((k, i) => (
+          <div key={k}>
+            <label className="text-2xs text-muted block mb-0.5">{k} · por defecto: {COL_DEFAULTS[i]}</label>
+            <input
+              className="input w-full text-sm"
+              value={headers[i]}
+              onChange={(e) => setHeaders((prev) => { const n = [...prev] as [string, string, string]; n[i] = e.target.value; return n })}
+              onBlur={(e) => saveHeader(i as 0 | 1 | 2, e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+            />
           </div>
         ))}
       </div>
-      <div className="flex gap-2 items-center">
-        <input
-          className="input text-sm flex-1 max-w-xs"
-          placeholder="Nombre de la columna (ej: Mínimo)"
-          value={nueva}
-          onChange={(e) => setNueva(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && addCol()}
-        />
-        <button
-          className="btn-primary btn-sm text-xs"
-          disabled={!nueva.trim() || saveMut.isPending}
-          onClick={addCol}
-        >
-          + Agregar
+      <div className="flex flex-wrap gap-2 mb-2">
+        {extra.length === 0 && <span className="text-xs text-muted">Sin columnas extra.</span>}
+        {extra.map((col) => (
+          <div key={col} className="flex items-center gap-1 bg-surface2 rounded-lg px-2 py-1">
+            <span className="text-xs font-semibold text-foreground">{col}</span>
+            <button type="button" className="text-muted hover:text-danger text-xs leading-none ml-1"
+              onClick={() => removeCol(col)} title="Eliminar">×</button>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2 items-center flex-wrap">
+        <input className="input text-sm max-w-xs" placeholder="Columna extra (ej: Mínimo)" value={nueva}
+          onChange={(e) => setNueva(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addCol()} />
+        <button type="button" className="btn-secondary btn-sm text-xs"
+          disabled={!nueva.trim() || saveMut.isPending} onClick={addCol}>
+          + Columna extra
         </button>
       </div>
     </div>
   )
 }
 
-// ─── Observaciones section ────────────────────────────────────────────────────
+// ─── Transporte grupo ──────────────────────────────────────────────────────────
+
+function GrupoTransporteSection({
+  grupo, canMoveUp, canMoveDown, onMoveUp, onMoveDown, onDropReorder,
+}: {
+  grupo: BibliotecaGrupo
+  canMoveUp: boolean
+  canMoveDown: boolean
+  onMoveUp: () => void
+  onMoveDown: () => void
+  onDropReorder: (fromId: string, toId: string) => void
+}) {
+  const qc = useQueryClient()
+  const { tipo } = parseGrupoNombre(grupo.nombre)
+  const schema = TRANSP_SCHEMA[tipo as keyof typeof TRANSP_SCHEMA] ?? TRANSP_SCHEMA.local
+  const sortedItems = [...grupo.items].sort((a, b) => a.orden - b.orden)
+  const badge = tipo === 'local' ? '🚛' : '📦'
+
+  const deleteGrupoMut = useMutation({
+    mutationFn: () => deleteGrupo(grupo.id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
+    onError: () => toast.error('Error al eliminar'),
+  })
+
+  const addFilaMut = useMutation({
+    mutationFn: () => createItem(grupo.id, { nombre: 'fila', tarifa: '', orden: sortedItems.length }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
+    onError: () => toast.error('Error al agregar fila'),
+  })
+
+  const deleteItemMut = useMutation({
+    mutationFn: deleteItem,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
+    onError: () => toast.error('Error al eliminar'),
+  })
+
+  const reorderItemMut = useMutation({
+    mutationFn: async ({ index, direction }: { index: number; direction: -1 | 1 }) => {
+      const j = index + direction
+      if (j < 0 || j >= sortedItems.length) return
+      const ids = sortedItems.map((i) => i.id)
+      const [moved] = ids.splice(index, 1)
+      ids.splice(j, 0, moved)
+      await persistOrden(ids, (id, orden) => updateItem(id, { orden }))
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
+    onError: () => toast.error('Error al reordenar'),
+  })
+
+  return (
+    <div className="bib-grupo-row" draggable
+      onDragStart={(e) => { e.dataTransfer.setData('text/plain', grupo.id); e.dataTransfer.effectAllowed = 'move' }}
+      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+      onDrop={(e) => { e.preventDefault(); const fid = e.dataTransfer.getData('text/plain'); if (fid && fid !== grupo.id) onDropReorder(fid, grupo.id) }}>
+      <div className="bib-grupo-title-row bib-grupo-title-row--open">
+        <span className="bib-grupo-drag" title="Reordenar">⠿</span>
+        <div className="detalle-servicio-orden-actions">
+          <button type="button" className="detalle-servicio-orden-btn" disabled={!canMoveUp} onClick={onMoveUp} title="Subir">▲</button>
+          <button type="button" className="detalle-servicio-orden-btn" disabled={!canMoveDown} onClick={onMoveDown} title="Bajar">▼</button>
+        </div>
+        <span className="bib-grupo-badge">{badge} {schema.label}</span>
+        <button type="button" className="btn-danger btn-sm px-2 py-0.5 text-xs flex-shrink-0"
+          onClick={() => { if (confirm(`¿Eliminar grupo "${schema.label}"?`)) deleteGrupoMut.mutate() }}>
+          🗑 Grupo
+        </button>
+      </div>
+      <div className="bib-grupo-body">
+        <TableScrollArea>
+        <table className="bib-items-table">
+          <thead>
+            <tr>
+              <th style={{ width: 36 }} />
+              {schema.cols.map((c) => <th key={c.id}>{c.nombre}</th>)}
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {sortedItems.map((item, index) => (
+              <SchemaItemRow key={item.id} item={item} cols={schema.cols}
+                canMoveUp={index > 0} canMoveDown={index < sortedItems.length - 1}
+                onMoveUp={() => reorderItemMut.mutate({ index, direction: -1 })}
+                onMoveDown={() => reorderItemMut.mutate({ index, direction: 1 })}
+                onDelete={() => deleteItemMut.mutate(item.id)} />
+            ))}
+            {sortedItems.length === 0 && (
+              <tr>
+                <td colSpan={schema.cols.length + 2} className="text-xs text-muted text-center py-3">
+                  Sin filas. Usa &quot;+ Fila&quot; para agregar.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+        </TableScrollArea>
+        <button type="button" className="btn-secondary btn-sm text-xs bib-grupo-add-item"
+          onClick={() => addFilaMut.mutate()}>
+          + Fila
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Transporte section ────────────────────────────────────────────────────────
+
+function BibTransporteSection({ linea }: { linea: BibliotecaLinea }) {
+  const qc = useQueryClient()
+  const sortedGrupos = [...linea.grupos].sort((a, b) => a.orden - b.orden)
+
+  const addGrupoMut = useMutation({
+    mutationFn: (tipo: keyof typeof TRANSP_SCHEMA) =>
+      createGrupo(linea.id, { nombre: encodeGrupoNombre(tipo, TRANSP_SCHEMA[tipo].label), orden: sortedGrupos.length }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['biblioteca'] }); toast.success('Grupo agregado') },
+    onError: () => toast.error('Error al agregar grupo'),
+  })
+
+  const reorderGrupoMut = useMutation({
+    mutationFn: async ({ index, direction }: { index: number; direction: -1 | 1 }) => {
+      const j = index + direction
+      if (j < 0 || j >= sortedGrupos.length) return
+      const ids = sortedGrupos.map((g) => g.id)
+      const [moved] = ids.splice(index, 1)
+      ids.splice(j, 0, moved)
+      await persistOrden(ids, (id, orden) => updateGrupo(id, { orden }))
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
+    onError: () => toast.error('Error al reordenar'),
+  })
+
+  const dropReorderGrupoMut = useMutation({
+    mutationFn: async ({ fromId, toId }: { fromId: string; toId: string }) => {
+      const ids = sortedGrupos.map((g) => g.id)
+      const fi = ids.indexOf(fromId); const ti = ids.indexOf(toId)
+      if (fi < 0 || ti < 0 || fi === ti) return
+      const [moved] = ids.splice(fi, 1)
+      ids.splice(ti, 0, moved)
+      await persistOrden(ids, (id, orden) => updateGrupo(id, { orden }))
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
+    onError: () => toast.error('Error al reordenar'),
+  })
+
+  return (
+    <div className="space-y-4">
+      {sortedGrupos.map((grupo, index) => (
+        <GrupoTransporteSection key={grupo.id} grupo={grupo}
+          canMoveUp={index > 0} canMoveDown={index < sortedGrupos.length - 1}
+          onMoveUp={() => reorderGrupoMut.mutate({ index, direction: -1 })}
+          onMoveDown={() => reorderGrupoMut.mutate({ index, direction: 1 })}
+          onDropReorder={(fid, tid) => dropReorderGrupoMut.mutate({ fromId: fid, toId: tid })} />
+      ))}
+      {sortedGrupos.length === 0 && (
+        <p className="text-sm text-muted text-center py-4">Sin grupos. Crea uno con los botones.</p>
+      )}
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className="btn-secondary btn-sm text-xs"
+          disabled={addGrupoMut.isPending} onClick={() => addGrupoMut.mutate('local')}>
+          🚛 + Nuevo grupo Transporte Local
+        </button>
+        <button type="button" className="btn-secondary btn-sm text-xs"
+          disabled={addGrupoMut.isPending} onClick={() => addGrupoMut.mutate('otros')}>
+          📦 + Nuevo grupo Otros Servicios
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Paqueteo table head ───────────────────────────────────────────────────────
+
+function PaqueteoTableHead({ entry }: { entry: (typeof PAQUETEO_SCHEMA)[string] }) {
+  if (!entry.colspanGroups) {
+    return (
+      <thead>
+        <tr>
+          <th style={{ width: 36 }} />
+          {entry.cols.map((c) => <th key={c.id}>{c.nombre}</th>)}
+          <th />
+        </tr>
+      </thead>
+    )
+  }
+
+  const spanColIds = new Set(entry.colspanGroups.flatMap((g) => g.cols))
+  const leadCols = entry.cols.filter((c) => !spanColIds.has(c.id))
+
+  return (
+    <thead>
+      <tr>
+        <th style={{ width: 36 }} rowSpan={2} />
+        {leadCols.map((c) => <th key={c.id} rowSpan={2}>{c.nombre}</th>)}
+        {entry.colspanGroups.map((g) => (
+          <th key={g.label} colSpan={g.cols.length} className="text-center">{g.label}</th>
+        ))}
+        <th rowSpan={2} />
+      </tr>
+      <tr>
+        {entry.colspanGroups.flatMap((g) =>
+          g.cols.map((colId) => {
+            const col = entry.cols.find((c) => c.id === colId)
+            return <th key={colId}>{col?.nombre ?? colId}</th>
+          })
+        )}
+      </tr>
+    </thead>
+  )
+}
+
+// ─── Paqueteo grupo ────────────────────────────────────────────────────────────
+
+function GrupoPaqueteoSection({
+  grupo, canMoveUp, canMoveDown, onMoveUp, onMoveDown,
+}: {
+  grupo: BibliotecaGrupo
+  canMoveUp: boolean
+  canMoveDown: boolean
+  onMoveUp: () => void
+  onMoveDown: () => void
+}) {
+  const qc = useQueryClient()
+  const { tipo } = parseGrupoNombre(grupo.nombre)
+  const entry = PAQUETEO_SCHEMA[tipo]
+  if (!entry) return null
+
+  const sortedItems = [...grupo.items].sort((a, b) => a.orden - b.orden)
+
+  const addFilaMut = useMutation({
+    mutationFn: () => createItem(grupo.id, { nombre: 'fila', tarifa: '', orden: sortedItems.length }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
+    onError: () => toast.error('Error al agregar fila'),
+  })
+
+  const deleteItemMut = useMutation({
+    mutationFn: deleteItem,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
+    onError: () => toast.error('Error al eliminar'),
+  })
+
+  const reorderItemMut = useMutation({
+    mutationFn: async ({ index, direction }: { index: number; direction: -1 | 1 }) => {
+      const j = index + direction
+      if (j < 0 || j >= sortedItems.length) return
+      const ids = sortedItems.map((i) => i.id)
+      const [moved] = ids.splice(index, 1)
+      ids.splice(j, 0, moved)
+      await persistOrden(ids, (id, orden) => updateItem(id, { orden }))
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
+    onError: () => toast.error('Error al reordenar'),
+  })
+
+  return (
+    <div className="bib-grupo-row">
+      <div className="bib-grupo-title-row bib-grupo-title-row--open">
+        <div className="detalle-servicio-orden-actions">
+          <button type="button" className="detalle-servicio-orden-btn" disabled={!canMoveUp} onClick={onMoveUp} title="Subir">▲</button>
+          <button type="button" className="detalle-servicio-orden-btn" disabled={!canMoveDown} onClick={onMoveDown} title="Bajar">▼</button>
+        </div>
+        <span className="bib-grupo-badge">{entry.label}</span>
+      </div>
+      <div className="bib-grupo-body">
+        <TableScrollArea>
+        <table className="bib-items-table">
+          <PaqueteoTableHead entry={entry} />
+          <tbody>
+            {sortedItems.map((item, index) => (
+              <SchemaItemRow key={item.id} item={item} cols={entry.cols}
+                canMoveUp={index > 0} canMoveDown={index < sortedItems.length - 1}
+                onMoveUp={() => reorderItemMut.mutate({ index, direction: -1 })}
+                onMoveDown={() => reorderItemMut.mutate({ index, direction: 1 })}
+                onDelete={() => deleteItemMut.mutate(item.id)} />
+            ))}
+            {sortedItems.length === 0 && (
+              <tr>
+                <td colSpan={entry.cols.length + 2} className="text-xs text-muted text-center py-3">
+                  Sin filas. Usa &quot;+ Fila&quot; para agregar.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+        </TableScrollArea>
+        <button type="button" className="btn-secondary btn-sm text-xs bib-grupo-add-item"
+          onClick={() => addFilaMut.mutate()}>
+          + Fila
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Paqueteo section (tabs) ──────────────────────────────────────────────────
+
+const PAQUETEO_TAB_GRUPOS: Record<PaqueteoTab, readonly string[]> = {
+  COORDINADORA: PAQUETEO_GRUPOS_COORD,
+  TCC: PAQUETEO_GRUPOS_TCC,
+  SERVIENTREGA: PAQUETEO_GRUPOS_SERVIENTREGA,
+}
+
+function BibPaqueteoSection({ linea }: { linea: BibliotecaLinea }) {
+  const qc = useQueryClient()
+  const [tab, setTab] = useState<PaqueteoTab>('COORDINADORA')
+
+  const allGrupos = [...linea.grupos].sort((a, b) => a.orden - b.orden)
+  const tiposPresentes = new Set(allGrupos.map((g) => parseGrupoNombre(g.nombre).tipo))
+  const tabGrupos = allGrupos.filter((g) =>
+    (PAQUETEO_TAB_GRUPOS[tab] as readonly string[]).includes(parseGrupoNombre(g.nombre).tipo)
+  )
+
+  const seedMut = useMutation({
+    mutationFn: async () => {
+      const allTipos = [...PAQUETEO_GRUPOS_COORD, ...PAQUETEO_GRUPOS_TCC, ...PAQUETEO_GRUPOS_SERVIENTREGA]
+      let orden = allGrupos.length
+      for (const tipo of allTipos) {
+        if (!tiposPresentes.has(tipo)) {
+          await createGrupo(linea.id, { nombre: encodeGrupoNombre(tipo, PAQUETEO_SCHEMA[tipo].label), orden: orden++ })
+        }
+      }
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['biblioteca'] }); toast.success('Grupos inicializados') },
+    onError: () => toast.error('Error al inicializar'),
+  })
+
+  const reorderGrupoMut = useMutation({
+    mutationFn: async ({ index, direction }: { index: number; direction: -1 | 1 }) => {
+      const j = index + direction
+      if (j < 0 || j >= tabGrupos.length) return
+      const ids = tabGrupos.map((g) => g.id)
+      const [moved] = ids.splice(index, 1)
+      ids.splice(j, 0, moved)
+      await persistOrden(ids, (id, orden) => updateGrupo(id, { orden }))
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
+    onError: () => toast.error('Error al reordenar'),
+  })
+
+  if (allGrupos.length === 0) {
+    return (
+      <div className="text-center py-6">
+        <p className="text-sm text-muted mb-3">Sin grupos. Inicializa los 13 grupos estándar.</p>
+        <button type="button" className="btn-primary btn-sm"
+          disabled={seedMut.isPending} onClick={() => seedMut.mutate()}>
+          {seedMut.isPending ? 'Inicializando...' : '⚡ Inicializar grupos de Paqueteo'}
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div className="flex gap-0 mb-4 border-b border-border">
+        {PAQUETEO_PAQUETEADORAS.map((t) => (
+          <button key={t} type="button"
+            className={`bib-tab-btn${tab === t ? ' bib-tab-btn--active' : ''}`}
+            onClick={() => setTab(t)}>
+            {t}
+          </button>
+        ))}
+      </div>
+      <div className="space-y-4">
+        {tabGrupos.map((grupo, index) => (
+          <GrupoPaqueteoSection key={grupo.id} grupo={grupo}
+            canMoveUp={index > 0} canMoveDown={index < tabGrupos.length - 1}
+            onMoveUp={() => reorderGrupoMut.mutate({ index, direction: -1 })}
+            onMoveDown={() => reorderGrupoMut.mutate({ index, direction: 1 })} />
+        ))}
+        {tabGrupos.length === 0 && (
+          <p className="text-xs text-muted text-center py-4">Sin grupos para {tab}.</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Observaciones ─────────────────────────────────────────────────────────────
 
 function ObsCard({ obs, onDelete }: { obs: BibliotecaObs; onDelete: () => void }) {
   const qc = useQueryClient()
@@ -324,10 +844,7 @@ function ObsCard({ obs, onDelete }: { obs: BibliotecaObs; onDelete: () => void }
             <button className="btn-danger btn-sm px-1.5 py-0.5 text-xs" onClick={onDelete}>×</button>
           </div>
         </div>
-        <div
-          className="text-xs text-muted leading-relaxed line-clamp-3"
-          dangerouslySetInnerHTML={{ __html: obs.html }}
-        />
+        <div className="text-xs text-muted leading-relaxed line-clamp-3" dangerouslySetInnerHTML={{ __html: obs.html }} />
       </div>
     )
   }
@@ -340,11 +857,8 @@ function ObsCard({ obs, onDelete }: { obs: BibliotecaObs; onDelete: () => void }
       </div>
       <div>
         <label className="text-2xs text-muted block mb-0.5">Contenido (HTML o texto)</label>
-        <textarea
-          className="input w-full text-sm font-mono min-h-24 resize-y"
-          value={html}
-          onChange={(e) => setHtml(e.target.value)}
-        />
+        <textarea className="input w-full text-sm font-mono min-h-24 resize-y" value={html}
+          onChange={(e) => setHtml(e.target.value)} />
       </div>
       <div className="flex gap-2 justify-end">
         <button className="btn-secondary btn-sm text-xs" onClick={() => setEditing(false)}>Cancelar</button>
@@ -386,17 +900,14 @@ function ObsSection({ linea }: { linea: BibliotecaLinea }) {
         <span className="text-xs font-bold text-accent uppercase tracking-widest">📝 Observaciones de cotización</span>
         <button className="btn-ghost btn-sm text-xs" onClick={() => setAdding(true)}>+ Nueva</button>
       </div>
-
       {obs.length === 0 && !adding && (
         <p className="text-xs text-muted">Sin observaciones. Se mostrarán al pie de la cotización en PDF.</p>
       )}
-
       <div className="space-y-2">
         {obs.map((o) => (
           <ObsCard key={o.id} obs={o} onDelete={() => delMut.mutate(o.id)} />
         ))}
       </div>
-
       {adding && (
         <div className="rounded-lg border border-accent/30 bg-accent/5 p-3 space-y-2">
           <div>
@@ -406,18 +917,15 @@ function ObsSection({ linea }: { linea: BibliotecaLinea }) {
           </div>
           <div>
             <label className="text-2xs text-muted block mb-0.5">Contenido (HTML o texto)</label>
-            <textarea
-              className="input w-full text-sm font-mono min-h-20 resize-y"
-              placeholder="Ej: <p>Tarifas sujetas a cambio sin previo aviso.</p>"
-              value={newHtml}
-              onChange={(e) => setNewHtml(e.target.value)}
-            />
+            <textarea className="input w-full text-sm font-mono min-h-20 resize-y"
+              placeholder="<p>Tarifas sujetas a cambio sin previo aviso.</p>"
+              value={newHtml} onChange={(e) => setNewHtml(e.target.value)} />
           </div>
           <div className="flex gap-2 justify-end">
-            <button className="btn-secondary btn-sm text-xs" onClick={() => { setAdding(false); setNewNombre(''); setNewHtml('') }}>Cancelar</button>
+            <button className="btn-secondary btn-sm text-xs"
+              onClick={() => { setAdding(false); setNewNombre(''); setNewHtml('') }}>Cancelar</button>
             <button className="btn-primary btn-sm text-xs"
-              disabled={!newNombre.trim() || addMut.isPending}
-              onClick={() => addMut.mutate()}>
+              disabled={!newNombre.trim() || addMut.isPending} onClick={() => addMut.mutate()}>
               {addMut.isPending ? 'Guardando...' : 'Agregar'}
             </button>
           </div>
@@ -431,17 +939,19 @@ function ObsSection({ linea }: { linea: BibliotecaLinea }) {
 
 function LineaSection({ linea }: { linea: BibliotecaLinea }) {
   const qc = useQueryClient()
-  const [expanded, setExpanded] = useState(true)
-  const [editingName, setEditingName] = useState(false)
-  const [nombre, setNombre] = useState(linea.nombre)
+  const [expanded, setExpanded] = useState(false)
   const [showAddGrupo, setShowAddGrupo] = useState(false)
   const [nuevoGrupo, setNuevoGrupo] = useState('')
 
-  const updateLineaMut = useMutation({
-    mutationFn: () => updateLinea(linea.id, { nombre }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['biblioteca'] }); setEditingName(false) },
-    onError: () => toast.error('Error al guardar'),
-  })
+  const isTransporte = isTransporteLine(linea.nombre)
+  const isPaqueteo = isPaqueteoLine(linea.nombre)
+  const isStandard = !isTransporte && !isPaqueteo
+  const icon = isTransporte ? '🚛' : isPaqueteo ? '📦' : '📋'
+
+  const raw: string[] = (linea.columnas as string[]) ?? []
+  const { headers, extra: extraCols } = parseColumnas(raw)
+  const sortedGrupos = [...linea.grupos].sort((a, b) => a.orden - b.orden)
+  const totalItems = linea.grupos.reduce((s, g) => s + g.items.length, 0)
 
   const deleteLineaMut = useMutation({
     mutationFn: () => deleteLinea(linea.id),
@@ -450,79 +960,110 @@ function LineaSection({ linea }: { linea: BibliotecaLinea }) {
   })
 
   const addGrupoMut = useMutation({
-    mutationFn: () => createGrupo(linea.id, { nombre: nuevoGrupo }),
+    mutationFn: () => createGrupo(linea.id, { nombre: nuevoGrupo, orden: sortedGrupos.length }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['biblioteca'] })
-      setShowAddGrupo(false)
-      setNuevoGrupo('')
+      setShowAddGrupo(false); setNuevoGrupo('')
       toast.success('Grupo agregado')
     },
     onError: () => toast.error('Error al agregar grupo'),
   })
 
-  const totalItems = linea.grupos.reduce((s, g) => s + g.items.length, 0)
+  const reorderGrupoMut = useMutation({
+    mutationFn: async ({ index, direction }: { index: number; direction: -1 | 1 }) => {
+      const j = index + direction
+      if (j < 0 || j >= sortedGrupos.length) return
+      const ids = sortedGrupos.map((g) => g.id)
+      const [moved] = ids.splice(index, 1)
+      ids.splice(j, 0, moved)
+      await persistOrden(ids, (id, orden) => updateGrupo(id, { orden }))
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
+    onError: () => toast.error('Error al reordenar'),
+  })
+
+  const dropReorderGrupoMut = useMutation({
+    mutationFn: async ({ fromId, toId }: { fromId: string; toId: string }) => {
+      const ids = sortedGrupos.map((g) => g.id)
+      const fi = ids.indexOf(fromId); const ti = ids.indexOf(toId)
+      if (fi < 0 || ti < 0 || fi === ti) return
+      const [moved] = ids.splice(fi, 1)
+      ids.splice(ti, 0, moved)
+      await persistOrden(ids, (id, orden) => updateGrupo(id, { orden }))
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
+    onError: () => toast.error('Error al reordenar'),
+  })
 
   return (
-    <div className="card overflow-hidden">
-      {/* Header línea */}
-      <div className="flex items-center gap-3 px-5 py-3 bg-accent/5 border-b border-border">
-        <button onClick={() => setExpanded((x) => !x)} className="text-accent text-sm">
-          {expanded ? '▼' : '▶'}
-        </button>
-        {editingName ? (
-          <div className="flex items-center gap-2 flex-1">
-            <input className="input flex-1" value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && updateLineaMut.mutate()} />
-            <button className="btn-primary btn-sm" onClick={() => updateLineaMut.mutate()}>OK</button>
-            <button className="btn-secondary btn-sm" onClick={() => setEditingName(false)}>✕</button>
+    <div className="bib-linea-card">
+      <div className={`bib-linea-header${expanded ? ' bib-linea-header--open' : ''}`}
+        onClick={() => setExpanded((x) => !x)}
+        onKeyDown={(e) => e.key === 'Enter' && setExpanded((x) => !x)}
+        role="button" tabIndex={0}>
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <span className="text-xl flex-shrink-0">{icon}</span>
+          <div className="min-w-0">
+            <div className="font-condensed text-base font-bold tracking-wide text-accent truncate">{linea.nombre}</div>
+            <div className="text-xs text-muted">{sortedGrupos.length} grupos · {totalItems} ítems</div>
           </div>
-        ) : (
-          <span
-            className="flex-1 text-base font-bold text-foreground cursor-pointer hover:text-accent"
-            onDoubleClick={() => setEditingName(true)}
-            title="Doble clic para editar nombre"
-          >
-            {linea.nombre}
-          </span>
-        )}
-        <span className="text-xs text-muted">{linea.grupos.length} grupos · {totalItems} items</span>
-        <div className="flex gap-2">
-          <button className="btn-ghost btn-sm text-xs" onClick={() => { setShowAddGrupo(true); setExpanded(true) }}>
-            + Grupo
-          </button>
-          <button className="btn-danger btn-sm text-xs"
-            onClick={() => { if (confirm(`¿Eliminar línea "${linea.nombre}" con todos sus grupos e items?`)) deleteLineaMut.mutate() }}>
-            Eliminar línea
-          </button>
         </div>
+        <span className="text-muted text-lg flex-shrink-0">{expanded ? '▲' : '▼'}</span>
       </div>
 
-      {/* Grupos + Columnas + Observaciones */}
       {expanded && (
-        <div className="p-5 space-y-4">
-          {showAddGrupo && (
-            <div className="flex gap-2 items-center p-3 rounded-lg border border-accent/30 bg-accent/5">
-              <input className="input flex-1 text-sm" placeholder="Nombre del grupo" value={nuevoGrupo}
-                onChange={(e) => setNuevoGrupo(e.target.value)} autoFocus
-                onKeyDown={(e) => e.key === 'Enter' && nuevoGrupo && addGrupoMut.mutate()} />
-              <button className="btn-secondary btn-sm text-xs" onClick={() => setShowAddGrupo(false)}>Cancelar</button>
-              <button className="btn-primary btn-sm text-xs"
-                disabled={!nuevoGrupo || addGrupoMut.isPending}
-                onClick={() => addGrupoMut.mutate()}>
-                Agregar
+        <div className="bib-linea-body space-y-4" onClick={(e) => e.stopPropagation()}>
+          {isStandard && <ColumnasSection linea={linea} />}
+
+          {isTransporte && <BibTransporteSection linea={linea} />}
+          {isPaqueteo && <BibPaqueteoSection linea={linea} />}
+
+          {isStandard && (
+            <>
+              {sortedGrupos.length === 0 && !showAddGrupo && (
+                <p className="text-sm text-muted text-center py-4">Sin grupos. Crea el primero con &quot;+ Nuevo grupo&quot;.</p>
+              )}
+              {sortedGrupos.map((grupo, index) => (
+                <GrupoSection key={grupo.id} grupo={grupo}
+                  headers={headers} extraCols={extraCols}
+                  canMoveUp={index > 0} canMoveDown={index < sortedGrupos.length - 1}
+                  onMoveUp={() => reorderGrupoMut.mutate({ index, direction: -1 })}
+                  onMoveDown={() => reorderGrupoMut.mutate({ index, direction: 1 })}
+                  onDropReorder={(fid, tid) => dropReorderGrupoMut.mutate({ fromId: fid, toId: tid })} />
+              ))}
+              {showAddGrupo ? (
+                <div className="flex gap-2 items-center p-3 rounded-lg border border-accent/30 bg-accent/5">
+                  <input className="input flex-1 text-sm" placeholder="Nombre del grupo" value={nuevoGrupo} autoFocus
+                    onChange={(e) => setNuevoGrupo(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && nuevoGrupo && addGrupoMut.mutate()} />
+                  <button type="button" className="btn-secondary btn-sm text-xs" onClick={() => setShowAddGrupo(false)}>Cancelar</button>
+                  <button type="button" className="btn-primary btn-sm text-xs"
+                    disabled={!nuevoGrupo || addGrupoMut.isPending} onClick={() => addGrupoMut.mutate()}>
+                    Agregar
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <button type="button" className="btn-secondary btn-sm text-xs" onClick={() => setShowAddGrupo(true)}>+ Nuevo grupo</button>
+                  <button type="button" className="btn-danger btn-sm text-xs"
+                    onClick={() => { if (confirm(`¿Eliminar línea "${linea.nombre}" con todos sus grupos e ítems?`)) deleteLineaMut.mutate() }}>
+                    Eliminar línea
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          {!isStandard && (
+            <div className="flex justify-end pt-2">
+              <button type="button" className="btn-danger btn-sm text-xs"
+                onClick={() => { if (confirm(`¿Eliminar línea "${linea.nombre}"?`)) deleteLineaMut.mutate() }}>
+                Eliminar línea
               </button>
             </div>
           )}
-          {linea.grupos.length === 0 && !showAddGrupo && (
-            <p className="text-sm text-muted text-center py-4">Sin grupos. Crea el primero con "+ Grupo".</p>
-          )}
-          {linea.grupos.map((grupo) => (
-            <GrupoSection key={grupo.id} grupo={grupo} lineaId={linea.id} columnas={linea.columnas ?? []} />
-          ))}
 
-          <div className="border-t border-border pt-4 space-y-3">
-            <ColumnasSection linea={linea} />
+          <div className="border-t border-border pt-4">
             <ObsSection linea={linea} />
           </div>
         </div>
@@ -547,8 +1088,7 @@ export default function Biblioteca() {
     mutationFn: () => createLinea({ nombre: nuevaLinea }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['biblioteca'] })
-      setShowAddLinea(false)
-      setNuevaLinea('')
+      setShowAddLinea(false); setNuevaLinea('')
       toast.success('Línea creada')
     },
     onError: () => toast.error('Error al crear línea'),
@@ -558,44 +1098,31 @@ export default function Biblioteca() {
   const totalItems  = lineas.reduce((s, l) => s + l.grupos.reduce((sg, g) => sg + g.items.length, 0), 0)
 
   return (
-    <div className="p-6 space-y-5">
-
-      {/* Header */}
+    <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Biblioteca de Tarifas</h1>
-          <p className="text-sm text-muted mt-0.5">
-            {lineas.length} líneas · {totalGrupos} grupos · {totalItems} items
+          <h2 className="section-title">Biblioteca de Tarifas</h2>
+          <p className="text-sm text-muted mt-1">
+            Catálogo de líneas, grupos e ítems usado en el paso <strong>Servicios</strong> al crear cotizaciones.
           </p>
+          <p className="text-sm text-muted mt-0.5">{lineas.length} líneas · {totalGrupos} grupos · {totalItems} ítems</p>
         </div>
-        <button className="btn-primary btn-sm" onClick={() => setShowAddLinea(true)}>
-          + Nueva línea
-        </button>
+        <button className="btn-primary btn-sm" onClick={() => setShowAddLinea(true)}>+ Nueva línea</button>
       </div>
 
-      {/* Formulario nueva línea */}
       {showAddLinea && (
         <div className="card p-4 flex gap-3 items-center border border-accent/30">
-          <input
-            className="input flex-1"
-            placeholder="Nombre de la línea (ej: Zona Franca)"
-            value={nuevaLinea}
+          <input className="input flex-1" placeholder="Nombre de la línea (ej: Zona Franca)" value={nuevaLinea} autoFocus
             onChange={(e) => setNuevaLinea(e.target.value)}
-            autoFocus
-            onKeyDown={(e) => e.key === 'Enter' && nuevaLinea && addLineaMut.mutate()}
-          />
+            onKeyDown={(e) => e.key === 'Enter' && nuevaLinea && addLineaMut.mutate()} />
           <button className="btn-secondary btn-sm" onClick={() => setShowAddLinea(false)}>Cancelar</button>
-          <button
-            className="btn-primary btn-sm"
-            disabled={!nuevaLinea.trim() || addLineaMut.isPending}
-            onClick={() => addLineaMut.mutate()}
-          >
+          <button className="btn-primary btn-sm" disabled={!nuevaLinea.trim() || addLineaMut.isPending}
+            onClick={() => addLineaMut.mutate()}>
             {addLineaMut.isPending ? 'Creando...' : 'Crear línea'}
           </button>
         </div>
       )}
 
-      {/* Contenido */}
       {isLoading ? (
         <div className="space-y-4">
           {[...Array(3)].map((_, i) => (
@@ -607,9 +1134,7 @@ export default function Biblioteca() {
           <div className="text-5xl mb-4">⚙️</div>
           <p className="font-semibold text-foreground mb-1">Biblioteca vacía</p>
           <p className="text-sm mb-4">Crea la primera línea de servicios con sus tarifas.</p>
-          <button className="btn-primary btn-sm" onClick={() => setShowAddLinea(true)}>
-            + Nueva línea
-          </button>
+          <button className="btn-primary btn-sm" onClick={() => setShowAddLinea(true)}>+ Nueva línea</button>
         </div>
       ) : (
         <div className="space-y-5">

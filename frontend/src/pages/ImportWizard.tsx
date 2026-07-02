@@ -4,6 +4,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import * as XLSX from 'xlsx'
 import { importRecords } from '../api/records'
 import { toast } from '../store/toastStore'
+import { usePagination } from '../hooks/usePagination'
+import { DataListPanel } from '../components/ui/DataListPanel'
 
 // ─── Plantilla descargable ─────────────────────────────────────────────────────
 
@@ -62,6 +64,8 @@ export default function ImportWizard() {
   const [result, setResult] = useState<ImportResult | null>(null)
   const [dragOver, setDragOver] = useState(false)
 
+  const previewPagination = usePagination(preview, { resetDeps: [file, tipo], pageSize: 25 })
+
   // Leer Excel en el frontend para preview
   function handleFile(f: File) {
     setFile(f)
@@ -73,7 +77,7 @@ export default function ImportWizard() {
       const rows = XLSX.utils.sheet_to_json<PreviewRow>(ws, { defval: '' })
       if (rows.length > 0) {
         setHeaders(Object.keys(rows[0]))
-        setPreview(rows.slice(0, 10))
+        setPreview(rows)
       }
       setStep(2)
     }
@@ -107,7 +111,7 @@ export default function ImportWizard() {
   // ─── Render por paso ─────────────────────────────────────────────────────────
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
 
       {/* Header */}
       <div>
@@ -265,7 +269,7 @@ export default function ImportWizard() {
             {preview.length === 0 ? (
               <p className="text-sm text-danger">El archivo parece estar vacío o sin datos válidos.</p>
             ) : (
-              <div className="overflow-x-auto rounded-lg border border-border">
+              <DataListPanel pagination={previewPagination} className="rounded-lg border border-border">
                 <table className="text-xs w-full">
                   <thead className="bg-surface2">
                     <tr>
@@ -280,7 +284,7 @@ export default function ImportWizard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {preview.map((row, i) => (
+                    {previewPagination.pageItems.map((row, i) => (
                       <tr key={i} className="border-t border-border">
                         {headers.map((h) => (
                           <td key={h} className="px-3 py-1.5 text-foreground whitespace-nowrap max-w-32 truncate"
@@ -292,7 +296,7 @@ export default function ImportWizard() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </DataListPanel>
             )}
 
             {/* Validación básica columnas requeridas */}

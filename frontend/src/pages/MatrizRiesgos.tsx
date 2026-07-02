@@ -1,8 +1,10 @@
 import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ShieldAlert, Search, RefreshCw, CheckCircle2, Clock, BookOpen } from 'lucide-react'
+import { ShieldAlert, RefreshCw, CheckCircle2, Clock, BookOpen } from 'lucide-react'
 import { listMatriz, upsertMatriz, MatrizRiesgoRow, MatrizRiesgoUpsert } from '../api/matrizRiesgos'
 import { useToastStore } from '../store/toastStore'
+import { usePagination } from '../hooks/usePagination'
+import { DataListPanel, TableScrollArea } from '../components/ui/DataListPanel'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const MR_OPCIONES = {
@@ -39,7 +41,7 @@ function InlineSelect({
     <select
       value={value ?? ''}
       onChange={e => onChange(e.target.value)}
-      className="w-full bg-surface border border-border rounded text-xs text-foreground px-2 py-1 focus:outline-none focus:border-accent"
+      className="cell-select"
     >
       <option value="">{placeholder ?? '—'}</option>
       {options.map(o => <option key={o} value={o}>{o}</option>)}
@@ -63,9 +65,9 @@ function RiesgoBadge({ riesgo }: { riesgo: string }) {
 // ─── KPI card ─────────────────────────────────────────────────────────────────
 function KpiCard({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div className="card-glass rounded-xl p-4 flex flex-col gap-1 border border-border">
-      <div className="text-[10px] uppercase tracking-[1.5px] text-muted font-semibold">{label}</div>
-      <div className="text-3xl font-display font-bold" style={{ color }}>{value}</div>
+    <div className="crm-kpi-cell" style={{ borderTopColor: color }}>
+      <div className="crm-kpi-label">{label}</div>
+      <div className="crm-kpi-value" style={{ color }}>{value}</div>
     </div>
   )
 }
@@ -139,20 +141,22 @@ export default function MatrizRiesgos() {
 
   const pendientes = filteredRows.filter(r => !r.matrizRiesgo?.mercancia).length
 
+  const pagination = usePagination(filteredRows, {
+    resetDeps: [search, filtRiesgo, filtComp, filtCia],
+    pageSize: 25,
+  })
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <ShieldAlert size={22} className="text-accent" />
-          <div>
-            <h1 className="text-xl font-display font-bold text-foreground tracking-wide">Matriz de Riesgos</h1>
-            <p className="text-xs text-muted">FR-002-GC · Solo clientes activos</p>
-          </div>
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="section-title" style={{ marginBottom: 4 }}>Matriz de Riesgos</h2>
+          <p className="text-xs text-muted">FR-002-GC · Solo clientes activos</p>
         </div>
         <div className="flex items-center gap-2">
           {/* Tabs */}
-          <div className="flex bg-surface border border-border rounded-lg p-0.5 text-xs">
+          <div className="flex bg-surface2 border border-border rounded-lg p-0.5 text-xs">
             <button
               onClick={() => setActiveTab('matriz')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${activeTab === 'matriz' ? 'bg-accent/15 text-accent font-semibold' : 'text-muted hover:text-foreground'}`}
@@ -170,7 +174,7 @@ export default function MatrizRiesgos() {
           </div>
           <button
             onClick={() => refetch()}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface border border-border text-muted hover:text-foreground text-xs transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface2 border border-border text-muted hover:text-foreground hover:bg-surface3 text-xs transition-colors"
           >
             <RefreshCw size={13} />
             Actualizar
@@ -189,81 +193,64 @@ export default function MatrizRiesgos() {
       )}
 
       {/* KPI row */}
-      <div className="grid grid-cols-5 gap-3">
+      <div className="crm-kpi-strip">
         {kpis.map(k => <KpiCard key={k.label} label={k.label} value={k.value} color={k.color} />)}
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar empresa o NIT..."
-            className="w-full pl-8 pr-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground placeholder:text-muted focus:outline-none focus:border-accent"
-          />
-        </div>
-        <select
-          value={filtRiesgo}
-          onChange={e => setFiltRiesgo(e.target.value)}
-          className="px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent"
-        >
+      <div className="filter-bar">
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Buscar empresa o NIT..."
+          className="filter-input"
+        />
+        <select value={filtRiesgo} onChange={e => setFiltRiesgo(e.target.value)} className="filter-select">
           <option value="">Todos los riesgos</option>
           {RIESGO_ORDER.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
-        <select
-          value={filtCia}
-          onChange={e => setFiltCia(e.target.value)}
-          className="px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent"
-        >
+        <select value={filtCia} onChange={e => setFiltCia(e.target.value)} className="filter-select">
           <option value="">Todas las compañías</option>
           <option value="Logimat">Logimat</option>
           <option value="IMC Cargo">IMC Cargo</option>
           <option value="IMC Depósito">IMC Depósito</option>
+          <option value="Aduana">Aduana</option>
         </select>
-        <select
-          value={filtComp}
-          onChange={e => setFiltComp(e.target.value)}
-          className="px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent"
-        >
+        <select value={filtComp} onChange={e => setFiltComp(e.target.value)} className="filter-select">
           <option value="">Todos</option>
           <option value="completa">Completas</option>
           <option value="pendiente">Pendientes</option>
         </select>
       </div>
 
-      {/* Table */}
-      <div className="card-glass rounded-xl border border-border overflow-x-auto">
-        <table className="w-full text-xs min-w-[1100px]">
+      <DataListPanel
+        pagination={pagination}
+        loading={isLoading}
+        empty={
+          <div className="empty-state py-12 text-muted">No hay clientes registrados.</div>
+        }
+      >
+        <table className="w-full text-xs min-w-[1500px]">
           <thead>
-            <tr className="border-b border-border text-muted uppercase tracking-[1px] text-[10px]">
-              <th className="text-left px-4 py-3 font-semibold w-[180px]">Empresa</th>
-              <th className="text-left px-3 py-3 font-semibold">Mercancía</th>
-              <th className="text-left px-3 py-3 font-semibold">Tipo Persona</th>
-              <th className="text-left px-3 py-3 font-semibold">Tiempo</th>
-              <th className="text-left px-3 py-3 font-semibold">Capital</th>
-              <th className="text-left px-3 py-3 font-semibold">Frecuencia Op.</th>
-              <th className="text-left px-3 py-3 font-semibold">Facturación</th>
-              <th className="text-left px-3 py-3 font-semibold">Certificación</th>
-              <th className="text-left px-3 py-3 font-semibold">Análisis Fin.</th>
-              <th className="text-left px-3 py-3 font-semibold">Control a Aplicar</th>
-              <th className="text-left px-3 py-3 font-semibold">Frecuencia</th>
-              <th className="text-center px-3 py-3 font-semibold">Puntaje</th>
-              <th className="text-center px-3 py-3 font-semibold">Riesgo</th>
-              <th className="text-center px-3 py-3 font-semibold w-[60px]"></th>
+            <tr>
+              <th className="text-left w-[180px]">Empresa</th>
+              <th className="text-left min-w-[120px]">Mercancía</th>
+              <th className="text-left min-w-[100px]">Tipo Persona</th>
+              <th className="text-left min-w-[100px]">Tiempo</th>
+              <th className="text-left min-w-[110px]">Capital</th>
+              <th className="text-left min-w-[100px]">Frecuencia Op.</th>
+              <th className="text-left min-w-[100px]">Facturación</th>
+              <th className="text-left min-w-[100px]">Certificación</th>
+              <th className="text-left min-w-[110px]">Análisis Fin.</th>
+              <th className="text-left min-w-[140px]">Control a Aplicar</th>
+              <th className="text-left min-w-[100px]">Frecuencia</th>
+              <th className="text-center min-w-[72px]">Puntaje</th>
+              <th className="text-center min-w-[88px]">Riesgo</th>
+              <th className="text-center w-[52px]"></th>
             </tr>
           </thead>
           <tbody>
-            {isLoading ? (
-              <tr>
-                <td colSpan={14} className="text-center py-12 text-muted">Cargando...</td>
-              </tr>
-            ) : filteredRows.length === 0 ? (
-              <tr>
-                <td colSpan={14} className="text-center py-12 text-muted">No hay clientes registrados.</td>
-              </tr>
-            ) : filteredRows.map(row => {
+            {pagination.pageItems.map(row => {
               const m = row.matrizRiesgo
               const d = editing[row.id] ?? {}
               const isEdited = !!editing[row.id]
@@ -309,7 +296,7 @@ export default function MatrizRiesgos() {
                       value={(d.control as string | undefined) ?? m?.control ?? ''}
                       onChange={e => handleChange(row.id, 'control', e.target.value)}
                       placeholder="Descripción del control..."
-                      className="w-full bg-surface border border-border rounded text-xs text-foreground px-2 py-1 focus:outline-none focus:border-accent placeholder:text-muted/50"
+                      className="cell-input"
                     />
                   </td>
                   <td className="px-3 py-2.5 min-w-[110px]">
@@ -343,10 +330,10 @@ export default function MatrizRiesgos() {
             })}
           </tbody>
         </table>
-      </div>
+      </DataListPanel>
 
       {/* Control suggestions panel */}
-      {filteredRows.some(r => r.matrizRiesgo?.control) && (
+      {activeTab === 'matriz' && filteredRows.some(r => r.matrizRiesgo?.control) && (
         <div className="card-glass rounded-xl border border-border p-5 space-y-3">
           <h2 className="text-xs font-semibold text-muted uppercase tracking-[1.5px]">Controles sugeridos</h2>
           <div className="space-y-2">
@@ -383,6 +370,7 @@ export default function MatrizRiesgos() {
             <div className="px-5 py-3 border-b border-border">
               <h3 className="text-xs font-semibold text-muted uppercase tracking-[1.5px]">Pesos por Criterio</h3>
             </div>
+            <TableScrollArea>
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-border text-muted text-[10px] uppercase tracking-[1px]">
@@ -410,6 +398,7 @@ export default function MatrizRiesgos() {
                 ))}
               </tbody>
             </table>
+            </TableScrollArea>
           </div>
 
           {/* Niveles de riesgo */}
@@ -417,6 +406,7 @@ export default function MatrizRiesgos() {
             <div className="px-5 py-3 border-b border-border">
               <h3 className="text-xs font-semibold text-muted uppercase tracking-[1.5px]">Niveles de Riesgo</h3>
             </div>
+            <TableScrollArea>
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-border text-muted text-[10px] uppercase tracking-[1px]">
@@ -440,6 +430,7 @@ export default function MatrizRiesgos() {
                 ))}
               </tbody>
             </table>
+            </TableScrollArea>
           </div>
 
           {/* Nota escala */}

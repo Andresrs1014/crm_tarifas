@@ -1,14 +1,6 @@
-// ─── Servicios logísticos (constantes del sistema) ───────────────────────────
-export const SERVICIOS = [
-  'Zona Franca',
-  'Depósito Aduanero',
-  'CEDI',
-  'Transporte',
-  'Paqueteo',
-  'Aduana',
-] as const
-
-export type Servicio = (typeof SERVICIOS)[number]
+// ─── Servicios logísticos — fuente única htmlV6/constants ────────────────────
+export { HTML_SERVICES as SERVICIOS } from '../lib/htmlV6/constants'
+export type { HtmlService as Servicio } from '../lib/htmlV6/constants'
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 export interface User {

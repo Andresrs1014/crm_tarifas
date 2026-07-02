@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { usePagination } from '../hooks/usePagination'
+import { DataListPanel } from '../components/ui/DataListPanel'
 
 // ─── Datos Colombia ───────────────────────────────────────────────────────────
 
@@ -136,6 +138,7 @@ export default function CotizadorPaqueteo() {
 
   const [error, setError] = useState('')
   const [resultados, setResultados] = useState<Resultado[] | null>(null)
+  const resultadosPagination = usePagination(resultados ?? [], { resetDeps: [resultados] })
 
   // ── Info tamaño estándar seleccionado
   const stdInfo = stdSize
@@ -206,12 +209,12 @@ export default function CotizadorPaqueteo() {
   const fmtCOP = (n: number) => new Intl.NumberFormat('es-CO').format(n)
 
   return (
-    <div className="p-6 space-y-6 max-w-3xl mx-auto">
+    <div className="space-y-6 max-w-3xl mx-auto">
 
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">📦 Cotizador Paqueteo</h1>
+          <h2 className="section-title" style={{ marginBottom: 0 }}>Cotizador Paqueteo</h2>
           <p className="text-sm text-muted mt-0.5">Calcula el costo de tu envío con las principales paqueteras</p>
         </div>
       </div>
@@ -382,7 +385,7 @@ export default function CotizadorPaqueteo() {
           </div>
 
           <div className="p-6 space-y-4">
-            <div className="table-card">
+            <DataListPanel pagination={resultadosPagination} hidePagination={(resultados?.length ?? 0) <= 10}>
               <table>
                 <thead>
                   <tr>
@@ -395,11 +398,11 @@ export default function CotizadorPaqueteo() {
                   </tr>
                 </thead>
                 <tbody>
-                  {resultados.map((r, i) => (
-                    <tr key={r.courier} style={i === 0 ? { background: 'rgba(245,166,35,0.05)' } : undefined}>
+                  {resultadosPagination.pageItems.map((r, i) => (
+                    <tr key={r.courier} style={i === 0 && resultadosPagination.page === 1 ? { background: 'rgba(245,166,35,0.05)' } : undefined}>
                       <td>
                         <span className="font-bold text-sm" style={{ color: r.color }}>{r.courier}</span>
-                        {i === 0 && (
+                        {i === 0 && resultadosPagination.page === 1 && (
                           <span className="ml-2 text-xs font-bold px-1.5 py-0.5 rounded" style={{ background: 'var(--gold)', color: '#000' }}>
                             MEJOR PRECIO
                           </span>
@@ -430,7 +433,7 @@ export default function CotizadorPaqueteo() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </DataListPanel>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="rounded-lg p-3 text-xs text-muted border" style={{ background: 'rgba(0,194,255,0.06)', borderColor: 'rgba(0,194,255,0.2)' }}>

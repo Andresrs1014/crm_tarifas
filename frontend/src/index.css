@@ -3,13 +3,31 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --bg: #080c14;
+    --surface: #0e1320;
+    --surface2: #131a28;
+    --surface3: #18212f;
+    --accent: #38bdf8;
+    --accent2: #0ea5e9;
+    --gold: #f59e0b;
+    --green: #34d399;
+    --red: #f87171;
+    --purple: #a78bfa;
+    --text: #e2e8f0;
+    --text2: #64748b;
+    --border: #1e293b;
+    --shadow: 0 2px 16px rgba(0,0,0,0.4);
+  }
+
   html {
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Barlow', sans-serif;
     color-scheme: dark;
   }
 
   body {
     @apply bg-bg text-foreground;
+    font-family: 'Barlow', sans-serif;
     min-height: 100vh;
     overflow-x: hidden;
     /* Subtle grid texture */
@@ -60,16 +78,23 @@
   }
 
   .btn-primary {
-    @apply btn bg-accent text-bg
-           shadow-[0_2px_12px_rgba(0,194,255,0.25)]
-           hover:shadow-[0_4px_20px_rgba(0,194,255,0.4)]
-           hover:-translate-y-px active:translate-y-0 active:shadow-none
-           hover:bg-accent/90;
+    @apply btn text-white border-transparent;
+    background-color: var(--accent2);
+    box-shadow: 0 2px 12px rgba(14, 165, 233, 0.25);
+  }
+  .btn-primary:hover {
+    background-color: var(--accent);
+    box-shadow: 0 4px 20px rgba(56, 189, 248, 0.35);
   }
 
   .btn-secondary {
-    @apply btn bg-surface2 text-muted border-border
-           hover:text-foreground hover:border-muted/60;
+    @apply btn text-muted;
+    background-color: var(--surface2);
+    border-color: var(--border);
+  }
+  .btn-secondary:hover {
+    @apply text-foreground border-muted/60;
+    background-color: var(--surface3);
   }
 
   .btn-danger {
@@ -142,7 +167,7 @@
     @apply text-[11px] uppercase tracking-[1.5px] text-muted mb-2;
   }
   .html-stat-value {
-    font-family: 'Barlow Condensed', 'DM Sans', sans-serif;
+    font-family: 'Barlow Condensed', sans-serif;
     @apply text-[38px] font-extrabold leading-none;
   }
   .html-stat-sub { @apply text-xs text-muted mt-1; }
@@ -168,12 +193,127 @@
 
   /* ─── Section titles ─────────────────────────────────────── */
   .section-title {
-    @apply font-bold text-2xl tracking-wide text-foreground mb-5 flex items-center gap-3;
+    font-family: 'Barlow Condensed', sans-serif;
+    @apply font-extrabold text-2xl tracking-widest text-foreground mb-5 flex items-center gap-3 uppercase;
+  }
+
+  /* ─── CRM KPI strip (Cotizaciones, Matriz, GD) ───────────── */
+  .crm-kpi-strip {
+    @apply grid gap-2.5 mb-4;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  }
+
+  .crm-kpi-cell {
+    @apply bg-surface border border-border rounded-xl px-4 py-3;
+    border-top-width: 3px;
+  }
+
+  .crm-kpi-label {
+    @apply text-2xs text-muted uppercase tracking-wider font-bold mb-1;
+  }
+
+  .crm-kpi-value {
+    font-family: 'Barlow Condensed', sans-serif;
+    @apply text-2xl font-bold leading-tight tabular;
   }
 
   /* ─── Table ──────────────────────────────────────────────── */
   .table-card {
-    @apply bg-surface border border-border rounded-xl overflow-hidden mb-7;
+    @apply bg-surface border border-border rounded-xl mb-7 w-full;
+    overflow: visible;
+  }
+
+  .data-list-panel {
+    @apply flex flex-col w-full;
+  }
+
+  /* HTML v6: .page-gd-wrap — scroll horizontal oculto, barra fija abajo */
+  .page-gd-wrap {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+  }
+
+  .page-gd-wrap::-webkit-scrollbar {
+    display: none;
+  }
+
+  .table-scroll-spacer {
+    height: 1px;
+    pointer-events: none;
+  }
+
+  /* Barra fija abajo — HTML v6 #mr-fixed-scroll */
+  .table-fixed-scroll {
+    position: fixed;
+    bottom: 0;
+    z-index: 90;
+    overflow-x: auto;
+    overflow-y: hidden;
+    height: 20px;
+    background: var(--surface2);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.35);
+    scrollbar-width: thin;
+    scrollbar-color: var(--text2) var(--surface);
+  }
+
+  main.main {
+    overflow-x: hidden;
+  }
+
+  main.main.main--has-h-scroll {
+    padding-bottom: 22px;
+  }
+
+  .table-fixed-scroll::-webkit-scrollbar {
+    height: 10px;
+  }
+
+  .table-fixed-scroll::-webkit-scrollbar-track {
+    background: var(--surface);
+  }
+
+  .table-fixed-scroll::-webkit-scrollbar-thumb {
+    background: var(--text2);
+    border-radius: 5px;
+  }
+
+  .table-fixed-scroll::-webkit-scrollbar-thumb:hover {
+    background: var(--accent);
+  }
+
+  .list-pagination {
+    @apply flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-border bg-surface2 text-sm;
+  }
+
+  .list-pagination-info {
+    @apply text-muted text-xs font-medium tabular-nums;
+  }
+
+  .list-pagination-controls {
+    @apply flex flex-wrap items-center gap-3 ml-auto;
+  }
+
+  .list-pagination-select {
+    @apply py-1 text-xs min-w-[96px];
+  }
+
+  .list-pagination-pages {
+    @apply flex items-center gap-1;
+  }
+
+  .list-pagination-current {
+    @apply px-2 text-xs text-muted tabular-nums min-w-[4.5rem] text-center;
+  }
+
+  .sr-only {
+    @apply absolute w-px h-px p-0 -m-px overflow-hidden whitespace-nowrap border-0;
+    clip: rect(0, 0, 0, 0);
   }
 
   .table-header {
@@ -181,34 +321,157 @@
            border-b border-border bg-surface2 flex-wrap;
   }
 
+  .table-header-2row {
+    @apply px-5 py-4 flex flex-col gap-3 border-b border-border bg-surface2;
+  }
+
+  .table-header-top {
+    @apply flex items-center justify-between gap-3 flex-wrap w-full;
+  }
+
+  .table-header-actions {
+    @apply flex flex-wrap items-center gap-3;
+  }
+
+  /* Fila de filtros — tablas y páginas (HTML v6 .table-filters) */
+  .table-filters,
+  .filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1rem;
+    width: 100%;
+  }
+
+  .filter-bar--page {
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+  }
+
+  .filter-bar--end {
+    width: auto;
+    flex: 1 1 28rem;
+    justify-content: flex-end;
+    margin-left: auto;
+  }
+
+  .filter-bar-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1rem;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .filter-bar-label {
+    @apply text-2xs uppercase tracking-widest text-muted font-semibold whitespace-nowrap;
+  }
+
+  .table-filters .filter-input,
+  .filter-bar .filter-input,
+  .page-crm-header-actions .filter-input {
+    flex: 1 1 15rem;
+    min-width: 12rem;
+    max-width: 100%;
+  }
+
+  .table-filters .filter-select,
+  .filter-bar .filter-select,
+  .page-crm-header-actions .filter-select,
+  .table-header-actions .filter-select {
+    flex: 1 1 11rem;
+    min-width: 10.5rem;
+    max-width: 100%;
+  }
+
+  @media (min-width: 1024px) {
+    .table-filters .filter-input,
+    .filter-bar .filter-input,
+    .page-crm-header-actions .filter-input {
+      flex: 1 1 16rem;
+      max-width: 22rem;
+    }
+
+    .table-filters .filter-select,
+    .filter-bar .filter-select,
+    .page-crm-header-actions .filter-select,
+    .table-header-actions .filter-select {
+      flex: 0 1 auto;
+      min-width: 11rem;
+      max-width: 15rem;
+    }
+  }
+
+  @media (max-width: 639px) {
+    .table-filters > .filter-input,
+    .table-filters > .filter-select,
+    .filter-bar-group > .filter-input,
+    .filter-bar-group > .filter-select,
+    .filter-bar > .filter-input:not([class*='w-']),
+    .filter-bar > .filter-select:not([class*='w-']),
+    .page-crm-header-actions > .filter-input,
+    .page-crm-header-actions > .filter-select,
+    .table-header-actions > .filter-select {
+      flex: 1 1 100%;
+      min-width: 100%;
+      max-width: 100%;
+    }
+  }
+
   .table-title {
-    @apply font-bold text-sm tracking-widest text-foreground uppercase;
+    font-family: 'Barlow Condensed', sans-serif;
+    @apply font-bold text-base tracking-widest text-foreground uppercase whitespace-nowrap;
   }
 
   .filter-input {
-    @apply bg-surface border border-border rounded-lg px-3 py-1.5 text-sm text-foreground
-           placeholder:text-muted focus:outline-none focus:border-accent
-           transition-[border-color] duration-150;
+    @apply bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-foreground
+           placeholder:text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/15
+           transition-[border-color,box-shadow] duration-150 min-h-[2.375rem];
   }
 
   .filter-select {
-    @apply bg-surface border border-border rounded-lg px-3 py-1.5 text-sm text-foreground
-           focus:outline-none focus:border-accent transition-[border-color] duration-150 cursor-pointer;
+    @apply bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-foreground
+           focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/15
+           transition-[border-color,box-shadow] duration-150 cursor-pointer min-h-[2.375rem];
+    appearance: auto;
+  }
+
+  /* Selects/inputs dentro de tablas (Matriz, GD modal, etc.) */
+  .cell-select,
+  .table-card select,
+  .table-card .cell-input {
+    @apply w-full min-w-[88px] bg-surface2 border border-border rounded-md text-xs text-foreground
+           px-2 py-1.5 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/15;
+  }
+
+  .table-card .cell-input {
+    @apply block;
   }
 
   table { @apply w-full border-collapse; }
 
+  /* Tablas anchas dentro del scroll sincronizado (barra fija abajo) */
+  .page-gd-wrap > table,
+  .page-gd-wrap > .bib-items-table,
+  .page-gd-wrap > .kanban-board,
+  .page-gd-wrap.ficha-tabs-scroll > .flex {
+    width: max-content;
+    min-width: 100%;
+  }
+
   thead th {
     @apply px-4 py-3 text-left text-2xs text-muted uppercase tracking-widest
-           font-semibold bg-surface2 border-b border-border whitespace-nowrap;
+           font-semibold bg-surface2 border-b border-border whitespace-nowrap sticky top-0 z-[1];
   }
 
   tbody tr {
-    @apply border-b border-border/40 transition-colors duration-100 hover:bg-accent/[0.025];
+    @apply border-b border-border/40 transition-colors duration-100 hover:bg-white/[0.02];
   }
 
   tbody td {
-    @apply px-4 py-3 text-sm;
+    @apply px-3 py-2.5 text-sm align-middle;
   }
 
   /* ─── Service tags ───────────────────────────────────────── */
@@ -249,7 +512,9 @@
 
   /* ─── Stat highlight (big numbers) ──────────────────────── */
   .stat-value {
-    @apply text-2xl font-bold tabular leading-none;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    @apply text-2xl tabular leading-none;
   }
 
   /* ─── Inline form row ────────────────────────────────────── */
@@ -299,11 +564,19 @@
 }
 
 /* ─── Print styles (CotPublica) ──────────────────────────────────────────── */
+.cot-publica-shell {
+  background: #eef1f6;
+  color: #1a1a2e;
+}
+
 @media print {
   body {
     background: #ffffff !important;
     background-image: none !important;
     color: #111111 !important;
+  }
+  .cot-publica-shell {
+    background: #ffffff !important;
   }
   #cot-print-area {
     background: #ffffff !important;

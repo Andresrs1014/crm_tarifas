@@ -1,0 +1,27 @@
+---
+description: Orquestación CRM — lee docs/orquestacion/ (3 fases, solo PC local)
+alwaysApply: true
+---
+
+# CRM Tarifas — Orquestación local
+
+## Si el usuario dice: `lee en docs/orquestacion/`
+
+1. Abrir **`docs/orquestacion/PROMPT-INICIO.md`** y seguirlo
+2. Fase **reconocimiento** — NO implementar código
+3. Escribir **`docs/orquestacion/reportes/REPORTE-<TU-AGENTE>.md`**
+4. Parar
+
+## Si el usuario dice: `Ejecuta lo que tenga tu nombre`
+
+1. Verificar aval en **`docs/orquestacion/TAREAS-SPRINT.md`**
+2. Ejecutar solo tareas asignadas a tu agente
+3. Docker local: http://localhost:82 — sin infra remota
+
+## Líder (Cursor)
+
+Tras los 4 reportes → consolidar **`TAREAS-SPRINT.md`** → esperar aval humano.
+
+## Fuente de verdad
+
+HTML `Ultima_versión/seguimiento-zymo-v6 (88).html`

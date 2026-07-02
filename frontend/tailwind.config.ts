@@ -1,30 +1,30 @@
 import type { Config } from 'tailwindcss'
 
 export default {
-  content: ['./index.html', './src/**/*.{ts,tsx}'],
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       colors: {
-        // ZYMO Dark Design System — exact colors from prototype HTML
-        bg:       '#0a0e1a',
-        surface:  '#111827',
-        surface2: '#1a2235',
-        surface3: '#1e2d45',
-        accent:   '#00c2ff',
-        accent2:  '#0077ff',
-        cyan:     '#00ffcc',
-        gold:     '#f5a623',
-        success:  '#00e676',
-        danger:   '#ff4444',
-        purple:   '#a855f7',
-        muted:    '#8899b4',
-        border:   '#1e3050',
-        foreground: '#e8edf5',
+        // ZYMO Dark Design System — aligned with html-v6.css / tailwind.config.js
+        bg:         '#080c14',
+        surface:    '#0e1320',
+        surface2:   '#131a28',
+        surface3:   '#18212f',
+        accent:     '#38bdf8',
+        accent2:    '#0ea5e9',
+        cyan:       '#00ffcc',
+        gold:       '#f5a623',
+        success:    '#34d399',
+        danger:     '#f87171',
+        purple:     '#a78bfa',
+        muted:      '#64748b',
+        border:     '#1e293b',
+        foreground: '#e2e8f0',
       },
       fontFamily: {
-        sans:    ['DM Sans', 'sans-serif'],
-        mono:    ['DM Mono', 'monospace'],
-        display: ['Outfit', 'DM Sans', 'sans-serif'], // headings & big numbers
+        sans:      ['Barlow', 'DM Sans', 'sans-serif'],
+        mono:      ['DM Mono', 'monospace'],
+        condensed: ['Barlow Condensed', 'sans-serif'],
       },
       fontSize: {
         '2xs': '0.625rem',

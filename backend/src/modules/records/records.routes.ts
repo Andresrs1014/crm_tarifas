@@ -8,6 +8,7 @@ import {
   createRecord,
   updateRecord,
   deleteRecord,
+  convertProspectToCliente,
 } from './records.service';
 import { importRecordsFromExcel } from './records.import';
 
@@ -111,6 +112,16 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     const body = RecordCreateSchema.parse(req.body);
     const record = await createRecord(body);
     res.status(201).json(record);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/records/:id/convert-to-cliente
+router.post('/:id/convert-to-cliente', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const record = await convertProspectToCliente(param(req.params.id));
+    res.json(record);
   } catch (err) {
     next(err);
   }

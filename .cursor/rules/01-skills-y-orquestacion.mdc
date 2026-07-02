@@ -1,0 +1,36 @@
+---
+description: Skills obligatorias + Docker + revisión entre agentes — CRM paridad HTML
+alwaysApply: true
+---
+
+# Skills y reglas suprema — CRM Tarifas
+
+## Objetivo
+
+Copiar **a la perfección** `Ultima_versión/seguimiento-zymo-v6 (88).html` — visual + funcionalidad 100%.
+
+## Antes de cualquier trabajo
+
+Leer **`docs/orquestacion/SKILLS-OBLIGATORIAS.md`** y aplicar todas las skills de tu rol.
+
+## Comandos humano
+
+| Comando | Acción |
+|---------|--------|
+| `lee en docs/orquestacion/` | Fase reconocimiento → reporte en `reportes/` — **sin código** |
+| `Ejecuta lo que tenga tu nombre` | Solo tras aval en `TAREAS-SPRINT.md` |
+
+## Docker
+
+| Agente | Docker |
+|--------|--------|
+| Cursor, Claude, Codex | ✅ |
+| **Minimax** | ❌ PROHIBIDO |
+
+## Revisar otro agente
+
+Documentar en `reportes/OBJECIONES-*.md`. **No editar** código ajeno.
+
+## Prompt para Claude/Codex/Minimax
+
+`docs/orquestacion/PROMPT-GENERAL-AGENTES.md`

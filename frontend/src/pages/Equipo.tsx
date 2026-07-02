@@ -178,12 +178,12 @@ export default function Equipo() {
   const comercialToEdit = comerciales.find((c) => c.id === editingId)
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="space-y-5">
 
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Equipo Comercial</h1>
+          <h2 className="section-title" style={{ marginBottom: 0 }}>Equipo Comercial</h2>
           <p className="text-sm text-muted mt-0.5">{comerciales.length} comerciales</p>
         </div>
         {!showForm && (

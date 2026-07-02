@@ -202,6 +202,15 @@ export async function createRecord(data: {
     await getOrCreateMatriz(created.id);
   }
 
+  if (recordData.tipo === 'prospecto') {
+    await prisma.crmMeta.create({
+      data: {
+        recordId: created.id,
+        estadoPipeline: recordData.estadoProspecto ?? 'prospecto',
+      },
+    });
+  }
+
   return created;
 }
 
@@ -331,4 +340,95 @@ export async function updateRecord(id: string, data: Partial<{
 
 export async function deleteRecord(id: string) {
   await prisma.record.delete({ where: { id } });
+}
+
+/** Avanza estadoProspecto + CrmMeta + stageHistory (side-effects M8 B4). */
+export async function advanceProspectoEstado(recordId: string, estadoProspecto: string) {
+  const current = await prisma.record.findUnique({
+    where: { id: recordId },
+    select: { tipo: true, estadoProspecto: true, stageHistory: true, createdAt: true },
+  });
+  if (!current || current.tipo !== 'prospecto') return;
+  if (current.estadoProspecto === estadoProspecto) return;
+
+  const now = new Date().toISOString();
+  const history = (current.stageHistory as JsonInput[]) ?? [];
+  if (history.length === 0 && current.estadoProspecto) {
+    history.push({ stage: current.estadoProspecto, desde: current.createdAt.toISOString(), hasta: now });
+  } else {
+    const last = history[history.length - 1];
+    if (last && last.hasta === null) last.hasta = now;
+  }
+  history.push({ stage: estadoProspecto, desde: now, hasta: null });
+
+  await prisma.record.update({
+    where: { id: recordId },
+    data: { estadoProspecto, stageHistory: history as JsonInput },
+  });
+
+  await prisma.crmMeta.upsert({
+    where: { recordId },
+    create: { recordId, estadoPipeline: estadoProspecto },
+    update: { estadoPipeline: estadoProspecto },
+  });
+}
+
+/** Convierte un prospecto en cliente activo (paridad HTML convertirACliente). */
+export async function convertProspectToCliente(id: string) {
+  const record = await prisma.record.findUnique({ where: { id } });
+  if (!record) {
+    throw Object.assign(new Error('Registro no encontrado'), { statusCode: 404 });
+  }
+  if (record.tipo !== 'prospecto') {
+    throw Object.assign(new Error('Este registro ya es un cliente'), { statusCode: 400 });
+  }
+
+  const visitaCliente = record.visitaCliente ?? record.visita ?? 'no';
+  const facturado = record.facturado ?? record.facturadoP ?? 'no';
+  const valor = record.valor ?? record.valorP ?? 0;
+  const facturacionLineas = record.facturacionLineas as Record<string, number> | null;
+  const hasLineBilling = facturacionLineas && Object.keys(facturacionLineas).length > 0;
+
+  await prisma.record.update({
+    where: { id },
+    data: {
+      tipo: 'cliente',
+      estadoCliente: record.estadoCliente ?? 'activo',
+      tipoCliente: record.tipoCliente ?? 'directo',
+      visitaCliente,
+      fechaVisitaCliente: record.fechaVisitaCliente ?? record.fechaVisita ?? undefined,
+      facturado,
+      valor,
+      nuevoServicio: record.nuevoServicio ?? 'no',
+      servicioNuevo: record.servicioNuevo ?? undefined,
+      facturacionLineas: hasLineBilling
+        ? (facturacionLineas as JsonInput)
+        : (record.servicios as string[]).length > 0 && valor > 0
+          ? Object.fromEntries(
+              (record.servicios as string[]).map((s) => [s, Math.floor(valor / (record.servicios as string[]).length)]),
+            ) as JsonInput
+          : (record.facturacionLineas as JsonInput),
+      estadoProspecto: record.estadoProspecto === 'facturado'
+        ? record.estadoProspecto
+        : 'facturado',
+    },
+  });
+
+  await prisma.actividad.create({
+    data: {
+      recordId: id,
+      tipo: 'seguimiento',
+      descripcion: 'Convertido de prospecto a cliente activo',
+      fecha: new Date(),
+      hecho: true,
+    },
+  });
+
+  const { getOrCreateMatriz } = await import('../matriz-riesgos/matriz-riesgos.service');
+  await getOrCreateMatriz(id);
+
+  const { getOrCreateGD } = await import('../gestion-documental/gestion-documental.service');
+  await getOrCreateGD(id);
+
+  return getRecordById(id);
 }

@@ -18,4 +18,4 @@ RUN npx prisma generate
 COPY --from=builder /app/dist ./dist
 RUN mkdir -p /app/uploads /app/data
 EXPOSE 3003
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node dist/server.js"]
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node dist/seed.js && node dist/server.js"]

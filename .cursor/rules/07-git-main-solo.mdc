@@ -1,0 +1,42 @@
+---
+description: Git — trabajar siempre en main cuando el humano trabaja solo (sin ramas feature)
+alwaysApply: true
+---
+
+# Git — rama main (trabajo solo)
+
+## Regla del humano
+
+Cuando el humano trabaja **solo** en este proyecto, **no usar ramas feature**.
+
+- Trabajar **directamente en `main`** (o la rama principal que exista: `main`, `master`, etc.).
+- Commits y push van a esa rama, salvo que el humano pida explícitamente otra cosa.
+
+## Qué deben hacer los agentes
+
+1. **Antes de codificar:** `git branch --show-current` — si no estás en `main`, cambiar con acuerdo del humano:
+   ```bash
+   git checkout main
+   git pull origin main
+   ```
+2. **No crear** ramas tipo `feature/*`, `fix/*`, `soylabumba`, etc. por iniciativa propia.
+3. **No proponer PRs** ni flujos multi-rama si el humano no lo pidió.
+4. **Push:** `git push origin main` (o la rama principal acordada).
+
+## Excepciones (solo si el humano lo pide)
+
+- Hotfix urgente en producción con rama dedicada nombrada por el humano.
+- Trabajo en equipo con varias personas a la vez (el humano avisará).
+
+## Migración desde ramas viejas
+
+Si hay trabajo en otra rama (ej. `soylabumba`) y el humano quiere unificar en `main`:
+
+```bash
+git checkout main
+git pull origin main
+git merge <rama-anterior>   # o cherry-pick commits concretos
+git push origin main
+```
+
+Documentar en commit qué se integró. No borrar ramas remotas sin confirmación del humano.
