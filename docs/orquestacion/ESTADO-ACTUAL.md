@@ -2,17 +2,18 @@
 
 > **Docker:** http://localhost:82 · `admin_local` / `AdminLocal2026!`
 
-## Oleada actual — paralela C18 + B1–B6
+## Oleada actual — paralela **sin dependencias**
 
-| Agente | Tarea | Estado |
-|--------|-------|--------|
-| **Claude** | **C18 / X11** Biblioteca Transporte + Paqueteo | 🟡 **ACTIVO** |
-| **Cursor** | **B1–B6** backend integración M8 | 🟡 **ACTIVO** |
-| **Codex** | X10 wizard paso 3 (tras C18) | ⏸ |
-| **MiniMax** | Sin tarea | ⏸ |
+| Agente | Tarea | Módulo | Estado |
+|--------|-------|--------|--------|
+| **Claude** | **C18 / X11** | Biblioteca (Transporte/Paqueteo) | 🟡 **ACTIVO** |
+| **Cursor** | **X12** | Matriz Riesgos + Gestión Documental | 🟡 **ACTIVO** |
+| — | X10 wizard paso 3 | Cotizaciones | ⏸ **después** de C18 (no paralelo) |
 
 Brief Claude: [agentes/CLAUDE-C18-X11-BIBLIOTECA.md](./agentes/CLAUDE-C18-X11-BIBLIOTECA.md)  
-Brief Cursor: [referencia/SPEC-INTEGRACION-M8.md](./referencia/SPEC-INTEGRACION-M8.md)
+Brief Cursor: [agentes/CURSOR-X12-MATRIZ-GD.md](./agentes/CURSOR-X12-MATRIZ-GD.md)
+
+**B1–B6 backend:** ✅ cerrado (commit `2070212`, Docker backend rebuilt).
 
 ---
 
@@ -62,7 +63,7 @@ Brief Cursor: [referencia/SPEC-INTEGRACION-M8.md](./referencia/SPEC-INTEGRACION-
 
 ## Próximo paso
 
-1. **Claude:** C18/X11 Biblioteca (frontend).
-2. **Cursor:** B1–B6 backend (paralelo).
-3. **Tras merge:** L10 Docker rebuild + **X10** wizard.
-4. **Humano:** L5 QA en :82.
+1. **Claude:** C18/X11 Biblioteca — solo `Biblioteca.tsx` + CSS.
+2. **Cursor:** X12 Matriz + GD — archivos distintos, **sin esperar a Claude**.
+3. **Después (secuencial):** X10 wizard paso 3 (cuando C18 termine).
+4. **Humano:** L5 QA por módulo en :82.

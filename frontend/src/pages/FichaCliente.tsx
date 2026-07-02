@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { getFichas, getAnalistas } from '../api/fichas'
 import { getComercialesApi } from '../api/comerciales'
+import { usePagination } from '../hooks/usePagination'
+import { DataListPanel } from '../components/ui/DataListPanel'
 
 const ESTADO_BADGE: Record<string, string> = {
   pendiente: 'badge-gray',
@@ -53,8 +55,12 @@ export default function FichaCliente() {
     ? Math.round(fichasAll.reduce((s, f) => s + f.pct, 0) / fichasAll.length)
     : 0
 
+  const pagination = usePagination(filtered, {
+    resetDeps: [search, filtEstado, filtComercial],
+  })
+
   return (
-    <div className="p-6 space-y-5">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -64,7 +70,7 @@ export default function FichaCliente() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="filter-bar">
         <input
           className="filter-input"
           placeholder="Buscar empresa..."
@@ -101,17 +107,17 @@ export default function FichaCliente() {
         ))}
       </div>
 
-      {/* Table */}
-      {isLoading ? (
-        <div className="space-y-2">{[...Array(4)].map((_, i) => <div key={i} className="h-12 bg-surface2 rounded-xl animate-pulse" />)}</div>
-      ) : filtered.length === 0 ? (
-        <div className="empty-state">
-          <div className="text-4xl mb-3">📋</div>
-          <p className="font-semibold text-foreground mb-1">Sin fichas</p>
-          <p className="text-sm">Las fichas se crean desde la ficha de cada cliente.</p>
-        </div>
-      ) : (
-        <div className="table-card">
+      <DataListPanel
+        pagination={pagination}
+        loading={isLoading}
+        empty={
+          <div className="empty-state">
+            <div className="text-4xl mb-3">📋</div>
+            <p className="font-semibold text-foreground mb-1">Sin fichas</p>
+            <p className="text-sm">Abre la ficha desde el detalle del cliente (botón «Ficha SOP») o desde la lista de clientes activos.</p>
+          </div>
+        }
+      >
           <table>
             <thead>
               <tr>
@@ -125,7 +131,7 @@ export default function FichaCliente() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((f) => (
+              {pagination.pageItems.map((f) => (
                 <tr key={f.id}>
                   <td className="font-semibold text-foreground">{f.record.empresa}</td>
                   <td className="text-sm text-muted">{f.record.comercial.nombre}</td>
@@ -149,8 +155,7 @@ export default function FichaCliente() {
               ))}
             </tbody>
           </table>
-        </div>
-      )}
+      </DataListPanel>
     </div>
   )
 }

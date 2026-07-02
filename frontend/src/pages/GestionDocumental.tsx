@@ -4,6 +4,8 @@ import { FolderOpen, X, ChevronRight, RefreshCw, AlertTriangle, Clock, CheckCirc
 import * as XLSX from 'xlsx'
 import { listGD, upsertGD, GD_DOCS, GDRow, DocEstado } from '../api/gestionDocumental'
 import { useToastStore } from '../store/toastStore'
+import { usePagination } from '../hooks/usePagination'
+import { DataListPanel } from '../components/ui/DataListPanel'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const ESTADO_STYLE = {
@@ -144,7 +146,7 @@ function DocModal({ row, onClose }: { row: GDRow; onClose: () => void }) {
           </button>
         </div>
 
-        <div className="p-6 space-y-5">
+        <div className="space-y-5">
           {/* Compliance bar */}
           <div className="card-glass rounded-xl p-4 border border-border">
             <div className="flex items-center justify-between mb-2">
@@ -166,7 +168,7 @@ function DocModal({ row, onClose }: { row: GDRow; onClose: () => void }) {
             <select
               value={ciclo}
               onChange={e => setCiclo(Number(e.target.value))}
-              className="bg-surface border border-border rounded-lg px-3 py-1 text-sm text-foreground focus:outline-none focus:border-accent"
+              className="filter-select"
             >
               {[anoActual - 1, anoActual, anoActual + 1].map(y => (
                 <option key={y} value={y}>{y}{y === anoActual ? ' (actual)' : ''}</option>
@@ -260,7 +262,7 @@ function DocModal({ row, onClose }: { row: GDRow; onClose: () => void }) {
                     <select
                       value={d.estado ?? ''}
                       onChange={e => setDoc(doc.id, 'estado', e.target.value)}
-                      className="bg-surface/80 border border-border rounded-lg px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-accent"
+                      className="cell-input"
                     >
                       <option value="">Sin estado</option>
                       <option value="completo">Completo</option>
@@ -271,7 +273,7 @@ function DocModal({ row, onClose }: { row: GDRow; onClose: () => void }) {
                       type="date"
                       value={d.fecha ?? ''}
                       onChange={e => setDoc(doc.id, 'fecha', e.target.value)}
-                      className="bg-surface/80 border border-border rounded-lg px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-accent"
+                      className="cell-input"
                     />
                   </div>
                   <input
@@ -280,7 +282,7 @@ function DocModal({ row, onClose }: { row: GDRow; onClose: () => void }) {
                     onChange={e => setDoc(doc.id, 'obs', e.target.value)}
                     onClick={e => e.stopPropagation()}
                     placeholder="Observaciones..."
-                    className="w-full bg-surface/80 border border-border rounded-lg px-2 py-1.5 text-xs text-foreground placeholder:text-muted focus:outline-none focus:border-accent"
+                    className="cell-input"
                   />
                 </div>
               )
@@ -339,8 +341,12 @@ export default function GestionDocumental() {
   const porVencer = filteredRows.filter(r => r.vencimiento.status === 'por-vencer').length
   const completos = filteredRows.filter(r => r.estadoDocs === 'completo').length
 
+  const pagination = usePagination(filteredRows, {
+    resetDeps: [search, filtVenc, filtEst, filtTipo, filtCia, filtPct],
+  })
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -350,7 +356,7 @@ export default function GestionDocumental() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => exportExcel(filteredRows)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface border text-xs font-semibold transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface2 border border-border text-xs font-semibold transition-colors hover:bg-surface3"
             style={{ borderColor: '#00e676', color: '#00e676' }}
           >
             <Download size={13} />
@@ -358,7 +364,7 @@ export default function GestionDocumental() {
           </button>
           <button
             onClick={() => refetch()}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface border border-border text-muted hover:text-foreground text-xs transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface2 border border-border text-muted hover:text-foreground hover:bg-surface3 text-xs transition-colors"
           >
             <RefreshCw size={13} />
             Actualizar
@@ -393,12 +399,12 @@ export default function GestionDocumental() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-center">
+      <div className="filter-bar">
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Buscar empresa o NIT..."
-          className="filter-input flex-1 min-w-48"
+          className="filter-input"
         />
         <select value={filtTipo} onChange={e => setFiltTipo(e.target.value)} className="filter-select">
           <option value="">Todos los tipos</option>
@@ -429,7 +435,7 @@ export default function GestionDocumental() {
         <select
           value={filtEst}
           onChange={e => setFiltEst(e.target.value)}
-          className="px-3 py-1.5 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent"
+          className="filter-select"
         >
           <option value="">Todos los estados</option>
           <option value="completo">Completo</option>
@@ -438,30 +444,31 @@ export default function GestionDocumental() {
         </select>
       </div>
 
-      {/* Table */}
-      <div className="table-card overflow-x-auto">
-        <table className="w-full text-sm min-w-[1100px]">
+      <DataListPanel
+        pagination={pagination}
+        loading={isLoading}
+        empty={
+          <div className="empty-state py-12 text-muted">No hay clientes registrados.</div>
+        }
+      >
+        <table className="w-full text-sm min-w-[1200px]">
           <thead>
-            <tr className="border-b border-border text-muted uppercase tracking-[1px] text-[10px]">
-              <th className="text-left px-5 py-3 font-semibold">Empresa</th>
-              <th className="text-left px-4 py-3 font-semibold">Tipo</th>
-              <th className="text-left px-4 py-3 font-semibold">Compañías</th>
-              <th className="text-left px-4 py-3 font-semibold">Ciclo</th>
-              <th className="text-left px-4 py-3 font-semibold w-[180px]">Cumplimiento</th>
-              <th className="text-left px-4 py-3 font-semibold">Estado docs</th>
-              <th className="text-left px-4 py-3 font-semibold">Última Act.</th>
-              <th className="text-left px-4 py-3 font-semibold">Próx. Act.</th>
-              <th className="text-center px-4 py-3 font-semibold">Días p/Vencer</th>
-              <th className="text-left px-4 py-3 font-semibold">Status</th>
-              <th className="px-4 py-3 w-[40px]"></th>
+            <tr>
+              <th className="text-left">Empresa</th>
+              <th className="text-left">Tipo</th>
+              <th className="text-left">Compañías</th>
+              <th className="text-left">Ciclo</th>
+              <th className="text-left w-[180px]">Cumplimiento</th>
+              <th className="text-left">Estado docs</th>
+              <th className="text-left">Última Act.</th>
+              <th className="text-left">Próx. Act.</th>
+              <th className="text-center">Días p/Vencer</th>
+              <th className="text-left">Status</th>
+              <th className="w-[40px]"></th>
             </tr>
           </thead>
           <tbody>
-            {isLoading ? (
-              <tr><td colSpan={11} className="text-center py-12 text-muted">Cargando...</td></tr>
-            ) : filteredRows.length === 0 ? (
-              <tr><td colSpan={11} className="text-center py-12 text-muted">No hay clientes registrados.</td></tr>
-            ) : filteredRows.map(row => {
+            {pagination.pageItems.map(row => {
               const vStyle = VENC_STYLE[row.vencimiento.status]
               const VIcon = vStyle.icon
               const eStyle = ESTADO_STYLE[row.estadoDocs]
@@ -533,7 +540,7 @@ export default function GestionDocumental() {
             })}
           </tbody>
         </table>
-      </div>
+      </DataListPanel>
 
       {/* Detail panel */}
       {selected && <DocModal row={selected} onClose={() => setSelected(null)} />}

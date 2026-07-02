@@ -7,6 +7,8 @@ import { toast } from '../store/toastStore'
 import { exportRecordsExcel } from '../utils/exportExcel'
 import { fmtEstado } from '../utils/fmtEstado'
 import { PROSPECTO_BADGE, PROSPECTO_FILTER_OPTIONS } from '../lib/htmlV6/domainConfig'
+import { usePagination } from '../hooks/usePagination'
+import { DataListPanel } from '../components/ui/DataListPanel'
 
 export default function Prospectos() {
   const navigate = useNavigate()
@@ -41,51 +43,64 @@ export default function Prospectos() {
     onError: () => toast.error('Error al eliminar'),
   })
 
+  const pagination = usePagination(prospectos, {
+    resetDeps: [search, estado, comercialId],
+  })
+
   return (
-    <div>
+    <div className="space-y-5">
       <div className="section-title">{'\uD83C\uDFAF'} <span>Prospectos</span></div>
 
-      <div className="table-card">
-        <div className="table-header-2row">
-          <div className="table-header-top">
-            <div className="table-title">Lista de Prospectos</div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={() => exportRecordsExcel(prospectos, 'prospectos.xlsx')}
-                disabled={prospectos.length === 0}
-                title="Exportar a Excel"
-                style={{ whiteSpace: 'nowrap' }}
-              >
-                {'\u2B07\uFE0F'} Exportar Excel
-              </button>
-              <Link
-                to="/registro/importar"
-                className="btn btn-secondary btn-sm"
-                style={{ whiteSpace: 'nowrap', borderColor: 'var(--green)', color: 'var(--green)' }}
-              >
-                {'\uD83D\uDCE4'} Carga Masiva
-              </Link>
+      <DataListPanel
+        pagination={pagination}
+        loading={isLoading}
+        empty={
+          <div className="empty-state">
+            <div className="empty-icon">{'\uD83C\uDFAF'}</div>
+            <div className="empty-title">Sin prospectos</div>
+            <div>Registra tu primer prospecto</div>
+          </div>
+        }
+        header={
+          <div className="table-header-2row">
+            <div className="table-header-top">
+              <div className="table-title">Lista de Prospectos</div>
+              <div className="table-header-actions">
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => exportRecordsExcel(prospectos, 'prospectos.xlsx')}
+                  disabled={prospectos.length === 0}
+                  title="Exportar a Excel"
+                >
+                  {'\u2B07\uFE0F'} Exportar Excel
+                </button>
+                <Link
+                  to="/registro/importar"
+                  className="btn btn-secondary btn-sm"
+                  style={{ borderColor: 'var(--green)', color: 'var(--green)' }}
+                >
+                  {'\uD83D\uDCE4'} Carga Masiva
+                </Link>
+              </div>
+            </div>
+            <div className="table-filters">
+              <input
+                className="filter-input"
+                placeholder={'\uD83D\uDD0D Buscar empresa...'}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              <select className="filter-select" value={estado} onChange={(e) => setEstado(e.target.value)}>
+                {PROSPECTO_FILTER_OPTIONS.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
+              </select>
+              <select className="filter-select" value={comercialId} onChange={(e) => setComercialId(e.target.value)}>
+                <option value="">Todos los comerciales</option>
+                {comerciales.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+              </select>
             </div>
           </div>
-          <div className="table-filters">
-            <input
-              className="filter-input"
-              placeholder={'\uD83D\uDD0D Buscar empresa...'}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <select className="filter-select" value={estado} onChange={(e) => setEstado(e.target.value)}>
-              {PROSPECTO_FILTER_OPTIONS.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
-            </select>
-            <select className="filter-select" value={comercialId} onChange={(e) => setComercialId(e.target.value)}>
-              <option value="">Todos los comerciales</option>
-              {comerciales.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-            </select>
-          </div>
-        </div>
-
-        <div style={{ overflowX: 'auto' }}>
+        }
+      >
           <table>
             <thead>
               <tr>
@@ -100,24 +115,7 @@ export default function Prospectos() {
               </tr>
             </thead>
             <tbody>
-              {isLoading ? (
-                [...Array(5)].map((_, i) => (
-                  <tr key={i}>
-                    <td colSpan={8}><div className="h-10 bg-surface2 rounded animate-pulse" /></td>
-                  </tr>
-                ))
-              ) : prospectos.length === 0 ? (
-                <tr>
-                  <td colSpan={8}>
-                    <div className="empty-state">
-                      <div className="empty-icon">{'\uD83C\uDFAF'}</div>
-                      <div className="empty-title">Sin prospectos</div>
-                      <div>Registra tu primer prospecto</div>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                prospectos.map((p) => {
+              {pagination.pageItems.map((p) => {
                   const servicios = (p.servicios ?? []) as string[]
                   return (
                     <tr key={p.id} className="cursor-pointer" onClick={() => navigate('/detalle/' + p.id)}>
@@ -179,11 +177,10 @@ export default function Prospectos() {
                     </tr>
                   )
                 })
-              )}
+              }
             </tbody>
           </table>
-        </div>
-      </div>
+      </DataListPanel>
 
       {confirmId && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setConfirmId(null)}>

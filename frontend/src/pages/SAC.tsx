@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getSacContactos, getSacFda, updateSacFotos, updateSacContacto } from '../api/sac'
 import { toast } from '../store/toastStore'
 import type { ContactoSAC } from '../types'
+import { usePagination } from '../hooks/usePagination'
+import { DataListPanel } from '../components/ui/DataListPanel'
 
 const MESES = [
   'Enero','Febrero','Marzo','Abril','Mayo','Junio',
@@ -232,8 +234,12 @@ export default function SAC() {
   const fdaEntregadosTotal  = fdaTodos.filter((c) => c.fdaEntregado).length
   const fdaPendientesTotal  = fdaTodos.filter((c) => !c.fdaEntregado).length
 
+  const conRegalosPagination = usePagination(conRegalos, { resetDeps: [mes, search] })
+  const sinRegalosPagination = usePagination(sinRegalos, { resetDeps: [mes, search] })
+  const fdaPagination = usePagination(fdaFiltrado, { resetDeps: [fdaCat, fdaSearch] })
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
 
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -248,7 +254,7 @@ export default function SAC() {
             )}
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="table-header-actions">
           <select className="filter-select" value={mes} onChange={(e) => setMes(Number(e.target.value))}>
             {MESES.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
           </select>
@@ -278,12 +284,14 @@ export default function SAC() {
       </div>
 
       {/* Filtro búsqueda */}
-      <input
-        className="filter-input w-full"
-        placeholder="Buscar contacto, empresa..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
+      <div className="filter-bar">
+        <input
+          className="filter-input"
+          placeholder="Buscar contacto, empresa..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
 
       {/* Alerta FDA pendiente */}
       {conRegalos.filter((c) => !c.fdaEntregado).length > 0 && (
@@ -314,7 +322,7 @@ export default function SAC() {
             {conRegalos.length > 0 && (
               <div>
                 <h3 className="text-xs font-bold text-muted uppercase tracking-widest mb-2">🎁 Reciben regalo ({conRegalos.length})</h3>
-                <div className="table-card">
+                <DataListPanel pagination={conRegalosPagination}>
                   <table>
                     <thead>
                       <tr>
@@ -328,7 +336,7 @@ export default function SAC() {
                       </tr>
                     </thead>
                     <tbody>
-                      {conRegalos.map((c) => {
+                      {conRegalosPagination.pageItems.map((c) => {
                         const dias = diasParaCumpleanos(c.cumpleanos)
                         return (
                           <tr key={c.id} className={c.fdaEntregado ? 'opacity-50' : ''}>
@@ -367,14 +375,14 @@ export default function SAC() {
                       })}
                     </tbody>
                   </table>
-                </div>
+                </DataListPanel>
               </div>
             )}
 
             {sinRegalos.length > 0 && (
               <div>
                 <h3 className="text-xs font-bold text-muted uppercase tracking-widest mb-2">Otros cumpleaños ({sinRegalos.length})</h3>
-                <div className="table-card">
+                <DataListPanel pagination={sinRegalosPagination}>
                   <table>
                     <thead>
                       <tr>
@@ -386,7 +394,7 @@ export default function SAC() {
                       </tr>
                     </thead>
                     <tbody>
-                      {sinRegalos.map((c) => {
+                      {sinRegalosPagination.pageItems.map((c) => {
                         const dias = diasParaCumpleanos(c.cumpleanos)
                         return (
                           <tr key={c.id}>
@@ -409,7 +417,7 @@ export default function SAC() {
                       })}
                     </tbody>
                   </table>
-                </div>
+                </DataListPanel>
               </div>
             )}
           </div>
@@ -421,9 +429,9 @@ export default function SAC() {
         {/* Header FDA */}
         <div className="flex items-center justify-between flex-wrap gap-3">
           <h2 className="text-xs font-bold text-accent uppercase tracking-widest">🎄 Control de Detalles Fin de Año</h2>
-          <div className="flex gap-2 flex-wrap">
+          <div className="filter-bar filter-bar--end">
             <input
-              className="filter-input w-48"
+              className="filter-input"
               placeholder="Buscar empresa o contacto..."
               value={fdaSearch}
               onChange={(e) => setFdaSearch(e.target.value)}
@@ -435,7 +443,7 @@ export default function SAC() {
               <option value="C">🥉 Categoría C</option>
             </select>
             <button
-              className="btn-secondary btn-sm"
+              className="btn-secondary btn-sm shrink-0"
               onClick={() => exportSacExcel(fdaFiltrado, 'sac-fin-de-ano.csv')}
               disabled={fdaFiltrado.length === 0}
             >
@@ -462,64 +470,65 @@ export default function SAC() {
         </div>
 
         {/* Tabla FDA */}
-        {fdaFiltrado.length === 0 ? (
-          <div className="empty-state">
-            <p className="text-sm text-muted">Sin contactos con regalos{fdaCat ? ` en categoría ${fdaCat}` : ''}.</p>
-          </div>
-        ) : (
-          <div className="table-card">
-            <table>
-              <thead>
-                <tr>
-                  <th>Contacto</th>
-                  <th>Empresa</th>
-                  <th>Cat.</th>
-                  <th>Comercial</th>
-                  <th>Cumpleaños</th>
-                  <th>FDA</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {fdaFiltrado.map((c) => (
-                  <tr key={c.id} className={c.fdaEntregado ? 'opacity-50' : ''}>
-                    <td>
-                      <button className="font-semibold text-foreground hover:text-accent transition-colors text-left" onClick={() => setEditContacto(c)}>
-                        {c.nombre}
-                      </button>
-                      {c.cargo && <div className="text-xs text-muted">{c.cargo}</div>}
-                    </td>
-                    <td className="text-sm">{c.empresa}</td>
-                    <td>
-                      {c.categoria ? (
-                        <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
-                          style={{ background: `${CAT_COLOR[c.categoria]}20`, color: CAT_COLOR[c.categoria] }}>
-                          {c.categoria}
-                        </span>
-                      ) : <span className="text-muted text-xs">—</span>}
-                    </td>
-                    <td className="text-sm text-muted">{c.comercial}</td>
-                    <td className="font-mono text-sm">{c.cumpleanos ? c.cumpleanos.slice(5) : '—'}</td>
-                    <td>
-                      <span className={c.fdaEntregado ? 'badge-green' : 'badge-gray'}>
-                        {c.fdaEntregado ? 'Entregado' : 'Pendiente'}
+        <DataListPanel
+          pagination={fdaPagination}
+          empty={
+            <div className="empty-state">
+              <p className="text-sm text-muted">Sin contactos con regalos{fdaCat ? ` en categoría ${fdaCat}` : ''}.</p>
+            </div>
+          }
+        >
+          <table>
+            <thead>
+              <tr>
+                <th>Contacto</th>
+                <th>Empresa</th>
+                <th>Cat.</th>
+                <th>Comercial</th>
+                <th>Cumpleaños</th>
+                <th>FDA</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {fdaPagination.pageItems.map((c) => (
+                <tr key={c.id} className={c.fdaEntregado ? 'opacity-50' : ''}>
+                  <td>
+                    <button className="font-semibold text-foreground hover:text-accent transition-colors text-left" onClick={() => setEditContacto(c)}>
+                      {c.nombre}
+                    </button>
+                    {c.cargo && <div className="text-xs text-muted">{c.cargo}</div>}
+                  </td>
+                  <td className="text-sm">{c.empresa}</td>
+                  <td>
+                    {c.categoria ? (
+                      <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
+                        style={{ background: `${CAT_COLOR[c.categoria]}20`, color: CAT_COLOR[c.categoria] }}>
+                        {c.categoria}
                       </span>
-                    </td>
-                    <td>
-                      <button
-                        className={`btn-sm px-2 py-1 text-xs ${c.fdaEntregado ? 'btn-secondary' : 'btn-primary'}`}
-                        disabled={updateMut.isPending}
-                        onClick={() => updateMut.mutate({ id: c.id, data: { fdaEntregado: !c.fdaEntregado } })}
-                      >
-                        {c.fdaEntregado ? 'Desmarcar' : 'Marcar FDA'}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                    ) : <span className="text-muted text-xs">—</span>}
+                  </td>
+                  <td className="text-sm text-muted">{c.comercial}</td>
+                  <td className="font-mono text-sm">{c.cumpleanos ? c.cumpleanos.slice(5) : '—'}</td>
+                  <td>
+                    <span className={c.fdaEntregado ? 'badge-green' : 'badge-gray'}>
+                      {c.fdaEntregado ? 'Entregado' : 'Pendiente'}
+                    </span>
+                  </td>
+                  <td>
+                    <button
+                      className={`btn-sm px-2 py-1 text-xs ${c.fdaEntregado ? 'btn-secondary' : 'btn-primary'}`}
+                      disabled={updateMut.isPending}
+                      onClick={() => updateMut.mutate({ id: c.id, data: { fdaEntregado: !c.fdaEntregado } })}
+                    >
+                      {c.fdaEntregado ? 'Desmarcar' : 'Marcar FDA'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </DataListPanel>
       </div>
 
       {/* Modal editar contacto */}

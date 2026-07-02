@@ -7,7 +7,7 @@ import { createActividad, updateActividad, deleteActividad } from '../api/activi
 import { toast } from '../store/toastStore'
 import type { ActividadTipo, EstadoProspecto, EstadoCliente, TipoVisita, TipoFacturado } from '../types'
 import { fmtEstado } from '../utils/fmtEstado'
-import DetalleCrmPanel, { type DetalleEditState } from '../components/detalle/DetalleCrmPanel'
+import DetalleCrmPanel, { type DetalleEditState, canOpenFichaSop } from '../components/detalle/DetalleCrmPanel'
 import {
   CLIENTE_BADGE,
   CLIENTE_ESTADO_OPTIONS,
@@ -16,6 +16,8 @@ import {
   PROSPECTO_BADGE,
   PROSPECTO_FORM_OPTIONS,
 } from '../lib/htmlV6/domainConfig'
+import { usePagination } from '../hooks/usePagination'
+import { DataListPanel } from '../components/ui/DataListPanel'
 
 const ESTADO_BADGE_P = PROSPECTO_BADGE
 const ESTADO_BADGE_C = CLIENTE_BADGE
@@ -79,6 +81,8 @@ export default function Detalle() {
     select: (data) => data.filter((c) => c.recordId === id),
     enabled: tab === 'cotizaciones',
   })
+
+  const cotPagination = usePagination(cotizaciones, { resetDeps: [id] })
 
   // â”€â”€ Estado ediciÃ³n â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -234,7 +238,7 @@ export default function Detalle() {
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="space-y-4">
         <div className="h-12 w-64 bg-surface2 rounded animate-pulse" />
         <div className="card p-6 h-48 animate-pulse bg-surface2" />
         <div className="card p-6 h-64 animate-pulse bg-surface2" />
@@ -269,21 +273,32 @@ export default function Detalle() {
   return (
     <div className="detalle-crm">
 
-      <div className="detalle-tabs">
-        <button
-          type="button"
-          className={`detalle-tab${tab !== 'cotizaciones' ? ' detalle-tab--active' : ''}`}
-          onClick={() => setTab('info')}
-        >
-          Información
-        </button>
-        <button
-          type="button"
-          className={`detalle-tab${tab === 'cotizaciones' ? ' detalle-tab--active' : ''}`}
-          onClick={() => setTab('cotizaciones')}
-        >
-          Cotizaciones
-        </button>
+      <div className="detalle-top-bar">
+        <div className="detalle-tabs">
+          <button
+            type="button"
+            className={`detalle-tab${tab !== 'cotizaciones' ? ' detalle-tab--active' : ''}`}
+            onClick={() => setTab('info')}
+          >
+            Información
+          </button>
+          <button
+            type="button"
+            className={`detalle-tab${tab === 'cotizaciones' ? ' detalle-tab--active' : ''}`}
+            onClick={() => setTab('cotizaciones')}
+          >
+            Cotizaciones
+          </button>
+        </div>
+        {canOpenFichaSop(record, isProspecto) && (
+          <Link
+            to={`/fichas/${id}`}
+            className="btn btn-primary btn-sm detalle-ficha-link"
+            title="Documentación SOP — se crea automáticamente si no existe"
+          >
+            Ficha SOP
+          </Link>
+        )}
       </div>
 
       {tab !== 'cotizaciones' && (
@@ -332,27 +347,27 @@ export default function Detalle() {
             </Link>
           </div>
 
-          {cotizaciones.length === 0 ? (
+          {cotPagination.totalItems === 0 ? (
             <div className="empty-state">
-              <div className="text-4xl mb-3">ðŸ“‹</div>
+              <div className="text-4xl mb-3">📋</div>
               <p className="font-semibold text-foreground mb-1">Sin cotizaciones</p>
-              <p className="text-sm">Crea la primera cotizaciÃ³n para este cliente.</p>
+              <p className="text-sm">Crea la primera cotización para este cliente.</p>
             </div>
           ) : (
-            <div className="table-card">
+            <DataListPanel pagination={cotPagination}>
               <table>
                 <thead>
                   <tr>
-                    <th>NÃºmero</th>
+                    <th>Número</th>
                     <th>Estado</th>
-                    <th>LÃ­neas</th>
+                    <th>Líneas</th>
                     <th>Comercial</th>
                     <th>Fecha</th>
                     <th></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {cotizaciones.map((cot) => (
+                  {cotPagination.pageItems.map((cot) => (
                     <tr key={cot.id}>
                       <td className="font-mono text-accent font-semibold">{cot.numero}</td>
                       <td>
@@ -382,7 +397,7 @@ export default function Detalle() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </DataListPanel>
           )}
         </div>
       )}

@@ -282,7 +282,7 @@ export default function CalendarioVisitas() {
   const pending = total - hechas
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3">
@@ -292,8 +292,7 @@ export default function CalendarioVisitas() {
             <p className="text-xs text-muted">Actividades con tipo "visita" de todos los registros</p>
           </div>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Comercial filter */}
+        <div className="table-header-actions">
           <select
             value={filtComercial}
             onChange={e => setFiltComercial(e.target.value)}
@@ -304,7 +303,7 @@ export default function CalendarioVisitas() {
           </select>
 
           {/* Vista toggle */}
-          <div className="flex rounded-lg border border-border overflow-hidden text-xs">
+          <div className="flex rounded-lg border border-border overflow-hidden text-xs shrink-0">
             <button
               onClick={() => setVista('mes')}
               className={`px-4 py-1.5 font-bold transition-colors ${vista === 'mes' ? 'bg-accent2 text-white' : 'text-muted hover:text-foreground'}`}

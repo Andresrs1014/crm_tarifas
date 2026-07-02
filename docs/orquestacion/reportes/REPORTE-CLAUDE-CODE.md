@@ -109,6 +109,66 @@
 
 ---
 
+## C18 — Biblioteca Transporte + Paqueteo + BIB-08 — 2026-07-01
+
+### Resumen ejecutivo
+
+BIB-05, BIB-06 y BIB-08 implementados. `tsc -b && vite build` sin errores.
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---------|--------|
+| `frontend/src/lib/htmlV6/constants.ts` | Agregado: `BibSchemaCol`, `PaqueteoSchemaEntry`, `TRANSP_SCHEMA` (local + otros), `PAQUETEO_SCHEMA` (13 grupos), `PAQUETEO_GRUPOS_*`, `PaqueteoTab` |
+| `frontend/src/styles/html-v6.css` | Agregado: `.bib-tab-btn`, `.bib-tab-btn--active`, `.bib-toggle-btn`, `.bib-grupo-badge` |
+| `frontend/src/pages/Biblioteca.tsx` | Reescritura completa — ver detalle abajo |
+
+### BIB-05 — Transporte
+
+- `BibTransporteSection`: renderiza línea Transporte con 2 botones "🚛 + Nuevo grupo Transporte Local" / "📦 + Nuevo grupo Otros Servicios"
+- `GrupoTransporteSection`: badge con tipo, tabla con columnas de `TRANSP_SCHEMA`, SchemaItemRow editable, reorder ▲▼, drag/drop, delete grupo
+- Grupos tipo codificado en `nombre`: `"local|TRANSPORTE LOCAL"` / `"otros|OTROS SERVICIOS DE TRANSPORTE"`
+- Detección: `linea.nombre.toLowerCase().includes('transporte')`
+
+### BIB-06 — Paqueteo
+
+- `BibPaqueteoSection`: 3 tabs (COORDINADORA / TCC / SERVIENTREGA), grupos filtrados por tab activo
+- `GrupoPaqueteoSection`: label de solo lectura del schema, tabla con `PaqueteoTableHead` (soporta `colspanGroups` para `tcc_radicacion`), filas schema-driven
+- Botón "⚡ Inicializar grupos de Paqueteo" si la línea no tiene ningún grupo — crea los 13 grupos de una vez
+- Tipos toggle `tarifa-mixta` / `mixta` / `tarifa-texto`: botón `bib-toggle-btn` persiste en `extraCols._tc_{colId}`
+
+### BIB-08 — Renombrar col1/col2/col3
+
+- `ColumnasSection` actualizado: 3 inputs para renombrar Servicio / Tarifa / Observación (headers estándar)
+- Codificado en `linea.columnas` con prefijos `__h1:`, `__h2:`, `__h3:`; sin migración Prisma
+- Las columnas extra siguen funcionando igual que antes
+
+### Componentes compartidos
+
+- `SchemaCell`: renderizador único para texto / moneda / porcentaje / tarifa / tarifa-mixta / tarifa-texto / mixta
+- `SchemaItemRow`: fila genérica para grupos schema-driven (Transporte + Paqueteo)
+- `ItemRow` + `GrupoSection` actualizados para recibir `headers[3]` y `extraCols[]` separados
+
+### Criterios de aceptación
+
+| AC | Estado |
+|----|--------|
+| AC-01 Línea Transporte muestra botones Nuevo grupo Local/Otros | ✅ |
+| AC-02 Tabla Transporte usa columnas de TRANSP_SCHEMA | ✅ |
+| AC-03 Línea Paqueteo muestra 3 tabs | ✅ |
+| AC-04 Grupos Paqueteo filtrados por tab activo | ✅ |
+| AC-05 tcc_radicacion tiene cabecera colspan de 2 filas | ✅ |
+| AC-06 Celdas tarifa-mixta/tarifa-texto tienen toggle $ / % / T | ✅ |
+| AC-10 `npm run build` pasa sin errores TS | ✅ `tsc -b && vite build` en 21.4s |
+
+### Restricciones respetadas
+
+- ⛔ `backend/` no tocado
+- ⛔ `WizardLayout.tsx` no tocado
+- ⛔ Sin migración Prisma — toda la info en `columnas Json` y `extraCols Json` existentes
+
+---
+
 ## C17 — Cierre paridad HTML v6 (auditoría + specs) — 2026-07-01
 
 ### Resumen ejecutivo

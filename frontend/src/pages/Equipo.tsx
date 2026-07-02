@@ -178,7 +178,7 @@ export default function Equipo() {
   const comercialToEdit = comerciales.find((c) => c.id === editingId)
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="space-y-5">
 
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">

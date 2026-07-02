@@ -10,8 +10,9 @@
 
 Implementar paridad HTML v6 en **Biblioteca de Tarifas** para líneas **Transporte** y **Paqueteo**, más renombrar columnas en líneas estándar.
 
-**⛔ No tocar:** `backend/` (Cursor trabaja B1–B6 en paralelo).  
-**⛔ No tocar:** `WizardLayout.tsx` paso 3 (tarea X10, después de X11).
+**⛔ No tocar:** `backend/` · `MatrizRiesgos.tsx` · `GestionDocumental.tsx` · `WizardLayout.tsx`  
+**⛔ Sin migración Prisma** — usar `BibliotecaLinea.columnas` Json y APIs existentes.  
+**Independencia:** Cursor trabaja Matriz/GD (X12) en paralelo; no hay dependencia entre vosotros.
 
 ---
 

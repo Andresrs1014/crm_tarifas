@@ -1,4 +1,5 @@
 import { useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
+import { Link } from 'react-router-dom'
 import type { ActividadTipo, CRMRecord, EstadoCliente, EstadoProspecto, TipoFacturado, TipoVisita } from '../../types'
 import {
   ACTIVIDAD_TIPO_ICON,
@@ -212,6 +213,14 @@ interface Props {
   obsSaving: boolean
 }
 
+function canOpenFichaSop(record: CRMRecord, isProspecto: boolean): boolean {
+  if (!isProspecto) return true
+  const stage = record.estadoProspecto
+  return stage === 'creacion_sop' || stage === 'facturado'
+}
+
+export { canOpenFichaSop }
+
 function DetalleField({
   label,
   children,
@@ -280,6 +289,15 @@ export default function DetalleCrmPanel({
         <div className="detalle-header-actions">
           {!editing ? (
             <>
+              {canOpenFichaSop(record, isProspecto) && (
+                <Link
+                  to={`/fichas/${record.id}`}
+                  className="btn btn-primary btn-sm"
+                  title="Documentación SOP — crea la ficha si aún no existe"
+                >
+                  Ficha SOP
+                </Link>
+              )}
               {isProspecto && onConvertToCliente && (
                 <button
                   type="button"

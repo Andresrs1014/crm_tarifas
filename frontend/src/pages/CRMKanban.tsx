@@ -35,6 +35,7 @@ import {
   recordMatchesCompaniaFilter,
 } from '../lib/htmlV6/domainConfig'
 import { fmtMoney } from '../utils/fmtMoney'
+import { TableScrollArea } from '../components/ui/DataListPanel'
 
 const STAGES = CRM_KANBAN_STAGES as { value: EstadoProspecto; label: string; color: string; bg: string }[]
 const STAGE_VALUES = STAGES.map((s) => s.value)
@@ -230,14 +231,64 @@ function KanbanColumn({
   )
 }
 
+function KanbanCardBody({
+  record,
+}: {
+  record: CRMRecord
+}) {
+  return (
+    <>
+      <p className="kanban-card-title">{record.empresa}</p>
+      {record.ciudad && <p className="kanban-card-meta">{record.ciudad}</p>}
+      {record.comercial && <p className="kanban-card-meta">{record.comercial.nombre}</p>}
+
+      {(record.servicios ?? []).length > 0 && (
+        <div className="kanban-card-tags">
+          {record.servicios.slice(0, 2).map((s) => (
+            <span key={s} className="stag">{s}</span>
+          ))}
+          {record.servicios.length > 2 && (
+            <span className="stag">+{record.servicios.length - 2}</span>
+          )}
+        </div>
+      )}
+
+      {record.ingresosEsperados ? (
+        <p className="money-gold kanban-card-money">{fmtMoney(record.ingresosEsperados)}</p>
+      ) : null}
+
+      {record.proximoSeguimiento && (
+        <p className={`kanban-card-date${
+          new Date(record.proximoSeguimiento) < new Date() ? ' kanban-card-date--late' : ''
+        }`}>
+          🔔 {new Date(record.proximoSeguimiento).toLocaleDateString('es-CO')}
+        </p>
+      )}
+    </>
+  )
+}
+
+/** Vista estática para DragOverlay — sin useSortable (evita congelar el board). */
+function KanbanCardPreview({ record, color }: { record: CRMRecord; color: string }) {
+  return (
+    <div
+      className="kanban-card kanban-card--overlay"
+      style={{ borderColor: color, cursor: 'grabbing' }}
+    >
+      <span className="kanban-card-handle" aria-hidden="true">⠿</span>
+      <div className="kanban-card-body">
+        <KanbanCardBody record={record} />
+      </div>
+    </div>
+  )
+}
+
 function KanbanCard({
   record,
   color,
-  overlay = false,
 }: {
   record: CRMRecord
   color: string
-  overlay?: boolean
 }) {
   const navigate = useNavigate()
   const {
@@ -252,14 +303,13 @@ function KanbanCard({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    borderColor: overlay ? color : undefined,
   }
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`kanban-card${isDragging && !overlay ? ' kanban-card--dragging' : ''}${overlay ? ' kanban-card--overlay' : ''}`}
+      className={`kanban-card${isDragging ? ' kanban-card--dragging' : ''}`}
       onClick={() => navigate(`/detalle/${record.id}`)}
       role="button"
       tabIndex={0}
@@ -277,32 +327,7 @@ function KanbanCard({
       </button>
 
       <div className="kanban-card-body">
-        <p className="kanban-card-title">{record.empresa}</p>
-        {record.ciudad && <p className="kanban-card-meta">{record.ciudad}</p>}
-        {record.comercial && <p className="kanban-card-meta">{record.comercial.nombre}</p>}
-
-        {(record.servicios ?? []).length > 0 && (
-          <div className="kanban-card-tags">
-            {record.servicios.slice(0, 2).map((s) => (
-              <span key={s} className="stag">{s}</span>
-            ))}
-            {record.servicios.length > 2 && (
-              <span className="stag">+{record.servicios.length - 2}</span>
-            )}
-          </div>
-        )}
-
-        {record.ingresosEsperados ? (
-          <p className="money-gold kanban-card-money">{fmtMoney(record.ingresosEsperados)}</p>
-        ) : null}
-
-        {record.proximoSeguimiento && (
-          <p className={`kanban-card-date${
-            new Date(record.proximoSeguimiento) < new Date() ? ' kanban-card-date--late' : ''
-          }`}>
-            🔔 {new Date(record.proximoSeguimiento).toLocaleDateString('es-CO')}
-          </p>
-        )}
+        <KanbanCardBody record={record} />
       </div>
     </div>
   )
@@ -311,6 +336,9 @@ function KanbanCard({
 export default function CRMKanban() {
   const qc = useQueryClient()
   const boardRef = useRef<HTMLDivElement>(null)
+  const columnsRef = useRef<ColumnMap>(
+    Object.fromEntries(STAGE_VALUES.map((v) => [v, [] as string[]])) as ColumnMap,
+  )
   const dragStartContainerRef = useRef<EstadoProspecto | null>(null)
   const dragTargetRef = useRef<EstadoProspecto | null>(null)
   const [comercialId, setComercialId] = useState('')
@@ -378,6 +406,8 @@ export default function CRMKanban() {
     setColumns(mergeOrder(base, loadStoredOrder()))
   }, [prospectosFiltrados])
 
+  columnsRef.current = columns
+
   useEffect(() => {
     localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(columns))
   }, [columns])
@@ -402,12 +432,23 @@ export default function CRMKanban() {
     ingresos: kpiIngresos ? fmtMoney(kpiIngresos) : '—',
   }
 
+  const resetDragState = useCallback(() => {
+    dragStartContainerRef.current = null
+    dragTargetRef.current = null
+    setActiveCard(null)
+    setOverColumn(null)
+  }, [])
+
+  const revertColumnsFromRecords = useCallback(() => {
+    setColumns(mergeOrder(buildColumnMap(prospectosFiltrados), loadStoredOrder()))
+  }, [prospectosFiltrados])
+
   const handleDragStart = useCallback((e: DragStartEvent) => {
     const record = recordsById.get(String(e.active.id))
     setActiveCard(record ?? null)
-    dragStartContainerRef.current = findContainer(columns, e.active.id)
+    dragStartContainerRef.current = findContainer(columnsRef.current, e.active.id)
     dragTargetRef.current = dragStartContainerRef.current
-  }, [recordsById, columns])
+  }, [recordsById])
 
   const handleDragOver = useCallback((e: DragOverEvent) => {
     const { active, over } = e
@@ -416,16 +457,29 @@ export default function CRMKanban() {
       return
     }
 
-    setColumns((prev) => {
-      const overContainer = findContainer(prev, over.id)
-      dragTargetRef.current = overContainer
-      setOverColumn(overContainer)
+    const overContainer = findContainer(columnsRef.current, over.id)
+    dragTargetRef.current = overContainer
+    setOverColumn(overContainer)
 
+    setColumns((prev) => {
       const activeContainer = findContainer(prev, active.id)
-      if (!activeContainer || !overContainer || activeContainer === overContainer) return prev
+      const targetContainer = findContainer(prev, over.id)
+      if (!activeContainer || !targetContainer) return prev
 
       const cardId = String(active.id)
-      return moveCardBetweenColumns(prev, cardId, activeContainer, overContainer, over.id)
+
+      if (activeContainer === targetContainer) {
+        if (isPlaceholderId(over.id)) return prev
+        const items = [...prev[activeContainer]]
+        const oldIndex = items.indexOf(cardId)
+        const newIndex = items.indexOf(String(over.id))
+        if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+          return { ...prev, [activeContainer]: arrayMove(items, oldIndex, newIndex) }
+        }
+        return prev
+      }
+
+      return moveCardBetweenColumns(prev, cardId, activeContainer, targetContainer, over.id)
     })
   }, [])
 
@@ -433,11 +487,11 @@ export default function CRMKanban() {
     const { active, over } = e
     const sourceAtStart = dragStartContainerRef.current
     const cardId = String(active.id)
-    dragStartContainerRef.current = null
-    setActiveCard(null)
-    setOverColumn(null)
 
-    if (isPlaceholderId(active.id)) return
+    if (isPlaceholderId(active.id)) {
+      resetDragState()
+      return
+    }
 
     let targetStage: EstadoProspecto | null = null
 
@@ -448,15 +502,34 @@ export default function CRMKanban() {
         : prev
 
       targetStage = findContainer(next, active.id)
-      dragTargetRef.current = null
       return next
     })
+
+    resetDragState()
 
     const record = recordsById.get(cardId)
     if (record && targetStage && normalizeStage(record.estadoProspecto) !== targetStage) {
       updateEstadoMut.mutate({ id: record.id, estado: targetStage })
     }
-  }, [recordsById, updateEstadoMut])
+  }, [recordsById, updateEstadoMut, resetDragState])
+
+  const handleDragCancel = useCallback(() => {
+    revertColumnsFromRecords()
+    resetDragState()
+  }, [revertColumnsFromRecords, resetDragState])
+
+  const collisionDetection = useCallback((args: Parameters<typeof closestCorners>[0]) => {
+    const hits = pointerWithin(args)
+    if (hits.length > 0) {
+      const cardHit = hits.find((hit) => {
+        const id = String(hit.id)
+        return !STAGE_VALUES.includes(id as EstadoProspecto) && !isPlaceholderId(id)
+      })
+      if (cardHit) return [cardHit, ...hits.filter((h) => h.id !== cardHit.id)]
+      return hits
+    }
+    return closestCorners(args)
+  }, [])
 
   return (
     <div className="page-crm">
@@ -467,14 +540,12 @@ export default function CRMKanban() {
         <div className="page-crm-header-actions">
           <input
             className="filter-input"
-            style={{ minWidth: 190 }}
             placeholder="Buscar empresa..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
           <select
             className="filter-select"
-            style={{ minWidth: 190 }}
             value={companiaFiltro}
             onChange={(e) => setCompaniaFiltro(e.target.value)}
           >
@@ -482,11 +553,11 @@ export default function CRMKanban() {
               <option key={o.value || 'all'} value={o.value}>{o.label}</option>
             ))}
           </select>
-          <select className="filter-select" style={{ minWidth: 190 }} value={comercialId} onChange={(e) => setComercialId(e.target.value)}>
+          <select className="filter-select" value={comercialId} onChange={(e) => setComercialId(e.target.value)}>
             <option value="">{'\uD83D\uDC65'} Todos los comerciales</option>
             {comerciales.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
           </select>
-          <Link to="/registro" className="btn btn-primary btn-sm" style={{ whiteSpace: 'nowrap' }}>
+          <Link to="/registro" className="btn btn-primary btn-sm shrink-0">
             {'\u2795'} Nuevo Prospecto
           </Link>
         </div>
@@ -529,51 +600,45 @@ export default function CRMKanban() {
 
       {isLoading ? (
         <div className="kanban-board-wrap">
-          <div className="kanban-board">
-            {STAGES.map((s) => (
-              <div key={s.value} className="kanban-column kanban-column--loading" />
-            ))}
-          </div>
+          <TableScrollArea>
+            <div className="kanban-board">
+              {STAGES.map((s) => (
+                <div key={s.value} className="kanban-column kanban-column--loading" />
+              ))}
+            </div>
+          </TableScrollArea>
         </div>
       ) : (
         <DndContext
           sensors={sensors}
           autoScroll={{ threshold: { x: 0.15, y: 0.2 } }}
-          collisionDetection={(args) => {
-            const hits = pointerWithin(args)
-            if (hits.length > 0) {
-              const columnHit = hits.find((hit) =>
-                STAGE_VALUES.includes(String(hit.id) as EstadoProspecto)
-                || isPlaceholderId(hit.id),
-              )
-              return columnHit ? [columnHit, ...hits.filter((h) => h.id !== columnHit.id)] : hits
-            }
-            return closestCorners(args)
-          }}
+          collisionDetection={collisionDetection}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
         >
           <div className="kanban-board-wrap">
-            <div className="kanban-board" ref={boardRef}>
-              {STAGES.map((stage) => (
-                <KanbanColumn
-                  key={stage.value}
-                  stage={stage}
-                  cardIds={columns[stage.value] ?? []}
-                  recordsById={recordsById}
-                  isOver={overColumn === stage.value}
-                />
-              ))}
-            </div>
+            <TableScrollArea>
+              <div className="kanban-board" ref={boardRef}>
+                {STAGES.map((stage) => (
+                  <KanbanColumn
+                    key={stage.value}
+                    stage={stage}
+                    cardIds={columns[stage.value] ?? []}
+                    recordsById={recordsById}
+                    isOver={overColumn === stage.value}
+                  />
+                ))}
+              </div>
+            </TableScrollArea>
           </div>
 
           <DragOverlay dropAnimation={null}>
             {activeCard && (
-              <KanbanCard
+              <KanbanCardPreview
                 record={activeCard}
-                color={STAGES.find((s) => s.value === activeCard.estadoProspecto)?.color ?? '#00c2ff'}
-                overlay
+                color={STAGES.find((s) => s.value === normalizeStage(activeCard.estadoProspecto))?.color ?? '#00c2ff'}
               />
             )}
           </DragOverlay>

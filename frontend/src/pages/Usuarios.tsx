@@ -4,6 +4,8 @@ import { getUsers, createUser, updateUser, deleteUser } from '../api/users'
 import { useAuthStore } from '../store/authStore'
 import { toast } from '../store/toastStore'
 import type { User } from '../types'
+import { usePagination } from '../hooks/usePagination'
+import { DataListPanel } from '../components/ui/DataListPanel'
 
 type Role = 'superadmin' | 'usuario'
 
@@ -243,8 +245,10 @@ export default function Usuarios() {
     onError: () => toast.error('Error al eliminar'),
   })
 
+  const pagination = usePagination(usuarios)
+
   return (
-    <div className="p-6 space-y-5">
+    <div className="space-y-5">
 
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -350,14 +354,7 @@ export default function Usuarios() {
       )}
 
       {/* Tabla */}
-      <div className="table-card">
-        {isLoading ? (
-          <div className="p-8 space-y-3">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-10 bg-surface2 rounded animate-pulse" />
-            ))}
-          </div>
-        ) : (
+      <DataListPanel pagination={pagination} loading={isLoading}>
           <table>
             <thead>
               <tr>
@@ -369,7 +366,7 @@ export default function Usuarios() {
               </tr>
             </thead>
             <tbody>
-              {usuarios.map((u) => (
+              {pagination.pageItems.map((u) => (
                 <UserRow
                   key={u.id}
                   user={u}
@@ -379,8 +376,7 @@ export default function Usuarios() {
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+      </DataListPanel>
 
       {/* Modal confirmación */}
       {confirmId && (

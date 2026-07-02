@@ -14,6 +14,8 @@ import {
   FACTURADO_BADGE,
   recordMatchesCompaniaFilter,
 } from '../lib/htmlV6/domainConfig'
+import { usePagination } from '../hooks/usePagination'
+import { DataListPanel } from '../components/ui/DataListPanel'
 
 const ESTADOS_CLIENTE = CLIENTE_ESTADO_OPTIONS
 
@@ -60,8 +62,12 @@ export default function Clientes() {
   const facturacionTotal = clientes.reduce((s, c) => s + (c.valor ?? 0), 0)
   const enRiesgo = clientes.filter((c) => c.estadoCliente === 'en-riesgo').length
 
+  const pagination = usePagination(clientes, {
+    resetDeps: [search, estado, comercialId, facturadoFiltro, companiaFiltro],
+  })
+
   return (
-    <div>
+    <div className="space-y-5">
       <div className="section-title">{'\uD83C\uDFE2'} Clientes <span>Activos</span></div>
       {clientes.length > 0 && (
         <p className="text-sm text-muted" style={{ marginBottom: 16, marginTop: -8 }}>
@@ -70,73 +76,69 @@ export default function Clientes() {
         </p>
       )}
 
-      <div className="table-card">
-        <div className="table-header-2row">
-          <div className="table-header-top">
-            <div className="table-title">Lista de Clientes</div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={() => exportRecordsExcel(clientes, 'clientes.xlsx')}
-                disabled={clientes.length === 0}
-                title="Exportar a Excel"
-                style={{ whiteSpace: 'nowrap' }}
-              >
-                {'\u2B07\uFE0F'} Exportar Excel
-              </button>
-              <Link
-                to="/registro/importar"
-                className="btn btn-secondary btn-sm"
-                style={{ whiteSpace: 'nowrap', borderColor: 'var(--green)', color: 'var(--green)' }}
-              >
-                {'\uD83D\uDCE4'} Carga Masiva
-              </Link>
-              <Link to="/registro" className="btn btn-primary btn-sm" style={{ whiteSpace: 'nowrap' }}>
-                {'\u2795'} Nuevo cliente
-              </Link>
+      <DataListPanel
+        pagination={pagination}
+        loading={isLoading}
+        empty={
+          <div className="empty-state">
+            <div className="empty-icon">{'\uD83C\uDFE2'}</div>
+            <div className="empty-title">Sin clientes</div>
+            <div>Cambia los filtros o crea un nuevo cliente.</div>
+          </div>
+        }
+        header={
+          <div className="table-header-2row">
+            <div className="table-header-top">
+              <div className="table-title">Lista de Clientes</div>
+              <div className="table-header-actions">
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => exportRecordsExcel(clientes, 'clientes.xlsx')}
+                  disabled={clientes.length === 0}
+                  title="Exportar a Excel"
+                >
+                  {'\u2B07\uFE0F'} Exportar Excel
+                </button>
+                <Link
+                  to="/registro/importar"
+                  className="btn btn-secondary btn-sm"
+                  style={{ borderColor: 'var(--green)', color: 'var(--green)' }}
+                >
+                  {'\uD83D\uDCE4'} Carga Masiva
+                </Link>
+                <Link to="/registro" className="btn btn-primary btn-sm">
+                  {'\u2795'} Nuevo cliente
+                </Link>
+              </div>
+            </div>
+            <div className="table-filters">
+              <input
+                className="filter-input"
+                placeholder={'\uD83D\uDD0D Buscar empresa o NIT...'}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              <select className="filter-select" value={estado} onChange={(e) => setEstado(e.target.value)}>
+                {ESTADOS_CLIENTE.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
+              </select>
+              <select className="filter-select" value={facturadoFiltro} onChange={(e) => setFacturadoF(e.target.value)}>
+                <option value="">Facturación: Todos</option>
+                <option value="si">Facturado</option>
+                <option value="no">No Facturado</option>
+              </select>
+              <select className="filter-select" value={companiaFiltro} onChange={(e) => setCompaniaFiltro(e.target.value)}>
+                {COMPANIAS_FILTER_OPTIONS.map((o) => (
+                  <option key={o.value || 'all'} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+              <select className="filter-select" value={comercialId} onChange={(e) => setComercialId(e.target.value)}>
+                <option value="">Todos los comerciales</option>
+                {comerciales.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+              </select>
             </div>
           </div>
-          <div className="table-filters">
-            <input
-              className="filter-input"
-              placeholder={'\uD83D\uDD0D Buscar empresa o NIT...'}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <select className="filter-select" value={estado} onChange={(e) => setEstado(e.target.value)}>
-              {ESTADOS_CLIENTE.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
-            </select>
-            <select className="filter-select" value={facturadoFiltro} onChange={(e) => setFacturadoF(e.target.value)}>
-              <option value="">Facturación: Todos</option>
-              <option value="si">Facturado</option>
-              <option value="no">No Facturado</option>
-            </select>
-            <select className="filter-select" value={companiaFiltro} onChange={(e) => setCompaniaFiltro(e.target.value)}>
-              {COMPANIAS_FILTER_OPTIONS.map((o) => (
-                <option key={o.value || 'all'} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-            <select className="filter-select" value={comercialId} onChange={(e) => setComercialId(e.target.value)}>
-              <option value="">Todos los comerciales</option>
-              {comerciales.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-            </select>
-          </div>
-        </div>
-
-        <div style={{ overflowX: 'auto' }}>
-          {isLoading ? (
-            <div className="p-8 space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-10 bg-surface2 rounded animate-pulse" />
-              ))}
-            </div>
-          ) : clientes.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">{'\uD83C\uDFE2'}</div>
-              <div className="empty-title">Sin clientes</div>
-              <div>Cambia los filtros o crea un nuevo cliente.</div>
-            </div>
-          ) : (
+        }
+      >
             <table>
               <thead>
                 <tr>
@@ -149,11 +151,11 @@ export default function Clientes() {
                   <th>Facturación</th>
                   <th>Estado</th>
                   <th>Cat.</th>
-                  <th>Acciones</th>
+                  <th className="col-actions-sticky">Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {clientes.map((c) => (
+                {pagination.pageItems.map((c) => (
                   <tr key={c.id} className="cursor-pointer" onClick={() => navigate(`/detalle/${c.id}`)}>
                     <td>
                       <strong>{c.empresa}</strong>
@@ -211,19 +213,20 @@ export default function Clientes() {
                         </span>
                       ) : <span className="text-muted text-xs">{'\u2014'}</span>}
                     </td>
-                    <td onClick={(e) => e.stopPropagation()}>
-                      <div className="flex gap-1">
-                        <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/detalle/${c.id}`)}>Ver</button>
-                        <button className="btn btn-danger btn-sm" onClick={() => setConfirmId(c.id)} title="Eliminar cliente">{'\u00D7'}</button>
+                    <td className="col-actions-sticky" onClick={(e) => e.stopPropagation()}>
+                      <div className="clientes-actions">
+                        <button type="button" className="btn btn-primary btn-sm" onClick={() => navigate(`/fichas/${c.id}`)}>
+                          Ficha SOP
+                        </button>
+                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => navigate(`/detalle/${c.id}`)}>Ver</button>
+                        <button type="button" className="btn btn-danger btn-sm" onClick={() => setConfirmId(c.id)} title="Eliminar cliente">{'\u00D7'}</button>
                       </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          )}
-        </div>
-      </div>
+      </DataListPanel>
 
       {confirmId && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setConfirmId(null)}>

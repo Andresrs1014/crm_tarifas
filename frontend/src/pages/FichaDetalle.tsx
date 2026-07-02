@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getFichaByRecord, updateFicha, getAnalistas, createAnalista, deleteAnalista } from '../api/fichas'
 import { getRecord } from '../api/records'
 import { toast } from '../store/toastStore'
+import { usePagination } from '../hooks/usePagination'
+import { DataListPanel, TableScrollArea } from '../components/ui/DataListPanel'
 
 // Types
 type TabId = 'info' | 'contactos' | 'facturacion' | 'operacion' | 'kickoff'
@@ -104,6 +106,8 @@ export default function FichaDetalle() {
 
   useEffect(() => {
     if (ficha) {
+      qc.invalidateQueries({ queryKey: ['fichas'] })
+      qc.invalidateQueries({ queryKey: ['fichas-all'] })
       setFichaId(ficha.id)
       setEstado(ficha.estado)
       const merged = { ...EMPTY_DATA, ...(ficha.data as Partial<FichaData>) }
@@ -112,6 +116,10 @@ export default function FichaDetalle() {
   }, [ficha])
 
   const pct = calcPct(data)
+
+  const contactosPagination = usePagination(data.contactos, { resetDeps: [tab] })
+  const asistentesPagination = usePagination(data.asistentes, { resetDeps: [tab] })
+  const compromisosPagination = usePagination(COMPROMISOS, { resetDeps: [tab], pageSize: 10 })
 
   const saveMut = useMutation({
     mutationFn: () => updateFicha(fichaId, { estado, pct, data: data as unknown as Record<string, unknown> }),
@@ -187,7 +195,7 @@ export default function FichaDetalle() {
   ].filter(Boolean) as string[]
 
   if (isLoading) return (
-    <div className="p-6 space-y-4">
+    <div className="space-y-4">
       <div className="h-10 w-64 bg-surface2 rounded animate-pulse" />
       <div className="h-64 bg-surface2 rounded-xl animate-pulse" />
     </div>
@@ -232,7 +240,8 @@ export default function FichaDetalle() {
       </div>
 
       {/* Tab bar */}
-      <div className="flex border-b border-border bg-surface2 overflow-x-auto">
+      <TableScrollArea className="ficha-tabs-scroll">
+      <div className="flex border-b border-border bg-surface2">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -245,6 +254,7 @@ export default function FichaDetalle() {
           </button>
         ))}
       </div>
+      </TableScrollArea>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6">
@@ -372,7 +382,7 @@ export default function FichaDetalle() {
               <h3 className="text-sm font-bold text-foreground">Matriz de contactos</h3>
               <button className="btn-secondary btn-sm" onClick={addContacto}>➕ Agregar contacto</button>
             </div>
-            <div className="table-card overflow-x-auto">
+            <DataListPanel pagination={contactosPagination} hidePagination={data.contactos.length <= 10}>
               <table>
                 <thead>
                   <tr>
@@ -383,7 +393,9 @@ export default function FichaDetalle() {
                   {data.contactos.length === 0 && (
                     <tr><td colSpan={8} className="text-center text-muted text-sm py-6">Sin contactos. Usa "Agregar contacto".</td></tr>
                   )}
-                  {data.contactos.map((c, i) => (
+                  {contactosPagination.pageItems.map((c, pageIdx) => {
+                    const i = contactosPagination.startIndex - 1 + pageIdx
+                    return (
                     <tr key={i}>
                       <td><input className="input w-full text-xs" value={c.cargo} onChange={(e) => updContacto(i, 'cargo', e.target.value)} /></td>
                       <td><input className="input w-full text-xs" value={c.tipo} onChange={(e) => updContacto(i, 'tipo', e.target.value)} /></td>
@@ -394,10 +406,10 @@ export default function FichaDetalle() {
                       <td className="text-center"><input type="checkbox" checked={c.aviso} onChange={(e) => updContacto(i, 'aviso', e.target.checked)} /></td>
                       <td><button className="text-danger/60 hover:text-danger text-xs" onClick={() => removeContacto(i)}>×</button></td>
                     </tr>
-                  ))}
+                  )})}
                 </tbody>
               </table>
-            </div>
+            </DataListPanel>
             {(data.tipoCliente === 'Intermediario' || data.tipoCliente === 'Referido') && (
               <div className="card p-5 space-y-4">
                 <h3 className="text-sm font-bold text-foreground">Cliente que refiere</h3>
@@ -656,33 +668,35 @@ export default function FichaDetalle() {
                 <h3 className="text-sm font-bold text-foreground">Asistentes Kick Off</h3>
                 <button className="btn-secondary btn-sm" onClick={addAsistente}>➕ Agregar asistente</button>
               </div>
-              <div className="table-card">
+              <DataListPanel pagination={asistentesPagination} hidePagination={data.asistentes.length <= 10}>
                 <table>
                   <thead><tr><th>Cargo</th><th>Contacto</th><th></th></tr></thead>
                   <tbody>
                     {data.asistentes.length === 0 && (
                       <tr><td colSpan={3} className="text-center text-muted text-sm py-4">Sin asistentes registrados.</td></tr>
                     )}
-                    {data.asistentes.map((a, i) => (
+                    {asistentesPagination.pageItems.map((a, pageIdx) => {
+                      const i = asistentesPagination.startIndex - 1 + pageIdx
+                      return (
                       <tr key={i}>
                         <td><input className="input w-full text-xs" value={a.cargo} onChange={(e) => updAsistente(i, 'cargo', e.target.value)} /></td>
                         <td><input className="input w-full text-xs" value={a.contacto} onChange={(e) => updAsistente(i, 'contacto', e.target.value)} /></td>
                         <td><button className="text-danger/60 hover:text-danger text-xs" onClick={() => removeAsistente(i)}>×</button></td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                 </table>
-              </div>
+              </DataListPanel>
             </div>
 
             {/* Compromisos */}
             <div>
               <h3 className="text-sm font-bold text-foreground mb-3">Compromisos</h3>
-              <div className="table-card">
+              <DataListPanel pagination={compromisosPagination} hidePagination>
                 <table>
                   <thead><tr><th>Compromiso</th><th>Responsable</th><th>Fecha</th></tr></thead>
                   <tbody>
-                    {COMPROMISOS.map((c, i) => (
+                    {compromisosPagination.pageItems.map((c, i) => (
                       <tr key={i}>
                         <td className="text-sm">{c.compromiso}</td>
                         <td className="text-sm text-muted">{c.responsable}</td>
@@ -691,7 +705,7 @@ export default function FichaDetalle() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </DataListPanel>
             </div>
 
             {/* Obs + Estado */}

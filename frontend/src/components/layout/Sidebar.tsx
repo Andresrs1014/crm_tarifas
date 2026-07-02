@@ -49,38 +49,51 @@ const NAV_HERRAMIENTAS: NavItem[] = [
   { to: '/sac', icon: <Cake size={16} />, label: 'SAC' },
 ]
 
-export default function Sidebar() {
+interface SidebarProps {
+  open?: boolean
+  onNavigate?: () => void
+}
+
+export default function Sidebar({ open = false, onNavigate }: SidebarProps) {
   const user = useAuthStore((s) => s.user)
 
   return (
     <aside
-      className="sidebar"
-      style={{ bottom: 0 }}
+      className={`sidebar${open ? ' sidebar--open' : ''}`}
+      style={{ bottom: 0, top: 'var(--header-h)' }}
     >
-      <NavSection label="Principal" items={NAV_PRINCIPAL} />
-      <NavSection label="Comercial" items={NAV_COMERCIAL} />
-      <NavSection label="Herramientas" items={NAV_HERRAMIENTAS} />
+      <NavSection label="Principal" items={NAV_PRINCIPAL} onNavigate={onNavigate} />
+      <NavSection label="Comercial" items={NAV_COMERCIAL} onNavigate={onNavigate} />
+      <NavSection label="Herramientas" items={NAV_HERRAMIENTAS} onNavigate={onNavigate} />
 
       {user?.role === 'superadmin' && (
         <NavSection
           label="Administración"
           items={[{ to: '/admin/usuarios', icon: <ShieldCheck size={16} />, label: 'Usuarios' }]}
+          onNavigate={onNavigate}
         />
       )}
     </aside>
   )
 }
 
-function NavSection({ label, items }: { label: string; items: NavItem[] }) {
+function NavSection({
+  label,
+  items,
+  onNavigate,
+}: {
+  label: string
+  items: NavItem[]
+  onNavigate?: () => void
+}) {
   return (
     <>
-      <div className="sidebar-label">
-        {label}
-      </div>
+      <div className="sidebar-label">{label}</div>
       {items.map((item) => (
         <NavLink
           key={item.to}
           to={item.to}
+          onClick={onNavigate}
           className={({ isActive }) =>
             ['nav-tab', isActive ? 'active' : ''].filter(Boolean).join(' ')
           }

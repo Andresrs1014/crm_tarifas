@@ -6,6 +6,8 @@ import {
   getCotizaciones, deleteCotizacion, duplicarCotizacion, updateCotizacion, getCotizacion,
   actualizarTarifas,
 } from '../api/cotizaciones'
+import { getBiblioteca } from '../api/biblioteca'
+import { buildCotHTML, flattenSnapshot } from '../lib/cotizacion/buildCotHTML'
 import { toast } from '../store/toastStore'
 import type { EstadoCotizacion } from '../types'
 import { exportCotizacionPDF } from '../utils/exportPDF'
@@ -16,6 +18,8 @@ import {
   COTIZACION_ESTADO_NEXT,
   COTIZACION_ESTADO_NEXT_LABEL,
 } from '../lib/htmlV6/domainConfig'
+import { usePagination } from '../hooks/usePagination'
+import { DataListPanel, TableScrollArea } from '../components/ui/DataListPanel'
 
 const ESTADOS = COTIZACION_ESTADO_OPTIONS
 
@@ -183,8 +187,24 @@ export default function Cotizaciones() {
   async function handlePDF(cotId: string, numero: string) {
     setPdfLoading(cotId)
     try {
-      const cot = await getCotizacion(cotId)
-      const html = cot.htmlPreview || `<h2>${cot.numero}</h2><p>${cot.empresa}</p>`
+      const [cot, biblioteca] = await Promise.all([getCotizacion(cotId), getBiblioteca()])
+      const html = biblioteca.length
+        ? buildCotHTML({
+          numero: cot.numero,
+          fecha: cot.createdAt,
+          empresa: cot.empresa,
+          nit: cot.nit,
+          ciudad: cot.ciudad,
+          contacto: cot.contacto,
+          email: cot.email,
+          comercial: cot.comercial,
+          paqueteadora: cot.paqueteadora,
+          lineas: cot.lineas,
+          itemsSnapshot: flattenSnapshot(cot.itemsSnapshot),
+          obsHtml: cot.obsHtml,
+          obsLibre: cot.obsLibre,
+        }, biblioteca)
+        : (cot.htmlPreview || `<h2>${cot.numero}</h2><p>${cot.empresa}</p>`)
       await exportCotizacionPDF(html, `cotizacion-${numero}.pdf`)
     } catch {
       toast.error('Error generando PDF')
@@ -198,8 +218,12 @@ export default function Cotizaciones() {
   const enviadas    = cotizacionesFiltradas.filter((c) => c.estado === 'enviada').length
   const rechazadas  = cotizacionesFiltradas.filter((c) => c.estado === 'rechazada').length
 
+  const pagination = usePagination(cotizacionesFiltradas, {
+    resetDeps: [estado, search, comercialFiltro],
+  })
+
   return (
-    <div className="p-6 space-y-5">
+    <div className="space-y-5">
 
       {/* CO-01: section-title */}
       <h2 className="section-title">Cotizaciones</h2>
@@ -224,46 +248,44 @@ export default function Cotizaciones() {
         </div>
       </div>
 
-      {/* CO-02/CO-03: table-card con table-header-2row */}
-      <div className="table-card">
-        <div className="table-header-2row">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <span className="table-title">Lista de Cotizaciones</span>
-            <div className="flex gap-2">
-              <Link to="/cotizaciones/nueva" className="btn-primary btn-sm">
-                + Nueva Cotización
-              </Link>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <input
-              className="filter-input flex-1 min-w-48"
-              placeholder="Buscar empresa, número..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <select className="filter-select" value={estado} onChange={(e) => setEstado(e.target.value)}>
-              {ESTADOS.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
-            </select>
-            <select className="filter-select" value={comercialFiltro} onChange={(e) => setComercialFiltro(e.target.value)}>
-              <option value="">Todos los comerciales</option>
-              {comercialesUnicos.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-        </div>
-        {isLoading ? (
-          <div className="p-8 space-y-3">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-10 bg-surface2 rounded animate-pulse" />
-            ))}
-          </div>
-        ) : cotizacionesFiltradas.length === 0 ? (
+      <DataListPanel
+        pagination={pagination}
+        loading={isLoading}
+        empty={
           <div className="empty-state">
             <div className="text-4xl mb-3">📋</div>
             <p className="font-semibold text-foreground mb-1">Sin cotizaciones</p>
             <p className="text-sm">Crea la primera cotización para un cliente o prospecto.</p>
           </div>
-        ) : (
+        }
+        header={
+          <div className="table-header-2row">
+            <div className="table-header-top">
+              <span className="table-title">Lista de Cotizaciones</span>
+              <div className="table-header-actions">
+                <Link to="/cotizaciones/nueva" className="btn-primary btn-sm">
+                  + Nueva Cotización
+                </Link>
+              </div>
+            </div>
+            <div className="table-filters">
+              <input
+                className="filter-input"
+                placeholder="Buscar empresa, número..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              <select className="filter-select" value={estado} onChange={(e) => setEstado(e.target.value)}>
+                {ESTADOS.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
+              </select>
+              <select className="filter-select" value={comercialFiltro} onChange={(e) => setComercialFiltro(e.target.value)}>
+                <option value="">Todos los comerciales</option>
+                {comercialesUnicos.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+        }
+      >
           <table>
             <thead>
               <tr>
@@ -278,7 +300,7 @@ export default function Cotizaciones() {
               </tr>
             </thead>
             <tbody>
-              {cotizacionesFiltradas.map((cot) => {
+              {pagination.pageItems.map((cot) => {
                 const nextEstado = COTIZACION_ESTADO_NEXT[cot.estado] as EstadoCotizacion | null
                 return (
                   <tr key={cot.id}>
@@ -416,8 +438,7 @@ export default function Cotizaciones() {
               })}
             </tbody>
           </table>
-        )}
-      </div>
+      </DataListPanel>
 
       {/* Modal actualizar tarifas — portal sobre todo el layout (z-index header/sidebar) */}
       {actualizarId && createPortal(
@@ -500,6 +521,7 @@ export default function Cotizaciones() {
                         Preview · {previewItems.length} ítem{previewItems.length !== 1 ? 's' : ''} monetarios
                       </p>
                       <div className="rounded-lg border border-border overflow-hidden">
+                        <TableScrollArea>
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b border-border bg-surface2">
@@ -518,6 +540,7 @@ export default function Cotizaciones() {
                             ))}
                           </tbody>
                         </table>
+                        </TableScrollArea>
                       </div>
                     </div>
                   )}

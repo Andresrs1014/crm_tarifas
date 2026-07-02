@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { authenticate, param } from '../../middleware/auth';
+import { authenticate, getAuthenticatedUserId, param } from '../../middleware/auth';
 import { listPreliqHistorial, createPreliqHistorial, deletePreliqHistorial } from './preliq-historial.service';
 
 const router = Router();
@@ -8,7 +8,7 @@ router.use(authenticate);
 // GET /api/preliq-historial
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user!.sub;
+    const userId = await getAuthenticatedUserId(req);
     const data = await listPreliqHistorial(userId);
     res.json(data);
   } catch (err) {
@@ -19,7 +19,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 // POST /api/preliq-historial
 router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user!.sub;
+    const userId = await getAuthenticatedUserId(req);
     const data = await createPreliqHistorial(userId, req.body);
     res.status(201).json(data);
   } catch (err) {
@@ -30,7 +30,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 // DELETE /api/preliq-historial/:id
 router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user!.sub;
+    const userId = await getAuthenticatedUserId(req);
     await deletePreliqHistorial(param(req.params.id), userId);
     res.json({ ok: true });
   } catch (err) {

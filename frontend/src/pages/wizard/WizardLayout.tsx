@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getCotizacion, createCotizacion, updateCotizacion } from '../../api/cotizaciones'
@@ -7,6 +7,19 @@ import { getComercialesApi } from '../../api/comerciales'
 import { getRecords, getRecord } from '../../api/records'
 import { toast } from '../../store/toastStore'
 import type { BibliotecaLinea, CRMRecord, EstadoCotizacion } from '../../types'
+import { PAQUETEO_PAQUETEADORAS } from '../../lib/htmlV6/constants'
+import {
+  type CotItemsSnapshot,
+  ensureTransportePaqueteoSnapshot,
+  isItemSelected,
+} from '../../lib/cotizacion/snapshot'
+import { buildCotHTML, flattenSnapshot } from '../../lib/cotizacion/buildCotHTML'
+import {
+  WizardPaso3,
+  countSelectedInSnapshot,
+  summarizeSnapshotItem,
+  itemDisplayTarifa,
+} from './WizardPaso3'
 
 // ─── Tipos wizard ──────────────────────────────────────────────────────────────
 
@@ -24,7 +37,7 @@ interface WizardData {
   lineas: string[]
   tarifaTipo: 'biblioteca' | 'especial'
   // Paso 3: Items seleccionados por línea (snapshot)
-  itemsSnapshot: Record<string, unknown>
+  itemsSnapshot: CotItemsSnapshot
   // Paso 4: Observaciones por línea + libres
   obsHtml: Record<string, string>
   obsLibre: string
@@ -42,6 +55,69 @@ const EMPTY: WizardData = {
 
 const STEPS = ['Datos básicos', 'Servicios', 'Tarifas', 'Observaciones', 'Resumen']
 
+const WIZARD_ESTADO_INICIAL: EstadoCotizacion[] = ['borrador', 'enviada']
+
+function canSaveDraftBasics(data: WizardData): boolean {
+  return data.empresa.trim() !== '' && data.comercial.trim() !== ''
+}
+
+function buildWizardPayload(data: WizardData, estado: EstadoCotizacion) {
+  return {
+    empresa: data.empresa,
+    nit: data.nit || undefined,
+    ciudad: data.ciudad || undefined,
+    contacto: data.contacto || undefined,
+    email: data.email || undefined,
+    comercial: data.comercial,
+    paqueteadora: data.paqueteadora || undefined,
+    recordId: data.recordId || undefined,
+    tarifaTipo: data.tarifaTipo,
+    estado,
+    lineas: data.lineas,
+    itemsSnapshot: data.itemsSnapshot,
+    obsHtml: data.obsHtml,
+    obsLibre: data.obsLibre || undefined,
+  }
+}
+
+async function persistCotizacion(
+  opts: {
+    isEdit: boolean
+    cotId: string | undefined
+    data: WizardData
+    estado: EstadoCotizacion
+    biblioteca: BibliotecaLinea[]
+  },
+) {
+  const basePayload = buildWizardPayload(opts.data, opts.estado)
+
+  let cot = opts.isEdit && opts.cotId
+    ? await updateCotizacion(opts.cotId, basePayload)
+    : await createCotizacion(basePayload)
+
+  const htmlPreview = buildCotHTML({
+    numero: cot.numero,
+    fecha: cot.createdAt,
+    empresa: opts.data.empresa,
+    nit: opts.data.nit,
+    ciudad: opts.data.ciudad,
+    contacto: opts.data.contacto,
+    email: opts.data.email,
+    comercial: opts.data.comercial,
+    paqueteadora: opts.data.paqueteadora,
+    lineas: opts.data.lineas,
+    itemsSnapshot: opts.data.itemsSnapshot,
+    obsHtml: opts.data.obsHtml,
+    obsLibre: opts.data.obsLibre,
+  }, opts.biblioteca)
+
+  if (htmlPreview !== cot.htmlPreview) {
+    cot = await updateCotizacion(cot.id, { ...basePayload, htmlPreview })
+  }
+
+  return cot
+}
+
 function applyRecordToWizard(record: CRMRecord): Partial<WizardData> {
   const contact =
     record.contactos?.find((c) => c.cargo?.toLowerCase().includes('comercial'))
@@ -54,7 +130,7 @@ function applyRecordToWizard(record: CRMRecord): Partial<WizardData> {
     contacto: contact?.nombre ?? '',
     email: contact?.email ?? '',
     comercial: record.comercial?.nombre ?? '',
-    paqueteadora: record.servicios?.includes('Paqueteo') ? 'Paqueteo' : (record.servicios?.[0] ?? ''),
+    paqueteadora: record.servicios?.includes('Paqueteo') ? 'COORDINADORA' : '',
   }
 }
 
@@ -159,8 +235,17 @@ function Paso1({ data, onChange }: { data: WizardData; onChange: (d: Partial<Wiz
       </div>
       <div className="form-group">
         <label>Paqueteadora</label>
-        <input className="filter-input w-full" value={data.paqueteadora}
-          onChange={(e) => onChange({ paqueteadora: e.target.value })} placeholder="Nombre paqueteadora" />
+        <select
+          className="filter-select w-full"
+          value={data.paqueteadora}
+          onChange={(e) => onChange({ paqueteadora: e.target.value })}
+        >
+          <option value="">— Ninguna / otra —</option>
+          {PAQUETEO_PAQUETEADORAS.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+        <p className="text-2xs text-muted mt-1">Requerida si cotizas línea Paqueteo (filtra grupos en paso 3).</p>
       </div>
       <div className="form-group">
         <label>Comercial <span className="text-danger">*</span></label>
@@ -236,110 +321,6 @@ function Paso2({
           <p className="text-sm text-muted">No hay líneas en la biblioteca. Configúralas en Biblioteca de Tarifas.</p>
         )}
       </div>
-    </div>
-  )
-}
-
-// ─── Paso 3: Selección de items ────────────────────────────────────────────────
-
-function Paso3({
-  data, onChange, lineasDisponibles,
-}: {
-  data: WizardData
-  onChange: (d: Partial<WizardData>) => void
-  lineasDisponibles: BibliotecaLinea[]
-}) {
-  const [activeLinea, setActiveLinea] = useState(data.lineas[0] ?? '')
-  const linea = lineasDisponibles.find((l) => l.nombre === activeLinea)
-
-  function toggleItem(lineaNombre: string, grupoNombre: string, item: {
-    id: string; nombre: string; tarifa: string; tipoTarifa: string; obs?: string
-  }) {
-    const prev = (data.itemsSnapshot[lineaNombre] as Record<string, unknown[]> | undefined) ?? {}
-    const grupoItems = (prev[grupoNombre] as { id: string }[] | undefined) ?? []
-    const exists = grupoItems.some((i: { id: string }) => i.id === item.id)
-    const nextGrupo = exists
-      ? grupoItems.filter((i: { id: string }) => i.id !== item.id)
-      : [...grupoItems, item]
-    onChange({
-      itemsSnapshot: {
-        ...data.itemsSnapshot,
-        [lineaNombre]: { ...prev, [grupoNombre]: nextGrupo },
-      },
-    })
-  }
-
-  function isSelected(lineaNombre: string, grupoNombre: string, itemId: string) {
-    const snap = data.itemsSnapshot[lineaNombre] as Record<string, { id: string }[]> | undefined
-    return (snap?.[grupoNombre] ?? []).some((i) => i.id === itemId)
-  }
-
-  return (
-    <div className="space-y-4">
-      {/* Tabs de líneas */}
-      <div className="flex gap-0 border-b border-border">
-        {data.lineas.map((l) => (
-          <button
-            key={l}
-            onClick={() => setActiveLinea(l)}
-            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
-              activeLinea === l
-                ? 'border-accent text-accent'
-                : 'border-transparent text-muted hover:text-foreground'
-            }`}
-          >
-            {l}
-          </button>
-        ))}
-      </div>
-
-      {/* Grupos e items */}
-      {linea ? (
-        <div className="space-y-4">
-          {linea.grupos.map((grupo) => (
-            <div key={grupo.id} className="grupo-card">
-              <div className="grupo-header grupo-header--open">
-                <div className="grupo-title">{grupo.nombre}</div>
-                <div className="text-xs text-muted flex-shrink-0">{grupo.items.length} ítems</div>
-              </div>
-              <div className="grupo-body space-y-1">
-                {grupo.items.map((item) => {
-                  const selected = isSelected(activeLinea, grupo.nombre, item.id)
-                  return (
-                    <div
-                      key={item.id}
-                      onClick={() => toggleItem(activeLinea, grupo.nombre, {
-                        id: item.id, nombre: item.nombre, tarifa: item.tarifa,
-                        tipoTarifa: item.tipoTarifa, obs: item.obs,
-                      })}
-                      className={`flex items-center justify-between p-2.5 rounded-lg cursor-pointer border transition-colors ${
-                        selected
-                          ? 'border-accent/40 bg-accent/5'
-                          : 'border-transparent hover:border-border hover:bg-surface2'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center text-2xs ${
-                          selected ? 'border-accent bg-accent' : 'border-border'
-                        }`}>
-                          {selected && <span className="text-black font-bold">✓</span>}
-                        </div>
-                        <span className="text-sm text-foreground">{item.nombre}</span>
-                        {item.obs && <span className="text-2xs text-muted">({item.obs})</span>}
-                      </div>
-                      <span className={`text-sm font-mono font-semibold ${selected ? 'text-accent' : 'text-muted'}`}>
-                        {item.tarifa}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-sm text-muted">Selecciona una línea.</p>
-      )}
     </div>
   )
 }
@@ -432,12 +413,13 @@ function Paso4({
 
 // ─── Paso 5: Resumen ───────────────────────────────────────────────────────────
 
-function Paso5({ data }: { data: WizardData }) {
-  const totalItems = Object.values(data.itemsSnapshot).reduce((sum: number, linSnap) => {
-    return sum + Object.values(linSnap as Record<string, unknown[]>).reduce(
-      (s: number, items) => s + (items as unknown[]).length, 0
-    )
-  }, 0)
+function Paso5({
+  data, onChange,
+}: {
+  data: WizardData
+  onChange: (d: Partial<WizardData>) => void
+}) {
+  const totalItems = countSelectedInSnapshot(data.itemsSnapshot)
 
   return (
     <div className="space-y-5">
@@ -450,14 +432,21 @@ function Paso5({ data }: { data: WizardData }) {
           {data.contacto && <div><span className="text-muted">Contacto:</span> <span className="text-foreground">{data.contacto}</span></div>}
           <div><span className="text-muted">Comercial:</span> <span className="text-foreground">{data.comercial}</span></div>
           <div><span className="text-muted">Tarifa:</span> <span className="text-foreground capitalize">{data.tarifaTipo}</span></div>
+          {!data.recordId && (
+            <div className="col-span-2 text-xs text-gold">
+              Sin vínculo CRM — la cotización quedará sin prospecto/cliente asociado.
+            </div>
+          )}
         </div>
       </div>
 
       <div className="card p-5 space-y-3">
         <h3 className="text-xs font-bold text-muted uppercase tracking-widest">Líneas seleccionadas</h3>
         {data.lineas.map((l) => {
-          const snap = data.itemsSnapshot[l] as Record<string, { id: string; nombre: string; tarifa: string }[]> | undefined
-          const items = snap ? Object.values(snap).flat() : []
+          const lineSnap = data.itemsSnapshot[l]
+          const items = lineSnap
+            ? Object.values(lineSnap).flat().filter(isItemSelected)
+            : []
           return (
             <div key={l} className="border-b border-border last:border-0 pb-3 last:pb-0">
               <p className="text-sm font-semibold text-foreground mb-1">{l}</p>
@@ -465,8 +454,8 @@ function Paso5({ data }: { data: WizardData }) {
                 <div className="space-y-0.5">
                   {items.map((item) => (
                     <div key={item.id} className="flex justify-between text-xs">
-                      <span className="text-muted">{item.nombre}</span>
-                      <span className="font-mono text-accent">{item.tarifa}</span>
+                      <span className="text-muted">{summarizeSnapshotItem(item)}</span>
+                      <span className="font-mono text-accent">{itemDisplayTarifa(item)}</span>
                     </div>
                   ))}
                 </div>
@@ -487,13 +476,24 @@ function Paso5({ data }: { data: WizardData }) {
       )}
 
       <div className="card p-5 space-y-3">
-        <h3 className="text-xs font-bold text-muted uppercase tracking-widest">Estado inicial</h3>
-        <div className="flex gap-3">
-          {(['borrador', 'enviada'] as EstadoCotizacion[]).map((e) => (
-            <span key={e} className={e === 'borrador' ? 'badge-gray' : 'badge-blue'}>{e}</span>
+        <h3 className="text-xs font-bold text-muted uppercase tracking-widest">Estado al guardar</h3>
+        <div className="type-toggle max-w-md">
+          {WIZARD_ESTADO_INICIAL.map((e) => (
+            <button
+              key={e}
+              type="button"
+              onClick={() => onChange({ estado: e })}
+              className={`type-btn ${data.estado === e ? 'active' : ''}`}
+            >
+              {e === 'borrador' ? 'Borrador' : 'Enviada'}
+            </button>
           ))}
         </div>
-        <p className="text-xs text-muted">La cotización se guardará como <strong>borrador</strong>. Puedes cambiar el estado desde la lista.</p>
+        <p className="text-xs text-muted">
+          {data.estado === 'enviada'
+            ? 'Al confirmar, la cotización quedará marcada como enviada. Puedes usar «Guardar borrador» en cualquier paso si aún no quieres enviarla.'
+            : 'Al confirmar, la cotización quedará en borrador. Cambia a Enviada arriba o márcala después desde la lista.'}
+        </p>
       </div>
     </div>
   )
@@ -509,7 +509,11 @@ export default function WizardLayout() {
   const isEdit = !!id
 
   const initialRecordId = searchParams.get('recordId') ?? ''
-  const [step, setStep] = useState(0)
+  const initialStep = Math.min(
+    Math.max(parseInt(searchParams.get('step') ?? '0', 10) || 0, 0),
+    STEPS.length - 1,
+  )
+  const [step, setStep] = useState(initialStep)
   const [data, setData] = useState<WizardData>({
     ...EMPTY,
     recordId: initialRecordId,
@@ -547,7 +551,7 @@ export default function WizardLayout() {
         recordId: cotExistente.recordId ?? '',
         lineas: cotExistente.lineas,
         tarifaTipo: cotExistente.tarifaTipo as 'biblioteca' | 'especial',
-        itemsSnapshot: cotExistente.itemsSnapshot as Record<string, unknown>,
+        itemsSnapshot: flattenSnapshot(cotExistente.itemsSnapshot),
         obsHtml: cotExistente.obsHtml,
         obsLibre: cotExistente.obsLibre ?? '',
         estado: cotExistente.estado,
@@ -565,54 +569,108 @@ export default function WizardLayout() {
     setData((prev) => ({ ...prev, ...partial }))
   }
 
-  // Validar paso actual
+  const handleSnapshotChange = useCallback((snap: CotItemsSnapshot) => {
+    onChange({ itemsSnapshot: snap })
+  }, [])
+
+  function advanceStep() {
+    if (step === 1 && biblioteca.length) {
+      const ensured = ensureTransportePaqueteoSnapshot(
+        data.itemsSnapshot,
+        data.lineas,
+        biblioteca,
+        data.paqueteadora,
+      )
+      if (ensured !== data.itemsSnapshot) {
+        onChange({ itemsSnapshot: ensured })
+      }
+    }
+    setStep((s) => s + 1)
+  }
+
   function canAdvance() {
     if (step === 0) return data.empresa.trim() !== '' && data.comercial !== ''
-    if (step === 1) return data.lineas.length > 0
+    if (step === 1) {
+      if (data.lineas.length === 0) return false
+      if (data.lineas.includes('Paqueteo') && !data.paqueteadora.trim()) return false
+      return true
+    }
     return true
   }
 
   // Mutations
   const saveMut = useMutation({
-    mutationFn: () => {
-      const payload = {
-        empresa: data.empresa,
-        nit: data.nit || undefined,
-        ciudad: data.ciudad || undefined,
-        contacto: data.contacto || undefined,
-        email: data.email || undefined,
-        comercial: data.comercial,
-        paqueteadora: data.paqueteadora || undefined,
-        recordId: data.recordId || undefined,
-        tarifaTipo: data.tarifaTipo,
-        estado: 'borrador' as EstadoCotizacion,
-        lineas: data.lineas,
-        itemsSnapshot: data.itemsSnapshot,
-        obsHtml: data.obsHtml,
-        obsLibre: data.obsLibre || undefined,
-      }
-      return isEdit
-        ? updateCotizacion(id!, payload)
-        : createCotizacion(payload)
-    },
+    mutationFn: () => persistCotizacion({
+      isEdit,
+      cotId: id,
+      data,
+      estado: data.estado,
+      biblioteca,
+    }),
     onSuccess: (cot) => {
       qc.invalidateQueries({ queryKey: ['cotizaciones'] })
-      toast.success(isEdit ? 'Cotización actualizada' : `Cotización ${cot.numero} creada`)
+      const estadoLabel = data.estado === 'enviada' ? ' (enviada)' : ''
+      if (!data.recordId) {
+        toast.success(
+          isEdit
+            ? `Cotización actualizada${estadoLabel} (sin vínculo CRM)`
+            : `Cotización ${cot.numero} creada${estadoLabel} (sin vínculo CRM)`,
+        )
+      } else {
+        toast.success(
+          isEdit
+            ? `Cotización actualizada${estadoLabel}`
+            : `Cotización ${cot.numero} creada${estadoLabel}`,
+        )
+      }
       navigate('/cotizaciones')
     },
     onError: () => toast.error('Error al guardar la cotización'),
   })
 
+  const draftMut = useMutation({
+    mutationFn: () => persistCotizacion({
+      isEdit,
+      cotId: id,
+      data,
+      estado: 'borrador',
+      biblioteca,
+    }),
+    onSuccess: (cot) => {
+      qc.invalidateQueries({ queryKey: ['cotizaciones'] })
+      onChange({ estado: 'borrador' })
+      if (!isEdit) {
+        toast.success(`Borrador ${cot.numero} guardado — puedes continuar después`)
+        navigate(`/cotizaciones/${cot.id}/editar?step=${step}`, { replace: true })
+      } else {
+        toast.success(`Borrador ${cot.numero} actualizado`)
+      }
+    },
+    onError: () => toast.error('Error al guardar el borrador'),
+  })
+
   const stepComponents = [
     <Paso1 key={0} data={data} onChange={onChange} />,
     <Paso2 key={1} data={data} onChange={onChange} lineasDisponibles={biblioteca} />,
-    <Paso3 key={2} data={data} onChange={onChange} lineasDisponibles={biblioteca} />,
+    <WizardPaso3
+      key={2}
+      lineas={data.lineas}
+      paqueteadora={data.paqueteadora}
+      snapshot={data.itemsSnapshot}
+      lineasDisponibles={biblioteca}
+      onChange={handleSnapshotChange}
+    />,
     <Paso4 key={3} data={data} onChange={onChange} lineasDisponibles={biblioteca} />,
-    <Paso5 key={4} data={data} />,
+    <Paso5 key={4} data={data} onChange={onChange} />,
   ]
 
+  const saveDraftEnabled = canSaveDraftBasics(data)
+  const finalLabel = isEdit
+    ? (data.estado === 'enviada' ? 'Guardar como enviada' : 'Guardar cambios')
+    : (data.estado === 'enviada' ? 'Crear y marcar enviada' : 'Crear cotización')
+
   return (
-    <div className="p-6 space-y-6 cot-wizard-page">
+    <div className="space-y-6 cot-wizard-page">
 
       <div>
         <button type="button" onClick={() => navigate('/cotizaciones')} className="text-xs text-muted hover:text-foreground mb-2">
@@ -649,7 +707,15 @@ export default function WizardLayout() {
         {stepComponents[step]}
       </div>
 
-      <div className="flex justify-between cot-wizard-nav">
+      {isEdit && cotExistente && (
+        <p className="text-xs text-muted">
+          Editando <strong className="text-foreground">{cotExistente.numero}</strong>
+          {' · '}
+          Estado actual: <strong className="text-foreground">{cotExistente.estado}</strong>
+        </p>
+      )}
+
+      <div className="flex flex-wrap justify-between gap-3 cot-wizard-nav">
         <button
           className="btn-secondary btn-sm"
           onClick={() => step === 0 ? navigate('/cotizaciones') : setStep((s) => s - 1)}
@@ -657,23 +723,35 @@ export default function WizardLayout() {
           {step === 0 ? 'Cancelar' : '← Anterior'}
         </button>
 
-        {step < STEPS.length - 1 ? (
+        <div className="flex flex-wrap gap-2 justify-end">
           <button
-            className="btn-primary btn-sm"
-            disabled={!canAdvance()}
-            onClick={() => setStep((s) => s + 1)}
+            type="button"
+            className="btn-secondary btn-sm"
+            disabled={!saveDraftEnabled || draftMut.isPending || saveMut.isPending}
+            onClick={() => draftMut.mutate()}
+            title={saveDraftEnabled ? undefined : 'Completa empresa y comercial para guardar borrador'}
           >
-            Siguiente →
+            {draftMut.isPending ? 'Guardando borrador...' : 'Guardar borrador'}
           </button>
-        ) : (
-          <button
-            className="btn-primary btn-sm"
-            disabled={saveMut.isPending}
-            onClick={() => saveMut.mutate()}
-          >
-            {saveMut.isPending ? 'Guardando...' : isEdit ? 'Guardar cambios' : 'Crear cotización'}
-          </button>
-        )}
+
+          {step < STEPS.length - 1 ? (
+            <button
+              className="btn-primary btn-sm"
+              disabled={!canAdvance()}
+              onClick={advanceStep}
+            >
+              Siguiente →
+            </button>
+          ) : (
+            <button
+              className="btn-primary btn-sm"
+              disabled={saveMut.isPending || draftMut.isPending}
+              onClick={() => saveMut.mutate()}
+            >
+              {saveMut.isPending ? 'Guardando...' : finalLabel}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )

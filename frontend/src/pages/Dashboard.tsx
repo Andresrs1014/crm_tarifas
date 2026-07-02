@@ -44,6 +44,8 @@ import {
 import { EstadoBadge } from '../lib/htmlV6/estadoBadge'
 import { cotFechaDisplay } from '../lib/htmlV6/cotUtils'
 import { exportRecordsExcel } from '../utils/exportExcel'
+import { usePagination } from '../hooks/usePagination'
+import { DataListPanel } from '../components/ui/DataListPanel'
 
 function StatCard({ tone, label, value, sub }: {
   tone: 'blue' | 'cyan' | 'green' | 'gold' | 'purple' | 'red'
@@ -103,8 +105,10 @@ export default function Dashboard() {
   const gestion = useMemo(() => computeGestionChart(recs), [recs])
   const cotLineas = useMemo(() => computeCotLineasChart(cots), [cots])
 
-  const recent = useMemo(() => [...recs].reverse().slice(0, 8), [recs])
-  const recentCots = useMemo(() => [...cots].reverse().slice(0, 6), [cots])
+  const recentAll = useMemo(() => [...recs].reverse(), [recs])
+  const recentCotsAll = useMemo(() => [...cots].reverse(), [cots])
+  const recentPagination = usePagination(recentAll, { resetDeps: [filterCom, filterMes, filterTipo] })
+  const recentCotsPagination = usePagination(recentCotsAll)
 
   const bannerParts: string[] = []
   if (filterCom) {
@@ -131,7 +135,7 @@ export default function Dashboard() {
 
   if (loadingRecords) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="space-y-4">
         {[...Array(3)].map((_, i) => (
           <div key={i} className="h-32 bg-surface2 rounded-xl animate-pulse" />
         ))}
@@ -140,14 +144,13 @@ export default function Dashboard() {
   }
 
   return (
-    <div>
+    <div className="space-y-4">
       {/* Filtros — HTML v6 */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-[11px] uppercase tracking-[1.5px] text-muted font-semibold">Filtros:</span>
+      <div className="filter-bar filter-bar--page">
+        <div className="filter-bar-group">
+          <span className="filter-bar-label">Filtros:</span>
           <select
             className="filter-select"
-            style={{ minWidth: 190 }}
             value={filterCom}
             onChange={(e) => setFilterCom(e.target.value)}
           >
@@ -158,7 +161,6 @@ export default function Dashboard() {
           </select>
           <select
             className="filter-select"
-            style={{ minWidth: 160 }}
             value={filterMes}
             onChange={(e) => setFilterMes(e.target.value)}
           >
@@ -169,7 +171,6 @@ export default function Dashboard() {
           </select>
           <select
             className="filter-select"
-            style={{ minWidth: 160 }}
             value={filterTipo}
             onChange={(e) => setFilterTipo(e.target.value)}
           >
@@ -180,7 +181,7 @@ export default function Dashboard() {
         </div>
         <button
           type="button"
-          className="btn-secondary btn-sm text-xs border-accent text-accent"
+          className="btn-secondary btn-sm text-xs border-accent text-accent shrink-0"
           onClick={() => exportRecordsExcel(recs, 'registros-dashboard.xlsx')}
         >
           📥 Exportar Excel
@@ -429,42 +430,43 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="table-card">
-          <div className="table-header flex justify-between items-center">
-            <span className="table-title">📄 Cotizaciones Recientes</span>
-            <Link to="/cotizaciones" className="btn-secondary btn-sm text-xs">Ver todas →</Link>
-          </div>
-          <div className="overflow-x-auto">
-            <table>
-              <thead>
-                <tr>
-                  <th>N°</th><th>Empresa</th><th>Líneas</th><th>Estado</th><th>Fecha</th><th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentCots.length === 0 ? (
-                  <tr><td colSpan={6}><div className="empty-state py-8">Sin cotizaciones</div></td></tr>
-                ) : recentCots.map((c) => {
-                  const badge = cotEstadoBadge(c)
-                  return (
-                    <tr key={c.id}>
-                      <td><strong>{c.numero || '—'}</strong></td>
-                      <td>{c.empresa || '—'}</td>
-                      <td>
-                        <div>{(c.lineas ?? []).map((s) => <span key={s} className="stag">{s}</span>)}</div>
-                      </td>
-                      <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
-                      <td className="text-xs text-muted">{cotFechaDisplay(c)}</td>
-                      <td>
-                        <Link to={`/cotizaciones/${c.id}/editar`} className="btn-secondary btn-sm text-xs">Ver</Link>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <DataListPanel
+          pagination={recentCotsPagination}
+          header={
+            <div className="table-header flex justify-between items-center">
+              <span className="table-title">📄 Cotizaciones Recientes</span>
+              <Link to="/cotizaciones" className="btn-secondary btn-sm text-xs">Ver todas →</Link>
+            </div>
+          }
+          empty={<div className="empty-state py-8">Sin cotizaciones</div>}
+        >
+          <table>
+            <thead>
+              <tr>
+                <th>N°</th><th>Empresa</th><th>Líneas</th><th>Estado</th><th>Fecha</th><th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentCotsPagination.pageItems.map((c) => {
+                const badge = cotEstadoBadge(c)
+                return (
+                  <tr key={c.id}>
+                    <td><strong>{c.numero || '—'}</strong></td>
+                    <td>{c.empresa || '—'}</td>
+                    <td>
+                      <div>{(c.lineas ?? []).map((s) => <span key={s} className="stag">{s}</span>)}</div>
+                    </td>
+                    <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
+                    <td className="text-xs text-muted">{cotFechaDisplay(c)}</td>
+                    <td>
+                      <Link to={`/cotizaciones/${c.id}/editar`} className="btn-secondary btn-sm text-xs">Ver</Link>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </DataListPanel>
       </div>
 
       {/* Timeline + Gestión */}
@@ -511,41 +513,42 @@ export default function Dashboard() {
       </div>
 
       {/* Últimos registros */}
-      <div className="table-card">
-        <div className="table-header">
-          <span className="table-title">Últimos Registros</span>
-        </div>
-        <div className="overflow-x-auto">
-          <table>
-            <thead>
-              <tr>
-                <th>Empresa</th><th>Tipo</th><th>Comercial</th><th>Servicios</th><th>Estado</th><th>Fecha</th>
+      <DataListPanel
+        pagination={recentPagination}
+        header={
+          <div className="table-header">
+            <span className="table-title">Últimos Registros</span>
+          </div>
+        }
+        empty={<div className="empty-state py-8">Sin registros</div>}
+      >
+        <table>
+          <thead>
+            <tr>
+              <th>Empresa</th><th>Tipo</th><th>Comercial</th><th>Servicios</th><th>Estado</th><th>Fecha</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recentPagination.pageItems.map((r) => (
+              <tr key={r.id}>
+                <td><strong>{r.empresa}</strong></td>
+                <td>
+                  {r.tipo === 'prospecto'
+                    ? <span className="badge-blue">Prospecto</span>
+                    : <span className="badge-green">Cliente</span>}
+                </td>
+                <td className="text-xs">{r.comercial?.nombre ?? '—'}</td>
+                <td>
+                  {(r.servicios ?? []).slice(0, 3).map((s) => <span key={s} className="stag">{s}</span>)}
+                  {(r.servicios?.length ?? 0) > 3 && <span className="stag">+{r.servicios!.length - 3}</span>}
+                </td>
+                <td><EstadoBadge rec={r} /></td>
+                <td className="text-xs text-muted">{r.fecha?.slice(0, 10) ?? '—'}</td>
               </tr>
-            </thead>
-            <tbody>
-              {recent.length === 0 ? (
-                <tr><td colSpan={6}><div className="empty-state py-8">Sin registros</div></td></tr>
-              ) : recent.map((r) => (
-                <tr key={r.id}>
-                  <td><strong>{r.empresa}</strong></td>
-                  <td>
-                    {r.tipo === 'prospecto'
-                      ? <span className="badge-blue">Prospecto</span>
-                      : <span className="badge-green">Cliente</span>}
-                  </td>
-                  <td className="text-xs">{r.comercial?.nombre ?? '—'}</td>
-                  <td>
-                    {(r.servicios ?? []).slice(0, 3).map((s) => <span key={s} className="stag">{s}</span>)}
-                    {(r.servicios?.length ?? 0) > 3 && <span className="stag">+{r.servicios!.length - 3}</span>}
-                  </td>
-                  <td><EstadoBadge rec={r} /></td>
-                  <td className="text-xs text-muted">{r.fecha?.slice(0, 10) ?? '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            ))}
+          </tbody>
+        </table>
+      </DataListPanel>
     </div>
   )
 }

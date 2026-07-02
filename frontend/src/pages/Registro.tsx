@@ -225,7 +225,7 @@ export default function Registro() {
   }
 
   return (
-    <div>
+    <div className="space-y-5">
       <div className="section-title">
         ➕ Nuevo <span className="text-accent">Registro</span>
       </div>

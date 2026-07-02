@@ -2,22 +2,15 @@ import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Calculator, Search, ChevronRight, ChevronDown, Check, X, Printer, History, Trash2 } from 'lucide-react'
 import { getCotizaciones } from '../api/cotizaciones'
+import { getBiblioteca } from '../api/biblioteca'
 import { getPreliqHistorial, savePreliqHistorial, deletePreliqEntry, PreliqEntry } from '../api/preliqHistorial'
+import { getPreliqItemsFromCot, type PreliqItem } from '../lib/preliquidador/fromSnapshot'
 import { toast } from '../store/toastStore'
 import type { Cotizacion } from '../types'
 import { SVC_COLORS } from '../lib/htmlV6/domainConfig'
+import { TableScrollArea } from '../components/ui/DataListPanel'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-interface PreliqItem {
-  id: string
-  nombre: string
-  tarifa: string
-  tipoTarifa: 'moneda' | 'porcentaje'
-  obs?: string
-  _grupo: string
-  _linea: string
-}
-
 interface FormState {
   producto: string
   cif: string
@@ -58,23 +51,6 @@ function fmtCOP(n: number): string {
 function fmtPct(item: PreliqItem): string {
   const n = tarifaNum(item) * 100
   return n.toFixed(2).replace('.', ',') + '%'
-}
-
-// ─── Extract items from cotizacion snapshot ───────────────────────────────────
-function getItemsFromCot(cot: Cotizacion): PreliqItem[] {
-  const snap = cot.itemsSnapshot as Record<string, Record<string, { id: string; nombre: string; tarifa: string; tipoTarifa: string; obs?: string }[]>>
-  const result: PreliqItem[] = []
-  for (const linea of (cot.lineas ?? [])) {
-    const grupos = snap[linea]
-    if (!grupos) continue
-    for (const [grupo, items] of Object.entries(grupos)) {
-      if (!Array.isArray(items)) continue
-      for (const item of items) {
-        result.push({ ...item, tipoTarifa: item.tipoTarifa as 'moneda' | 'porcentaje', _grupo: grupo, _linea: linea })
-      }
-    }
-  }
-  return result
 }
 
 // ─── Detect which form fields are needed ─────────────────────────────────────
@@ -252,10 +228,9 @@ function calcPreliq(selectedItems: PreliqItem[], form: FormState, allItemsByLine
   for (const [linea, items] of Object.entries(porLinea)) {
     result.push({ _seccion: linea })
     const all = allItemsByLinea[linea] ?? []
-    // Deduplicate by grupo: if two items in same grupo, keep the one that's not a "minima" fija
     const seen = new Set<string>()
     for (const item of items) {
-      const key = item._grupo
+      const key = `${item._linea}::${item._grupo}::${item.id}`
       if (seen.has(key)) continue
       seen.add(key)
       const line = calcItem(item, { cif, peso, tipo, numCont, pallets, unidades }, all)
@@ -280,6 +255,12 @@ export default function Preliquidador() {
   const { data: cots = [] } = useQuery({
     queryKey: ['cotizaciones', 'preliq'],
     queryFn: () => getCotizaciones({}),
+  })
+
+  const { data: biblioteca = [] } = useQuery({
+    queryKey: ['biblioteca'],
+    queryFn: getBiblioteca,
+    staleTime: 60_000,
   })
 
   const { data: historial = [] } = useQuery({
@@ -314,7 +295,9 @@ export default function Preliquidador() {
   }, [cots, search])
 
   const allItems: PreliqItem[] = useMemo(() =>
-    selectedCot ? getItemsFromCot(selectedCot) : [], [selectedCot])
+    selectedCot && biblioteca.length ? getPreliqItemsFromCot(selectedCot, biblioteca) : [],
+    [selectedCot, biblioteca],
+  )
 
   const allItemsByLinea: Record<string, PreliqItem[]> = useMemo(() => {
     const m: Record<string, PreliqItem[]> = {}
@@ -391,7 +374,7 @@ export default function Preliquidador() {
   const total = result?.filter(l => !l._seccion).reduce((s, l) => s + (l.resultado ?? 0), 0) ?? 0
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div>
         <h2 className="section-title" style={{ marginBottom: 4 }}>Preliquidador</h2>
@@ -414,7 +397,7 @@ export default function Preliquidador() {
               onChange={e => { setSearch(e.target.value); setDropdown(true) }}
               onFocus={() => setDropdown(true)}
               placeholder="Buscar cotización por empresa o número..."
-              className="w-full pl-8 pr-8 py-2 bg-surface border border-border rounded-lg text-sm text-foreground placeholder:text-muted focus:outline-none focus:border-accent"
+              className="filter-input w-full pl-8 pr-8 py-2"
             />
             {selectedCot && (
               <button onClick={() => { setSelectedCot(null); setSearch(''); setSelectedItems(new Set()); setResult(null); setStep(1) }}
@@ -514,7 +497,7 @@ export default function Preliquidador() {
               <label className="text-xs text-muted block mb-1.5 uppercase tracking-wider">Producto / Mercancía</label>
               <input value={form.producto} onChange={e => setForm(p => ({ ...p, producto: e.target.value }))}
                 placeholder="Ej: Paneles Solares"
-                className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent" />
+                className="filter-input w-full" />
             </div>
 
             {fields.needCif && (
@@ -522,7 +505,7 @@ export default function Preliquidador() {
                 <label className="text-xs text-muted block mb-1.5 uppercase tracking-wider">Valor CIF / Mercancía (COP)</label>
                 <input value={form.cif} onChange={e => setForm(p => ({ ...p, cif: e.target.value }))}
                   placeholder="Ej: 50.000.000"
-                  className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent" />
+                  className="filter-input w-full" />
               </div>
             )}
 
@@ -531,7 +514,7 @@ export default function Preliquidador() {
                 <div>
                   <label className="text-xs text-muted block mb-1.5 uppercase tracking-wider">Tipo de Ingreso</label>
                   <select value={form.tipo} onChange={e => setForm(p => ({ ...p, tipo: e.target.value as FormState['tipo'] }))}
-                    className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent">
+                    className="filter-input w-full">
                     <option value="">-- Selecciona --</option>
                     <option value="lcl">Aérea / LCL (Consolidado)</option>
                     <option value="cont20">Contenedor 20 pies</option>
@@ -542,7 +525,7 @@ export default function Preliquidador() {
                   <div>
                     <label className="text-xs text-muted block mb-1.5 uppercase tracking-wider">N° de Contenedores</label>
                     <input type="number" min="1" value={form.numCont} onChange={e => setForm(p => ({ ...p, numCont: parseInt(e.target.value) || 1 }))}
-                      className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent" />
+                      className="filter-input w-full" />
                   </div>
                 )}
               </>
@@ -553,7 +536,7 @@ export default function Preliquidador() {
                 <label className="text-xs text-muted block mb-1.5 uppercase tracking-wider">Peso total (kg)</label>
                 <input type="number" min="0" value={form.peso} onChange={e => setForm(p => ({ ...p, peso: e.target.value }))}
                   placeholder="Ej: 2500"
-                  className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent" />
+                  className="filter-input w-full" />
               </div>
             )}
 
@@ -562,7 +545,7 @@ export default function Preliquidador() {
                 <label className="text-xs text-muted block mb-1.5 uppercase tracking-wider">N° de Pallets / Posiciones</label>
                 <input type="number" min="0" value={form.pallets} onChange={e => setForm(p => ({ ...p, pallets: e.target.value }))}
                   placeholder="Ej: 10"
-                  className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent" />
+                  className="filter-input w-full" />
               </div>
             )}
 
@@ -571,7 +554,7 @@ export default function Preliquidador() {
                 <label className="text-xs text-muted block mb-1.5 uppercase tracking-wider">N° de Unidades / Cajas</label>
                 <input type="number" min="0" value={form.unidades} onChange={e => setForm(p => ({ ...p, unidades: e.target.value }))}
                   placeholder="Ej: 50"
-                  className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-accent" />
+                  className="filter-input w-full" />
               </div>
             )}
           </div>
@@ -612,7 +595,7 @@ export default function Preliquidador() {
           </div>
 
           {/* Lines table */}
-          <div className="overflow-x-auto">
+          <TableScrollArea>
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-surface/80 text-[10px] text-muted uppercase tracking-[1.5px]">
@@ -646,7 +629,7 @@ export default function Preliquidador() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScrollArea>
 
           {/* Total */}
           <div className="px-5 py-4 bg-surface border-t-2 border-border flex items-center justify-between flex-wrap gap-4">
@@ -656,11 +639,11 @@ export default function Preliquidador() {
             </div>
             <div className="flex gap-2">
               <button onClick={() => { setResult(null); setStep(1); setSelectedItems(new Set()); setSelectedCot(null); setSearch('') }}
-                className="px-4 py-2 rounded-lg bg-surface border border-border text-muted text-sm hover:text-foreground transition-colors">
+                className="btn-secondary btn-sm">
                 Nueva
               </button>
               <button onClick={() => window.print()}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-surface border border-border text-sm text-foreground hover:bg-white/[0.05] transition-colors">
+                className="btn-secondary btn-sm flex items-center gap-1.5">
                 <Printer size={14} />
                 Imprimir
               </button>
@@ -709,7 +692,7 @@ export default function Preliquidador() {
                   <div className="flex gap-1.5">
                     <button
                       onClick={() => loadFromHistory(entry)}
-                      className="px-3 py-1.5 rounded-lg bg-surface border border-border text-xs text-foreground hover:bg-white/[0.05] transition-colors"
+                      className="btn-secondary btn-sm"
                     >
                       Ver
                     </button>
