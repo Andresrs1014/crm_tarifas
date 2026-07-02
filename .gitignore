@@ -36,6 +36,7 @@ Thumbs.db
 *.bak
 *.swp
 *.tmp
+dogfood-output/
 
 # ─── Backend data ────────────────────────────
 backend/data/
