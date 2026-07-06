@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAppMutation } from '../hooks/useAppMutation'
 import { getFichaByRecord, updateFicha, getAnalistas, createAnalista, deleteAnalista } from '../api/fichas'
 import { getRecord } from '../api/records'
 import { toast } from '../store/toastStore'
@@ -121,7 +122,7 @@ export default function FichaDetalle() {
   const asistentesPagination = usePagination(data.asistentes, { resetDeps: [tab] })
   const compromisosPagination = usePagination(COMPROMISOS, { resetDeps: [tab], pageSize: 10 })
 
-  const saveMut = useMutation({
+  const saveMut = useAppMutation({
     mutationFn: () => updateFicha(fichaId, { estado, pct, data: data as unknown as Record<string, unknown> }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fichas'] })
@@ -130,7 +131,7 @@ export default function FichaDetalle() {
     onError: () => toast.error('Error al guardar'),
   })
 
-  const createAnalistaMut = useMutation({
+  const createAnalistaMut = useAppMutation({
     mutationFn: () => createAnalista(newAnalista),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['analistas'] })
@@ -141,7 +142,7 @@ export default function FichaDetalle() {
     onError: () => toast.error('Error al crear analista'),
   })
 
-  const deleteAnalistaMut = useMutation({
+  const deleteAnalistaMut = useAppMutation({
     mutationFn: (id: string) => deleteAnalista(id),
     onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: ['analistas'] })

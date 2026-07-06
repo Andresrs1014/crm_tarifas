@@ -1,8 +1,12 @@
-import { useState, useCallback } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { FolderOpen, X, ChevronRight, RefreshCw, AlertTriangle, Clock, CheckCircle, Circle, Download } from 'lucide-react'
+import { useState, useCallback, useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAppMutation } from '../hooks/useAppMutation'
+import { FolderOpen, X, ChevronRight, RefreshCw, AlertTriangle, Clock, CheckCircle, Circle, Download, Paperclip, Eye, Trash2 } from 'lucide-react'
 import * as XLSX from 'xlsx'
-import { listGD, upsertGD, GD_DOCS, GDRow, DocEstado } from '../api/gestionDocumental'
+import {
+  listGD, upsertGD, GD_DOCS, GDRow, DocEstado, GDArchivo,
+  uploadGDArchivos, deleteGDArchivo, fetchGDArchivoBlob,
+} from '../api/gestionDocumental'
 import { useToastStore } from '../store/toastStore'
 import { usePagination } from '../hooks/usePagination'
 import { DataListPanel } from '../components/ui/DataListPanel'
@@ -42,6 +46,58 @@ function fmtDate(iso: string | null | undefined): string {
   return new Date(iso).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
+function fmtSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+const ARCHIVOS_ACCEPT = '.pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx'
+
+/** PDF e imágenes tienen visor nativo en el navegador; Word/Excel no — ahí solo tiene sentido descargar. */
+function esPrevisualizable(mime: string): boolean {
+  return mime === 'application/pdf' || mime.startsWith('image/')
+}
+
+async function abrirArchivo(recordId: string, docId: string, archivo: GDArchivo, modo: 'ver' | 'descargar') {
+  // La pestaña debe abrirse de forma SÍNCRONA (antes del await) o el navegador la
+  // degrada a descarga forzada en vez de mostrar el visor — por eso "Ver" y
+  // "Descargar" se sentían iguales.
+  let preview: Window | null = null
+  if (modo === 'ver') {
+    preview = window.open('', '_blank')
+    if (preview) preview.opener = null
+  }
+  try {
+    const blob = await fetchGDArchivoBlob(recordId, docId, archivo.id)
+    const url = window.URL.createObjectURL(blob)
+    if (modo === 'ver') {
+      if (preview) {
+        // Un blob: URL no lleva el nombre del archivo — se envuelve en un documento
+        // propio para que la pestaña muestre el nombre real en vez del blob: URL.
+        preview.document.title = archivo.nombre
+        preview.document.body.style.margin = '0'
+        const frame = preview.document.createElement('iframe')
+        frame.src = url
+        frame.title = archivo.nombre
+        frame.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;border:0'
+        preview.document.body.appendChild(frame)
+      } else {
+        window.open(url, '_blank', 'noopener,noreferrer')
+      }
+    } else {
+      const a = document.createElement('a')
+      a.href = url
+      a.download = archivo.nombre
+      a.click()
+    }
+    setTimeout(() => window.URL.revokeObjectURL(url), 30_000)
+  } catch (err) {
+    preview?.close()
+    throw err
+  }
+}
+
 // ─── Excel export ─────────────────────────────────────────────────────────────
 function exportExcel(rows: GDRow[]) {
   const data = rows.map(r => ({
@@ -77,7 +133,13 @@ function DocModal({ row, onClose }: { row: GDRow; onClose: () => void }) {
   const [ciclo, setCiclo] = useState(row.gd.cicloActual)
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
-  const mutate = useMutation({
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+
+  const mutate = useAppMutation({
     mutationFn: () => upsertGD(row.id, { docs: draft, cicloActual: ciclo }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['gestion-documental'] })
@@ -86,6 +148,40 @@ function DocModal({ row, onClose }: { row: GDRow; onClose: () => void }) {
     },
     onError: () => push('Error al guardar', 'error'),
   })
+
+  const uploadMut = useAppMutation({
+    mutationFn: ({ docId, files }: { docId: string; files: File[] }) => uploadGDArchivos(row.id, docId, files),
+    onSuccess: (data, { docId }) => {
+      setDraft(prev => ({ ...prev, [docId]: (data.docs as Record<string, DocEstado>)[docId] ?? prev[docId] }))
+      qc.invalidateQueries({ queryKey: ['gestion-documental'] })
+      push('Archivo(s) subido(s)', 'success')
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+      push(msg || 'Error al subir el archivo', 'error')
+    },
+  })
+
+  const deleteArchivoMut = useAppMutation({
+    mutationFn: ({ docId, archivoId }: { docId: string; archivoId: string }) => deleteGDArchivo(row.id, docId, archivoId),
+    onSuccess: (data, { docId }) => {
+      setDraft(prev => ({ ...prev, [docId]: (data.docs as Record<string, DocEstado>)[docId] ?? prev[docId] }))
+      qc.invalidateQueries({ queryKey: ['gestion-documental'] })
+      push('Archivo eliminado', 'success')
+    },
+    onError: () => push('Error al eliminar el archivo', 'error'),
+  })
+
+  function handleUpload(docId: string, fileList: FileList | null) {
+    const files = Array.from(fileList ?? [])
+    if (!files.length) return
+    uploadMut.mutate({ docId, files })
+  }
+
+  function handleDeleteArchivo(docId: string, archivo: GDArchivo) {
+    if (!confirm(`¿Eliminar "${archivo.nombre}"?`)) return
+    deleteArchivoMut.mutate({ docId, archivoId: archivo.id })
+  }
 
   const setDoc = useCallback((docId: string, field: keyof DocEstado, value: string) => {
     setDraft(prev => ({
@@ -113,14 +209,13 @@ function DocModal({ row, onClose }: { row: GDRow; onClose: () => void }) {
     })
   }
 
-  // Compute live compliance
+  // Compute live compliance — refleja el estado real de los docs, el ciclo se señaliza aparte (ver banner abajo)
   const desactualizado = ciclo < anoActual
   let totalPond = 0, cumplido = 0
   for (const d of docs) {
     const pond = esReferido ? d.pond_ref : d.pond_di
     if (!pond) continue
     totalPond += pond
-    if (desactualizado) continue
     const est = draft[d.id]?.estado ?? ''
     if (est === 'completo')        cumplido += pond
     else if (est === 'incompleto') cumplido += pond * 0.5
@@ -129,24 +224,31 @@ function DocModal({ row, onClose }: { row: GDRow; onClose: () => void }) {
   const color = pctColor(pct)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-end bg-black/50 backdrop-blur-sm" onClick={onClose}>
+    <div
+      className="fixed z-50 bg-black/50 backdrop-blur-sm"
+      style={{ top: 'var(--header-h)', left: 'var(--sidebar-w)', right: 0, bottom: 0 }}
+      onClick={onClose}
+    >
       <div
-        className="relative h-full w-full max-w-2xl bg-surface border-l border-border overflow-y-auto"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="docmodal-title"
+        className="relative h-full w-full bg-surface border-l border-border overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         <div className="sticky top-0 z-10 bg-surface border-b border-border px-6 py-4 flex items-start justify-between">
           <div>
-            <div className="text-lg font-display font-bold text-foreground">{row.empresa}</div>
+            <h2 id="docmodal-title" className="text-lg font-display font-bold text-foreground">{row.empresa}</h2>
             {row.nit && <div className="text-xs text-muted">NIT: {row.nit}</div>}
             <div className="text-xs text-muted">{row.comercial.nombre} · {row.tipoCliente}</div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 text-muted transition-colors mt-0.5">
+          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-lg hover:bg-white/10 text-muted transition-colors mt-0.5">
             <X size={18} />
           </button>
         </div>
 
-        <div className="space-y-5">
+        <div className="space-y-5 px-6 py-5">
           {/* Compliance bar */}
           <div className="card-glass rounded-xl p-4 border border-border">
             <div className="flex items-center justify-between mb-2">
@@ -284,6 +386,55 @@ function DocModal({ row, onClose }: { row: GDRow; onClose: () => void }) {
                     placeholder="Observaciones..."
                     className="cell-input"
                   />
+
+                  {/* Archivos adjuntos */}
+                  <div className="pt-2.5 border-t border-border/50 space-y-1.5" onClick={e => e.stopPropagation()}>
+                    <div className="text-[10px] text-muted uppercase tracking-wider font-semibold">Archivos adjuntos</div>
+                    {(d.archivos ?? []).map(archivo => (
+                      <div key={archivo.id} className="flex items-center gap-2 rounded-md bg-surface2 border border-border px-2.5 py-1.5">
+                        <span className="text-xs text-foreground truncate flex-1 min-w-0" title={archivo.nombre}>{archivo.nombre}</span>
+                        <span className="text-[10px] text-muted flex-shrink-0">{fmtSize(archivo.size)}</span>
+                        {esPrevisualizable(archivo.mime) && (
+                          <button
+                            type="button"
+                            aria-label={`Ver ${archivo.nombre}`}
+                            onClick={() => abrirArchivo(row.id, doc.id, archivo, 'ver').catch(() => push('Error al abrir el archivo', 'error'))}
+                            className="p-1.5 rounded hover:bg-accent/10 text-muted hover:text-accent transition-colors flex-shrink-0"
+                          >
+                            <Eye size={15} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          aria-label={`Descargar ${archivo.nombre}`}
+                          onClick={() => abrirArchivo(row.id, doc.id, archivo, 'descargar').catch(() => push('Error al descargar el archivo', 'error'))}
+                          className="p-1.5 rounded hover:bg-accent/10 text-muted hover:text-accent transition-colors flex-shrink-0"
+                        >
+                          <Download size={15} />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Eliminar ${archivo.nombre}`}
+                          onClick={() => handleDeleteArchivo(doc.id, archivo)}
+                          className="p-1.5 rounded hover:bg-danger/10 text-muted hover:text-danger transition-colors flex-shrink-0"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    ))}
+                    <label className="flex items-center gap-2 bg-surface2 border border-dashed border-border rounded-md px-2.5 py-1.5 text-xs text-muted hover:text-accent hover:border-accent transition-colors cursor-pointer">
+                      <Paperclip size={13} className="flex-shrink-0" />
+                      <span>{uploadMut.isPending && uploadMut.variables?.docId === doc.id ? 'Subiendo...' : 'Adjuntar archivo'}</span>
+                      <input
+                        type="file"
+                        multiple
+                        accept={ARCHIVOS_ACCEPT}
+                        className="hidden"
+                        disabled={uploadMut.isPending}
+                        onChange={e => { handleUpload(doc.id, e.target.files); e.target.value = '' }}
+                      />
+                    </label>
+                  </div>
                 </div>
               )
             })}

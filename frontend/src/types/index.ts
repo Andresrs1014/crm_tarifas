@@ -211,6 +211,7 @@ export interface BibliotecaGrupo {
   lineaId: string
   nombre: string
   orden: number
+  obsEcommerce?: string
   items: BibliotecaItem[]
 }
 
@@ -241,11 +242,16 @@ export interface Cotizacion {
   nit?: string
   ciudad?: string
   contacto?: string
+  cargo?: string
+  telefono?: string
   email?: string
   comercial: string
   paqueteadora?: string
   tarifaTipo: 'biblioteca' | 'especial'
   estado: EstadoCotizacion
+  fecha?: string
+  vigencia?: string
+  asunto?: string
   lineas: string[]
   itemsSnapshot: { [k: string]: unknown }
   obsHtml: { [k: string]: string }
@@ -261,11 +267,16 @@ export interface CotizacionCreate {
   nit?: string
   ciudad?: string
   contacto?: string
+  cargo?: string
+  telefono?: string
   email?: string
   comercial: string
   paqueteadora?: string
   tarifaTipo: string
   estado: EstadoCotizacion
+  fecha?: string
+  vigencia?: string
+  asunto?: string
   lineas: string[]
   itemsSnapshot: { [k: string]: unknown }
   obsHtml: { [k: string]: string }

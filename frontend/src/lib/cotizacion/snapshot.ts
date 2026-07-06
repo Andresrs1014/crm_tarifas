@@ -354,3 +354,27 @@ export function formatCampoDisplay(value: string, colTipo: string, toggle?: stri
   if (t === 'moneda' || t === 'tarifa') return value.startsWith('$') ? value : `$${value}`
   return value
 }
+
+/** colId → tipo base, derivado de TRANSP_SCHEMA + PAQUETEO_SCHEMA (evita hardcodear la lista dos veces). */
+const CAMPO_TIPO_BY_ID: Record<string, string> = (() => {
+  const map: Record<string, string> = {}
+  for (const { cols } of Object.values(TRANSP_SCHEMA)) {
+    for (const c of cols) map[c.id] = c.tipo
+  }
+  for (const { cols } of Object.values(PAQUETEO_SCHEMA)) {
+    for (const c of cols) map[c.id] = c.tipo
+  }
+  return map
+})()
+
+/** true si `campos[colId]` representa dinero para este ítem (respeta el toggle guardado en tiposCampo). */
+export function isMonedaCampo(colId: string, tiposCampo?: Record<string, string>): boolean {
+  const tipo = CAMPO_TIPO_BY_ID[colId]
+  if (!tipo) return false
+  if (tipo === 'moneda' || tipo === 'tarifa') return true
+  if (tipo === 'tarifa-mixta' || tipo === 'tarifa-texto' || tipo === 'mixta') {
+    const toggle = tiposCampo?.[colId]
+    return !toggle || toggle === 'moneda'
+  }
+  return false
+}

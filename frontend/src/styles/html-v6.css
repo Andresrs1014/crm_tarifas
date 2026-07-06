@@ -207,6 +207,15 @@
   transition: border-color 0.2s, box-shadow 0.2s;
   outline: none;
 }
+.form-card input::placeholder,
+.form-card textarea::placeholder,
+.form-group input::placeholder,
+.form-group textarea::placeholder,
+.form-grid input::placeholder,
+.form-grid textarea::placeholder {
+  color: var(--text2);
+  opacity: 1;
+}
 .form-card input:focus,
 .form-card select:focus,
 .form-card textarea:focus,

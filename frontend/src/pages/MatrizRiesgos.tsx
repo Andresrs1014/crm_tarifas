@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAppMutation } from '../hooks/useAppMutation'
 import { ShieldAlert, RefreshCw, CheckCircle2, Clock, BookOpen } from 'lucide-react'
 import { listMatriz, upsertMatriz, MatrizRiesgoRow, MatrizRiesgoUpsert } from '../api/matrizRiesgos'
 import { useToastStore } from '../store/toastStore'
@@ -90,7 +91,7 @@ export default function MatrizRiesgos() {
     staleTime: 30_000,
   })
 
-  const mutate = useMutation({
+  const mutate = useAppMutation({
     mutationFn: ({ recordId, data }: { recordId: string; data: MatrizRiesgoUpsert }) =>
       upsertMatriz(recordId, data),
     onSuccess: () => {

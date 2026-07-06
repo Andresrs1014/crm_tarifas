@@ -26,6 +26,11 @@ Incluye como mínimo: .cursorrules, ponytail/YAGNI, workflow, code-review,
 security, frontend-design, web-design-guidelines, y las de tu dominio.
 Si no leíste las skills → PARA y léelas primero.
 
+Antes de implementar algo custom: busca skill existente (find-skills,
+~/.cursor/skills-cursor/, ~/.claude/skills/) y úsala. Si no existe, créala
+en vez de reinventar. Excepción: skills exclusivas de Claude Code (ej.
+skill-creator) no son exigibles a Codex/Minimax.
+
 ▌ ORQUESTACIÓN — QUÉ HACER AHORA (FASE 1: RECONOCIMIENTO)
 NO implementes código todavía. Solo reconoce y documenta.
 

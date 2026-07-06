@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAppMutation } from '../hooks/useAppMutation'
 import { createRecord, getRecords } from '../api/records'
 import { getComercialesApi } from '../api/comerciales'
 import { toast } from '../store/toastStore'
@@ -78,7 +79,7 @@ export default function Registro() {
 
   const aliadosIndirectos = allRecords.filter((r) => r.tipoCliente === 'indirecto')
 
-  const createMut = useMutation({
+  const createMut = useAppMutation({
     mutationFn: createRecord,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['records'] })
@@ -443,7 +444,7 @@ export default function Registro() {
                   <p className="text-xs text-muted mb-3">Ingresa el valor facturado por cada servicio de interés:</p>
                   <div className="form-grid">
                     {servicios.map((s) => (
-                      <div key={s}>
+                      <div key={s} className="form-group">
                         <label>{s}</label>
                         <input type="number" min={0} style={{ textAlign: 'right' }} placeholder="0" value={billingP[s] ?? ''}
                           onChange={(e) => setBillingP((prev) => ({ ...prev, [s]: e.target.value }))} />
@@ -520,7 +521,7 @@ export default function Registro() {
                 <p className="text-xs text-muted mb-3">Ingresa el valor facturado por cada servicio de interés:</p>
                 <div className="form-grid">
                   {servicios.map((s) => (
-                    <div key={s}>
+                    <div key={s} className="form-group">
                       <label>{s}</label>
                       <input type="number" min={0} style={{ textAlign: 'right' }} placeholder="0" value={billingC[s] ?? ''}
                         onChange={(e) => setBillingC((prev) => ({ ...prev, [s]: e.target.value }))} />

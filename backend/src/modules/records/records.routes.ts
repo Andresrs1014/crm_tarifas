@@ -26,6 +26,7 @@ const ContactoSchema = z.object({
   orden: z.number().int().optional(),
   cumpleanos: z.string().optional(),
   recibeRegalos: z.boolean().optional(),
+  tipo: z.string().optional(),
 });
 
 const RecordCreateSchema = z.object({

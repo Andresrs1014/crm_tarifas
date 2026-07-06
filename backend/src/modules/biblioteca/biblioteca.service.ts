@@ -48,13 +48,13 @@ export async function deleteLinea(id: string) {
 }
 
 // --- Grupos ---
-export async function createGrupo(lineaId: string, data: { nombre: string; orden?: number }) {
+export async function createGrupo(lineaId: string, data: { nombre: string; orden?: number; obsEcommerce?: string }) {
   return prisma.bibliotecaGrupo.create({
-    data: { lineaId, nombre: data.nombre, orden: data.orden ?? 0 },
+    data: { lineaId, nombre: data.nombre, orden: data.orden ?? 0, obsEcommerce: data.obsEcommerce },
   });
 }
 
-export async function updateGrupo(id: string, data: { nombre?: string; orden?: number }) {
+export async function updateGrupo(id: string, data: { nombre?: string; orden?: number; obsEcommerce?: string }) {
   return prisma.bibliotecaGrupo.update({ where: { id }, data });
 }
 

@@ -1,8 +1,16 @@
 import prisma from '../../database';
 import { advanceProspectoEstado } from '../records/records.service';
+import { isMonedaCampo } from './tarifa-columnas';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type JsonInput = any;
+
+/** Vigencia por defecto: 30 días desde la fecha de la cotización (igual que resolveVigencia() del HTML). */
+function defaultVigencia(fecha: Date): Date {
+  const v = new Date(fecha);
+  v.setDate(v.getDate() + 30);
+  return v;
+}
 
 async function generateNumero(): Promise<string> {
   return prisma.$transaction(async (tx) => {
@@ -46,11 +54,16 @@ export async function createCotizacion(data: {
   nit?: string;
   ciudad?: string;
   contacto?: string;
+  cargo?: string;
+  telefono?: string;
   email?: string;
   comercial: string;
   paqueteadora?: string;
   tarifaTipo?: string;
   estado?: string;
+  fecha?: string;
+  vigencia?: string;
+  asunto?: string;
   lineas?: unknown[];
   itemsSnapshot?: Record<string, unknown>;
   obsHtml?: Record<string, unknown>;
@@ -66,11 +79,16 @@ export async function createCotizacion(data: {
       nit: data.nit,
       ciudad: data.ciudad,
       contacto: data.contacto,
+      cargo: data.cargo,
+      telefono: data.telefono,
       email: data.email,
       comercial: data.comercial,
       paqueteadora: data.paqueteadora,
       tarifaTipo: data.tarifaTipo ?? 'biblioteca',
       estado: data.estado ?? 'borrador',
+      fecha: data.fecha ? new Date(data.fecha) : new Date(),
+      vigencia: data.vigencia ? new Date(data.vigencia) : defaultVigencia(data.fecha ? new Date(data.fecha) : new Date()),
+      asunto: data.asunto,
       lineas: (data.lineas ?? []) as JsonInput,
       itemsSnapshot: (data.itemsSnapshot ?? {}) as JsonInput,
       obsHtml: (data.obsHtml ?? {}) as JsonInput,
@@ -86,11 +104,16 @@ export async function updateCotizacion(id: string, data: {
   nit?: string;
   ciudad?: string;
   contacto?: string;
+  cargo?: string;
+  telefono?: string;
   email?: string;
   comercial?: string;
   paqueteadora?: string;
   tarifaTipo?: string;
   estado?: string;
+  fecha?: string;
+  vigencia?: string;
+  asunto?: string;
   lineas?: unknown[];
   itemsSnapshot?: Record<string, unknown>;
   obsHtml?: Record<string, unknown>;
@@ -105,11 +128,16 @@ export async function updateCotizacion(id: string, data: {
       ...(data.nit !== undefined && { nit: data.nit }),
       ...(data.ciudad !== undefined && { ciudad: data.ciudad }),
       ...(data.contacto !== undefined && { contacto: data.contacto }),
+      ...(data.cargo !== undefined && { cargo: data.cargo }),
+      ...(data.telefono !== undefined && { telefono: data.telefono }),
       ...(data.email !== undefined && { email: data.email }),
       ...(data.comercial !== undefined && { comercial: data.comercial }),
       ...(data.paqueteadora !== undefined && { paqueteadora: data.paqueteadora }),
       ...(data.tarifaTipo !== undefined && { tarifaTipo: data.tarifaTipo }),
       ...(data.estado !== undefined && { estado: data.estado }),
+      ...(data.fecha !== undefined && { fecha: new Date(data.fecha) }),
+      ...(data.vigencia !== undefined && { vigencia: new Date(data.vigencia) }),
+      ...(data.asunto !== undefined && { asunto: data.asunto }),
       ...(data.lineas !== undefined && { lineas: data.lineas as JsonInput }),
       ...(data.itemsSnapshot !== undefined && { itemsSnapshot: data.itemsSnapshot as JsonInput }),
       ...(data.obsHtml !== undefined && { obsHtml: data.obsHtml as JsonInput }),
@@ -132,6 +160,7 @@ export async function deleteCotizacion(id: string) {
 export async function duplicarCotizacion(id: string) {
   const original = await getCotizacionById(id);
   const numero = await generateNumero();
+  const fecha = new Date();
   return prisma.cotizacion.create({
     data: {
       numero,
@@ -140,11 +169,16 @@ export async function duplicarCotizacion(id: string) {
       nit: original.nit,
       ciudad: original.ciudad,
       contacto: original.contacto,
+      cargo: original.cargo,
+      telefono: original.telefono,
       email: original.email,
       comercial: original.comercial,
       paqueteadora: original.paqueteadora,
       tarifaTipo: original.tarifaTipo,
       estado: 'borrador',
+      fecha,
+      vigencia: defaultVigencia(fecha),
+      asunto: original.asunto,
       lineas: original.lineas as JsonInput,
       itemsSnapshot: original.itemsSnapshot as JsonInput,
       obsHtml: original.obsHtml as JsonInput,
@@ -180,19 +214,40 @@ export async function actualizarTarifas(id: string, incremento: number) {
       newGrupos[grupoId] = itemsArr.map((item) => {
         const tipoTarifa = item.tipoTarifa as string | undefined;
         const tarifa = item.tarifa as string | undefined;
+        let updated = item;
+        let tocado = false;
+
         if (tipoTarifa === 'moneda' && tarifa) {
           const value = parseTarifaMoneda(tarifa);
           if (value !== null) {
-            itemsActualizados++;
-            return { ...item, tarifa: formatTarifaMoneda(value * (1 + incremento / 100)) };
+            updated = { ...updated, tarifa: formatTarifaMoneda(value * (1 + incremento / 100)) };
+            tocado = true;
           }
         }
-        return item;
+
+        // Ítems de Transporte/Paqueteo (schema): el valor vive en `campos`, no en `tarifa`.
+        const campos = item.campos as Record<string, string> | undefined;
+        if (campos) {
+          const tiposCampo = item.tiposCampo as Record<string, string> | undefined;
+          const newCampos: Record<string, string> = { ...campos };
+          for (const [colId, raw] of Object.entries(campos)) {
+            if (!raw || !isMonedaCampo(colId, tiposCampo)) continue;
+            const value = parseTarifaMoneda(raw);
+            if (value === null) continue;
+            newCampos[colId] = formatTarifaMoneda(value * (1 + incremento / 100));
+            tocado = true;
+          }
+          updated = { ...updated, campos: newCampos };
+        }
+
+        if (tocado) itemsActualizados++;
+        return updated;
       });
     }
     newSnapshot[lineaId] = newGrupos;
   }
 
+  const fecha = new Date();
   const newCot = await prisma.cotizacion.create({
     data: {
       numero,
@@ -201,11 +256,16 @@ export async function actualizarTarifas(id: string, incremento: number) {
       nit: original.nit,
       ciudad: original.ciudad,
       contacto: original.contacto,
+      cargo: original.cargo,
+      telefono: original.telefono,
       email: original.email,
       comercial: original.comercial,
       paqueteadora: original.paqueteadora,
       tarifaTipo: original.tarifaTipo,
       estado: 'borrador',
+      fecha,
+      vigencia: defaultVigencia(fecha),
+      asunto: original.asunto,
       lineas: original.lineas as JsonInput,
       itemsSnapshot: newSnapshot as JsonInput,
       obsHtml: original.obsHtml as JsonInput,

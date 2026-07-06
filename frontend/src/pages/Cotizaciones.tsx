@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAppMutation } from '../hooks/useAppMutation'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   getCotizaciones, deleteCotizacion, duplicarCotizacion, updateCotizacion, getCotizacion,
@@ -8,6 +9,7 @@ import {
 } from '../api/cotizaciones'
 import { getBiblioteca } from '../api/biblioteca'
 import { buildCotHTML, flattenSnapshot } from '../lib/cotizacion/buildCotHTML'
+import { isMonedaCampo } from '../lib/cotizacion/snapshot'
 import { toast } from '../store/toastStore'
 import type { EstadoCotizacion } from '../types'
 import { exportCotizacionPDF } from '../utils/exportPDF'
@@ -74,6 +76,22 @@ function buildPreview(snapshot: Record<string, unknown>, pct: number): PreviewIt
             })
           }
         }
+
+        // Ítems de Transporte/Paqueteo (schema): el valor vive en `campos`, no en `tarifa`.
+        const campos = row.campos as Record<string, string> | undefined
+        if (campos) {
+          const tiposCampo = row.tiposCampo as Record<string, string> | undefined
+          for (const [colId, raw] of Object.entries(campos)) {
+            if (!raw || !isMonedaCampo(colId, tiposCampo)) continue
+            const val = parseTarifaMoneda(raw)
+            if (val === null) continue
+            items.push({
+              descripcion: `${(row.nombre as string) || '—'} · ${colId}`,
+              antes: raw,
+              despues: fmtMoneda(val * factor),
+            })
+          }
+        }
       }
     }
   }
@@ -121,7 +139,7 @@ export default function Cotizaciones() {
   // Lista única de comerciales para el filtro
   const comercialesUnicos = [...new Set(cotizaciones.map((c) => c.comercial).filter(Boolean))].sort()
 
-  const deleteMut = useMutation({
+  const deleteMut = useAppMutation({
     mutationFn: deleteCotizacion,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['cotizaciones'] })
@@ -131,7 +149,7 @@ export default function Cotizaciones() {
     onError: () => toast.error('Error al eliminar'),
   })
 
-  const duplicarMut = useMutation({
+  const duplicarMut = useAppMutation({
     mutationFn: duplicarCotizacion,
     onSuccess: (cot) => {
       qc.invalidateQueries({ queryKey: ['cotizaciones'] })
@@ -141,7 +159,7 @@ export default function Cotizaciones() {
     onError: () => toast.error('Error al duplicar'),
   })
 
-  const avanzarMut = useMutation({
+  const avanzarMut = useAppMutation({
     mutationFn: ({ id, estado }: { id: string; estado: EstadoCotizacion }) =>
       updateCotizacion(id, { estado }),
     onSuccess: () => {
@@ -151,7 +169,7 @@ export default function Cotizaciones() {
     onError: () => toast.error('Error al actualizar'),
   })
 
-  const rechazarMut = useMutation({
+  const rechazarMut = useAppMutation({
     mutationFn: (id: string) => updateCotizacion(id, { estado: 'rechazada' }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['cotizaciones'] })
@@ -173,7 +191,7 @@ export default function Cotizaciones() {
     return buildPreview(normalizeSnapshot(cotActualizar.itemsSnapshot), pct)
   }, [cotActualizar, pct])
 
-  const actualizarMut = useMutation({
+  const actualizarMut = useAppMutation({
     mutationFn: ({ id, inc }: { id: string; inc: number }) => actualizarTarifas(id, inc),
     onSuccess: ({ cotizacion, itemsActualizados }) => {
       qc.invalidateQueries({ queryKey: ['cotizaciones'] })
@@ -191,11 +209,15 @@ export default function Cotizaciones() {
       const html = biblioteca.length
         ? buildCotHTML({
           numero: cot.numero,
-          fecha: cot.createdAt,
+          fecha: cot.fecha ?? cot.createdAt,
+          vigencia: cot.vigencia,
+          asunto: cot.asunto,
           empresa: cot.empresa,
           nit: cot.nit,
           ciudad: cot.ciudad,
           contacto: cot.contacto,
+          cargo: cot.cargo,
+          telefono: cot.telefono,
           email: cot.email,
           comercial: cot.comercial,
           paqueteadora: cot.paqueteadora,
@@ -331,7 +353,7 @@ export default function Cotizaciones() {
                       <span className="text-xs text-muted capitalize">{cot.tarifaTipo}</span>
                     </td>
                     <td className="text-xs text-muted whitespace-nowrap">
-                      {new Date(cot.createdAt).toLocaleDateString('es-CO')}
+                      {new Date(cot.fecha ?? cot.createdAt).toLocaleDateString('es-CO')}
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <div className="cot-row-actions">

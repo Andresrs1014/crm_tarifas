@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
+import { useAppMutation } from '../hooks/useAppMutation'
 import * as XLSX from 'xlsx'
 import { importRecords } from '../api/records'
 import { toast } from '../store/toastStore'
@@ -95,7 +96,7 @@ export default function ImportWizard() {
     }
   }
 
-  const importMut = useMutation({
+  const importMut = useAppMutation({
     mutationFn: () => {
       if (!file) throw new Error('Sin archivo')
       return importRecords(file, tipo)

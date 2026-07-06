@@ -32,17 +32,28 @@ export const GD_DOCS: GDDoc[] = [
   { id: 'listas_caut',nombre: 'Listas Cautelares',                                                     aplica: 'todos',   pond_di: 0.20,  pond_ref: 0.20 },
 ];
 
+export interface GDArchivo {
+  id: string;
+  nombre: string;
+  size: number;
+  mime: string;
+  uploadedAt: string; // ISO datetime
+}
+
 export interface DocEstado {
   estado?: 'completo' | 'incompleto' | 'pendiente';
   obs?: string;
   fecha?: string; // ISO date string
+  archivos?: GDArchivo[];
 }
 
-function calcCumplimiento(docs: Record<string, DocEstado>, tipoCliente: string, cicloActual: number): number {
+/**
+ * El % de cumplimiento refleja el estado REAL de los documentos, independiente del
+ * "ciclo documental" (año de renovación). Un ciclo desactualizado se señaliza aparte
+ * (ver `vencimiento` en enrichRow) — no debe ocultar el avance ya diligenciado.
+ */
+function calcCumplimiento(docs: Record<string, DocEstado>, tipoCliente: string): number {
   const esReferido = tipoCliente === 'referido';
-  const anoActual = new Date().getFullYear();
-  if (cicloActual < anoActual) return 0;
-
   const aplicables = GD_DOCS.filter(d => esReferido ? d.aplica === 'todos' : true);
   let totalPond = 0, cumplido = 0;
   for (const d of aplicables) {
@@ -98,7 +109,7 @@ function enrichRow(r: {
   const gd = r.gestionDocumental;
   const docs: Record<string, DocEstado> = gd ? (gd.docs as Record<string, DocEstado>) : {};
   const cicloActual = gd?.cicloActual ?? new Date().getFullYear();
-  const cumplimiento = calcCumplimiento(docs, r.tipoCliente, cicloActual);
+  const cumplimiento = calcCumplimiento(docs, r.tipoCliente);
   const vencimiento  = calcVencimiento(docs);
   const estadoDocs   = calcEstadoDocs(docs, r.tipoCliente);
 
@@ -184,4 +195,37 @@ export async function upsertGD(recordId: string, data: {
       cicloActual: data.cicloActual,
     },
   });
+}
+
+/** Adjunta archivos ya guardados en disco a un documento y marca su estado como completo (paridad con el HTML de referencia). */
+export async function addArchivos(recordId: string, docId: string, nuevos: GDArchivo[]) {
+  const gd = await getOrCreateGD(recordId);
+  const docs = { ...(gd.docs as Record<string, DocEstado>) };
+  const actual = docs[docId] ?? {};
+  docs[docId] = {
+    ...actual,
+    archivos: [...(actual.archivos ?? []), ...nuevos],
+    estado: 'completo',
+  };
+  return prisma.gestionDocumental.update({ where: { recordId }, data: { docs: docs as JsonInput } });
+}
+
+/** Busca un archivo por id sin mutar nada — usado para servir/descargar. */
+export async function findArchivo(recordId: string, docId: string, archivoId: string): Promise<GDArchivo | null> {
+  const gd = await prisma.gestionDocumental.findUnique({ where: { recordId } });
+  if (!gd) return null;
+  const docs = gd.docs as Record<string, DocEstado>;
+  const archivos = docs[docId]?.archivos ?? [];
+  return archivos.find(a => a.id === archivoId) ?? null;
+}
+
+/** Quita la metadata del archivo; retorna el registro actualizado y el archivo eliminado (para poder borrarlo de disco). */
+export async function removeArchivo(recordId: string, docId: string, archivoId: string) {
+  const gd = await getOrCreateGD(recordId);
+  const docs = { ...(gd.docs as Record<string, DocEstado>) };
+  const actual = docs[docId] ?? {};
+  const archivo = (actual.archivos ?? []).find(a => a.id === archivoId) ?? null;
+  docs[docId] = { ...actual, archivos: (actual.archivos ?? []).filter(a => a.id !== archivoId) };
+  const updated = await prisma.gestionDocumental.update({ where: { recordId }, data: { docs: docs as JsonInput } });
+  return { updated, archivo };
 }

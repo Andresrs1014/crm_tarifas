@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, type Dispatch, type SetStateAction } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAppMutation } from '../hooks/useAppMutation'
 import { getRecord, updateRecord, deleteRecord, convertToCliente } from '../api/records'
 import { getCotizaciones } from '../api/cotizaciones'
 import { createActividad, updateActividad, deleteActividad } from '../api/actividades'
@@ -130,7 +131,7 @@ export default function Detalle() {
 
   // â”€â”€ Mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  const updateMut = useMutation({
+  const updateMut = useAppMutation({
     mutationFn: () => {
       const facturadoActivo = edit.facturado && edit.facturado !== 'no'
       const lineasFacturacion = facturadoActivo
@@ -169,7 +170,7 @@ export default function Detalle() {
     onError: () => toast.error('Error al guardar'),
   })
 
-  const deleteMut = useMutation({
+  const deleteMut = useAppMutation({
     mutationFn: () => deleteRecord(id!),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['records'] })
@@ -179,7 +180,7 @@ export default function Detalle() {
     onError: () => toast.error('Error al eliminar'),
   })
 
-  const convertMut = useMutation({
+  const convertMut = useAppMutation({
     mutationFn: () => convertToCliente(id!),
     onSuccess: (updated) => {
       qc.invalidateQueries({ queryKey: ['records'] })
@@ -191,7 +192,7 @@ export default function Detalle() {
     onError: () => toast.error('No se pudo convertir a cliente'),
   })
 
-  const createActMut = useMutation({
+  const createActMut = useAppMutation({
     mutationFn: () => createActividad(id!, {
       tipo: actForm.tipo,
       descripcion: actForm.descripcion,
@@ -208,14 +209,14 @@ export default function Detalle() {
     onError: () => toast.error('Error al registrar'),
   })
 
-  const toggleHechoMut = useMutation({
+  const toggleHechoMut = useAppMutation({
     mutationFn: ({ actId, hecho }: { actId: string; hecho: boolean }) =>
       updateActividad(actId, { hecho }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['record', id] }),
     onError: () => toast.error('Error al actualizar'),
   })
 
-  const deleteActMut = useMutation({
+  const deleteActMut = useAppMutation({
     mutationFn: (actId: string) => deleteActividad(actId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['record', id] })
@@ -224,7 +225,7 @@ export default function Detalle() {
     onError: () => toast.error('Error al eliminar'),
   })
 
-  const obsMut = useMutation({
+  const obsMut = useAppMutation({
     mutationFn: () => updateRecord(id!, { observaciones: obsText }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['record', id] })

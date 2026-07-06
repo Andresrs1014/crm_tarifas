@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAppMutation } from '../hooks/useAppMutation'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   DndContext,
@@ -374,7 +375,7 @@ export default function CRMKanban() {
     refetchInterval: 5 * 60 * 1000,
   })
 
-  const updateEstadoMut = useMutation({
+  const updateEstadoMut = useAppMutation({
     mutationFn: ({ id, estado }: { id: string; estado: EstadoProspecto }) =>
       updateRecord(id, { estadoProspecto: estado }),
     onSuccess: () => {

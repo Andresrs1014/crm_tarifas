@@ -66,6 +66,14 @@ Si una tarea encaja en un dominio adicional → buscar skill con `find-skills` o
 
 ---
 
+## Buscar/crear skills antes de implementar (todos los agentes, regla permanente)
+
+**Regla:** antes de escribir una solución custom para un dominio con skill disponible, **buscar primero** (`find-skills`, `~/.cursor/skills-cursor/`, `~/.claude/skills/`) y **usarla**. Si no existe skill para el dominio, **crearla** en vez de reinventar la solución desde cero (Claude: plugin `skill-creator`; Cursor/Codex/Minimax: documentar el patrón reutilizable en `docs/orquestacion/referencia/` o su carpeta de skills propia).
+
+**Excepción:** capacidades exclusivas de la plataforma Claude Code (plugins/skills que solo Claude puede invocar, ej. `skill-creator`) no son exigibles a Codex/Minimax/Cursor — cada agente aplica el equivalente de su propio ecosistema.
+
+---
+
 ## Al revisar trabajo de otro agente (todos)
 
 | # | Skill | Ruta |
@@ -85,6 +93,7 @@ Si una tarea encaja en un dominio adicional → buscar skill con `find-skills` o
 [ ] Leí skills de mi rol (tabla arriba)
 [ ] Sé si puedo tocar Docker (Minimax: NO)
 [ ] Sé que revisar ≠ editar código ajeno
+[ ] Busqué skill existente antes de implementar (o creé una si no existía)
 ```
 
 ---

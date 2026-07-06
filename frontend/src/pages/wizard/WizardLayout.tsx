@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAppMutation } from '../../hooks/useAppMutation'
 import { getCotizacion, createCotizacion, updateCotizacion } from '../../api/cotizaciones'
 import { getBiblioteca } from '../../api/biblioteca'
 import { getComercialesApi } from '../../api/comerciales'
@@ -8,6 +9,7 @@ import { getRecords, getRecord } from '../../api/records'
 import { toast } from '../../store/toastStore'
 import type { BibliotecaLinea, CRMRecord, EstadoCotizacion } from '../../types'
 import { PAQUETEO_PAQUETEADORAS } from '../../lib/htmlV6/constants'
+import { COTIZACION_ESTADO_OPTIONS } from '../../lib/htmlV6/domainConfig'
 import {
   type CotItemsSnapshot,
   ensureTransportePaqueteoSnapshot,
@@ -29,10 +31,15 @@ interface WizardData {
   nit: string
   ciudad: string
   contacto: string
+  cargo: string
+  telefono: string
   email: string
   comercial: string
   paqueteadora: string
   recordId: string
+  fecha: string
+  vigencia: string
+  asunto: string
   // Paso 2: Líneas de servicio
   lineas: string[]
   tarifaTipo: 'biblioteca' | 'especial'
@@ -45,9 +52,19 @@ interface WizardData {
   estado: EstadoCotizacion
 }
 
+function todayISO(): string {
+  return new Date().toISOString().split('T')[0]
+}
+
+function plusDaysISO(iso: string, days: number): string {
+  const d = new Date(iso)
+  d.setDate(d.getDate() + days)
+  return d.toISOString().split('T')[0]
+}
+
 const EMPTY: WizardData = {
-  empresa: '', nit: '', ciudad: '', contacto: '', email: '',
-  comercial: '', paqueteadora: '', recordId: '',
+  empresa: '', nit: '', ciudad: '', contacto: '', cargo: '', telefono: '', email: '',
+  comercial: '', paqueteadora: '', recordId: '', fecha: '', vigencia: '', asunto: '',
   lineas: [], tarifaTipo: 'biblioteca',
   itemsSnapshot: {}, obsHtml: {}, obsLibre: '',
   estado: 'borrador',
@@ -55,7 +72,7 @@ const EMPTY: WizardData = {
 
 const STEPS = ['Datos básicos', 'Servicios', 'Tarifas', 'Observaciones', 'Resumen']
 
-const WIZARD_ESTADO_INICIAL: EstadoCotizacion[] = ['borrador', 'enviada']
+const WIZARD_ESTADO_OPTIONS = COTIZACION_ESTADO_OPTIONS.filter((o) => o.value !== '')
 
 function canSaveDraftBasics(data: WizardData): boolean {
   return data.empresa.trim() !== '' && data.comercial.trim() !== ''
@@ -67,12 +84,17 @@ function buildWizardPayload(data: WizardData, estado: EstadoCotizacion) {
     nit: data.nit || undefined,
     ciudad: data.ciudad || undefined,
     contacto: data.contacto || undefined,
+    cargo: data.cargo || undefined,
+    telefono: data.telefono || undefined,
     email: data.email || undefined,
     comercial: data.comercial,
     paqueteadora: data.paqueteadora || undefined,
     recordId: data.recordId || undefined,
     tarifaTipo: data.tarifaTipo,
     estado,
+    fecha: data.fecha || undefined,
+    vigencia: data.vigencia || undefined,
+    asunto: data.asunto || undefined,
     lineas: data.lineas,
     itemsSnapshot: data.itemsSnapshot,
     obsHtml: data.obsHtml,
@@ -97,11 +119,15 @@ async function persistCotizacion(
 
   const htmlPreview = buildCotHTML({
     numero: cot.numero,
-    fecha: cot.createdAt,
+    fecha: cot.fecha ?? cot.createdAt,
+    vigencia: cot.vigencia,
+    asunto: opts.data.asunto,
     empresa: opts.data.empresa,
     nit: opts.data.nit,
     ciudad: opts.data.ciudad,
     contacto: opts.data.contacto,
+    cargo: opts.data.cargo,
+    telefono: opts.data.telefono,
     email: opts.data.email,
     comercial: opts.data.comercial,
     paqueteadora: opts.data.paqueteadora,
@@ -128,6 +154,8 @@ function applyRecordToWizard(record: CRMRecord): Partial<WizardData> {
     nit: record.nit ?? '',
     ciudad: record.ciudad ?? '',
     contacto: contact?.nombre ?? '',
+    cargo: contact?.cargo ?? '',
+    telefono: contact?.telefono ?? '',
     email: contact?.email ?? '',
     comercial: record.comercial?.nombre ?? '',
     paqueteadora: record.servicios?.includes('Paqueteo') ? 'COORDINADORA' : '',
@@ -229,9 +257,34 @@ function Paso1({ data, onChange }: { data: WizardData; onChange: (d: Partial<Wiz
           onChange={(e) => onChange({ contacto: e.target.value })} placeholder="Nombre del contacto" />
       </div>
       <div className="form-group">
+        <label>Cargo</label>
+        <input className="filter-input w-full" value={data.cargo}
+          onChange={(e) => onChange({ cargo: e.target.value })} placeholder="Cargo del contacto" />
+      </div>
+      <div className="form-group">
+        <label>Teléfono</label>
+        <input className="filter-input w-full" value={data.telefono}
+          onChange={(e) => onChange({ telefono: e.target.value })} placeholder="Teléfono del contacto" />
+      </div>
+      <div className="form-group">
         <label>Email</label>
         <input type="email" className="filter-input w-full" value={data.email}
           onChange={(e) => onChange({ email: e.target.value })} placeholder="correo@empresa.com" />
+      </div>
+      <div className="form-group">
+        <label>Fecha de cotización</label>
+        <input type="date" className="filter-input w-full" value={data.fecha}
+          onChange={(e) => onChange({ fecha: e.target.value })} />
+      </div>
+      <div className="form-group">
+        <label>Vigencia (válida hasta)</label>
+        <input type="date" className="filter-input w-full" value={data.vigencia}
+          onChange={(e) => onChange({ vigencia: e.target.value })} />
+      </div>
+      <div className="form-group full">
+        <label>Asunto / Descripción</label>
+        <input className="filter-input w-full" value={data.asunto}
+          onChange={(e) => onChange({ asunto: e.target.value })} placeholder="Asunto opcional de la cotización" />
       </div>
       <div className="form-group">
         <label>Paqueteadora</label>
@@ -253,6 +306,18 @@ function Paso1({ data, onChange }: { data: WizardData; onChange: (d: Partial<Wiz
           onChange={(e) => onChange({ comercial: e.target.value })}>
           <option value="">Seleccionar comercial</option>
           {comerciales.map((c) => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
+        </select>
+      </div>
+      <div className="form-group">
+        <label>Estado</label>
+        <select
+          className="filter-select w-full"
+          value={data.estado}
+          onChange={(e) => onChange({ estado: e.target.value as EstadoCotizacion })}
+        >
+          {WIZARD_ESTADO_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
         </select>
       </div>
     </div>
@@ -429,9 +494,13 @@ function Paso5({
           <div><span className="text-muted">Empresa:</span> <span className="text-foreground font-semibold">{data.empresa}</span></div>
           {data.nit && <div><span className="text-muted">NIT:</span> <span className="font-mono text-foreground">{data.nit}</span></div>}
           {data.ciudad && <div><span className="text-muted">Ciudad:</span> <span className="text-foreground">{data.ciudad}</span></div>}
-          {data.contacto && <div><span className="text-muted">Contacto:</span> <span className="text-foreground">{data.contacto}</span></div>}
+          {data.contacto && <div><span className="text-muted">Contacto:</span> <span className="text-foreground">{data.contacto}{data.cargo ? ` (${data.cargo})` : ''}</span></div>}
+          {data.telefono && <div><span className="text-muted">Teléfono:</span> <span className="text-foreground">{data.telefono}</span></div>}
           <div><span className="text-muted">Comercial:</span> <span className="text-foreground">{data.comercial}</span></div>
           <div><span className="text-muted">Tarifa:</span> <span className="text-foreground capitalize">{data.tarifaTipo}</span></div>
+          {data.fecha && <div><span className="text-muted">Fecha:</span> <span className="text-foreground">{data.fecha}</span></div>}
+          {data.vigencia && <div><span className="text-muted">Válida hasta:</span> <span className="text-foreground">{data.vigencia}</span></div>}
+          {data.asunto && <div className="col-span-2"><span className="text-muted">Asunto:</span> <span className="text-foreground">{data.asunto}</span></div>}
           {!data.recordId && (
             <div className="col-span-2 text-xs text-gold">
               Sin vínculo CRM — la cotización quedará sin prospecto/cliente asociado.
@@ -475,24 +544,13 @@ function Paso5({
         </div>
       )}
 
-      <div className="card p-5 space-y-3">
+      <div className="card p-5 space-y-2">
         <h3 className="text-xs font-bold text-muted uppercase tracking-widest">Estado al guardar</h3>
-        <div className="type-toggle max-w-md">
-          {WIZARD_ESTADO_INICIAL.map((e) => (
-            <button
-              key={e}
-              type="button"
-              onClick={() => onChange({ estado: e })}
-              className={`type-btn ${data.estado === e ? 'active' : ''}`}
-            >
-              {e === 'borrador' ? 'Borrador' : 'Enviada'}
-            </button>
-          ))}
-        </div>
+        <p className="text-sm text-foreground font-semibold">
+          {WIZARD_ESTADO_OPTIONS.find((o) => o.value === data.estado)?.label}
+        </p>
         <p className="text-xs text-muted">
-          {data.estado === 'enviada'
-            ? 'Al confirmar, la cotización quedará marcada como enviada. Puedes usar «Guardar borrador» en cualquier paso si aún no quieres enviarla.'
-            : 'Al confirmar, la cotización quedará en borrador. Cambia a Enviada arriba o márcala después desde la lista.'}
+          Definido en «Datos básicos» — vuelve al paso 1 para cambiarlo antes de confirmar.
         </p>
       </div>
     </div>
@@ -514,9 +572,9 @@ export default function WizardLayout() {
     STEPS.length - 1,
   )
   const [step, setStep] = useState(initialStep)
-  const [data, setData] = useState<WizardData>({
-    ...EMPTY,
-    recordId: initialRecordId,
+  const [data, setData] = useState<WizardData>(() => {
+    const fecha = todayISO()
+    return { ...EMPTY, recordId: initialRecordId, fecha, vigencia: plusDaysISO(fecha, 30) }
   })
 
   const { data: recordPrefill } = useQuery({
@@ -545,10 +603,15 @@ export default function WizardLayout() {
         nit: cotExistente.nit ?? '',
         ciudad: cotExistente.ciudad ?? '',
         contacto: cotExistente.contacto ?? '',
+        cargo: cotExistente.cargo ?? '',
+        telefono: cotExistente.telefono ?? '',
         email: cotExistente.email ?? '',
         comercial: cotExistente.comercial,
         paqueteadora: cotExistente.paqueteadora ?? '',
         recordId: cotExistente.recordId ?? '',
+        fecha: cotExistente.fecha ? cotExistente.fecha.slice(0, 10) : '',
+        vigencia: cotExistente.vigencia ? cotExistente.vigencia.slice(0, 10) : '',
+        asunto: cotExistente.asunto ?? '',
         lineas: cotExistente.lineas,
         tarifaTipo: cotExistente.tarifaTipo as 'biblioteca' | 'especial',
         itemsSnapshot: flattenSnapshot(cotExistente.itemsSnapshot),
@@ -599,7 +662,7 @@ export default function WizardLayout() {
   }
 
   // Mutations
-  const saveMut = useMutation({
+  const saveMut = useAppMutation({
     mutationFn: () => persistCotizacion({
       isEdit,
       cotId: id,
@@ -628,7 +691,7 @@ export default function WizardLayout() {
     onError: () => toast.error('Error al guardar la cotización'),
   })
 
-  const draftMut = useMutation({
+  const draftMut = useAppMutation({
     mutationFn: () => persistCotizacion({
       isEdit,
       cotId: id,

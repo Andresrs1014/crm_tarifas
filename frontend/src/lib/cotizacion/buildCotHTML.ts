@@ -144,10 +144,14 @@ function renderStandardTable(
 export interface BuildCotHTMLInput {
   numero: string
   fecha?: string
+  vigencia?: string
+  asunto?: string
   empresa: string
   nit?: string
   ciudad?: string
   contacto?: string
+  cargo?: string
+  telefono?: string
   email?: string
   comercial: string
   paqueteadora?: string
@@ -159,11 +163,13 @@ export interface BuildCotHTMLInput {
 
 export function buildCotHTML(input: BuildCotHTMLInput, biblioteca: BibliotecaLinea[]): string {
   const fecha = formatCotFecha(input.fecha)
+  const vigencia = input.vigencia ? formatCotFecha(input.vigencia) : ''
 
   const clienteParts = [
     input.nit ? `NIT: ${esc(input.nit)}` : '',
     input.ciudad ? `Ciudad: ${esc(input.ciudad)}` : '',
-    input.contacto ? `Contacto: ${esc(input.contacto)}` : '',
+    input.contacto ? `Contacto: ${esc(input.contacto)}${input.cargo ? ` (${esc(input.cargo)})` : ''}` : '',
+    input.telefono ? `Tel: ${esc(input.telefono)}` : '',
     input.email ? esc(input.email) : '',
   ].filter(Boolean).join(' · ')
 
@@ -222,6 +228,7 @@ export function buildCotHTML(input: BuildCotHTMLInput, biblioteca: BibliotecaLin
     <div class="cot-preview-meta">
       <strong>COTIZACIÓN ${esc(input.numero)}</strong>
       Fecha: ${esc(fecha)}<br>
+      ${vigencia ? `Válida hasta: ${esc(vigencia)}<br>` : ''}
       Comercial: ${esc(input.comercial)}
       ${input.paqueteadora ? `<br>Paqueteadora: ${esc(input.paqueteadora)}` : ''}
     </div>
@@ -230,6 +237,7 @@ export function buildCotHTML(input: BuildCotHTMLInput, biblioteca: BibliotecaLin
     <strong>${esc(input.empresa)}</strong>
     ${clienteParts || '—'}
   </div>
+  ${input.asunto?.trim() ? `<p style="font-size:14px;font-weight:700;color:#002366;margin:-16px 0 20px">Asunto: ${esc(input.asunto)}</p>` : ''}
   ${body || '<p style="color:#888;font-size:13px">Sin ítems seleccionados.</p>'}
   <div class="cot-footer-line">
     <span>Propuesta comercial · Grupo ZYMO</span>
