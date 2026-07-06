@@ -444,7 +444,7 @@ export default function Registro() {
                   <p className="text-xs text-muted mb-3">Ingresa el valor facturado por cada servicio de interés:</p>
                   <div className="form-grid">
                     {servicios.map((s) => (
-                      <div key={s}>
+                      <div key={s} className="form-group">
                         <label>{s}</label>
                         <input type="number" min={0} style={{ textAlign: 'right' }} placeholder="0" value={billingP[s] ?? ''}
                           onChange={(e) => setBillingP((prev) => ({ ...prev, [s]: e.target.value }))} />
@@ -521,7 +521,7 @@ export default function Registro() {
                 <p className="text-xs text-muted mb-3">Ingresa el valor facturado por cada servicio de interés:</p>
                 <div className="form-grid">
                   {servicios.map((s) => (
-                    <div key={s}>
+                    <div key={s} className="form-group">
                       <label>{s}</label>
                       <input type="number" min={0} style={{ textAlign: 'right' }} placeholder="0" value={billingC[s] ?? ''}
                         onChange={(e) => setBillingC((prev) => ({ ...prev, [s]: e.target.value }))} />
