@@ -183,11 +183,16 @@ model Cotizacion {
   nit           String?
   ciudad        String?
   contacto      String?
+  cargo         String?
+  telefono      String?
   email         String?
   comercial     String
   paqueteadora  String?
   tarifaTipo    String   @default("biblioteca") @map("tarifa_tipo")
   estado        String   @default("borrador")
+  fecha         DateTime?
+  vigencia      DateTime?
+  asunto        String?
   lineas        Json     @default("[]")
   itemsSnapshot Json     @default("{}") @map("items_snapshot")
   obsHtml       Json     @default("{}") @map("obs_html")

@@ -9,6 +9,7 @@ import {
 } from '../api/cotizaciones'
 import { getBiblioteca } from '../api/biblioteca'
 import { buildCotHTML, flattenSnapshot } from '../lib/cotizacion/buildCotHTML'
+import { isMonedaCampo } from '../lib/cotizacion/snapshot'
 import { toast } from '../store/toastStore'
 import type { EstadoCotizacion } from '../types'
 import { exportCotizacionPDF } from '../utils/exportPDF'
@@ -71,6 +72,22 @@ function buildPreview(snapshot: Record<string, unknown>, pct: number): PreviewIt
             items.push({
               descripcion: (row.nombre as string) || (row.descripcion as string) || '—',
               antes: row.tarifa,
+              despues: fmtMoneda(val * factor),
+            })
+          }
+        }
+
+        // Ítems de Transporte/Paqueteo (schema): el valor vive en `campos`, no en `tarifa`.
+        const campos = row.campos as Record<string, string> | undefined
+        if (campos) {
+          const tiposCampo = row.tiposCampo as Record<string, string> | undefined
+          for (const [colId, raw] of Object.entries(campos)) {
+            if (!raw || !isMonedaCampo(colId, tiposCampo)) continue
+            const val = parseTarifaMoneda(raw)
+            if (val === null) continue
+            items.push({
+              descripcion: `${(row.nombre as string) || '—'} · ${colId}`,
+              antes: raw,
               despues: fmtMoneda(val * factor),
             })
           }
@@ -192,11 +209,15 @@ export default function Cotizaciones() {
       const html = biblioteca.length
         ? buildCotHTML({
           numero: cot.numero,
-          fecha: cot.createdAt,
+          fecha: cot.fecha ?? cot.createdAt,
+          vigencia: cot.vigencia,
+          asunto: cot.asunto,
           empresa: cot.empresa,
           nit: cot.nit,
           ciudad: cot.ciudad,
           contacto: cot.contacto,
+          cargo: cot.cargo,
+          telefono: cot.telefono,
           email: cot.email,
           comercial: cot.comercial,
           paqueteadora: cot.paqueteadora,
@@ -332,7 +353,7 @@ export default function Cotizaciones() {
                       <span className="text-xs text-muted capitalize">{cot.tarifaTipo}</span>
                     </td>
                     <td className="text-xs text-muted whitespace-nowrap">
-                      {new Date(cot.createdAt).toLocaleDateString('es-CO')}
+                      {new Date(cot.fecha ?? cot.createdAt).toLocaleDateString('es-CO')}
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <div className="cot-row-actions">
