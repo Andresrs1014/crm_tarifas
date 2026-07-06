@@ -388,9 +388,10 @@ function DocModal({ row, onClose }: { row: GDRow; onClose: () => void }) {
                   />
 
                   {/* Archivos adjuntos */}
-                  <div className="space-y-2" onClick={e => e.stopPropagation()}>
+                  <div className="pt-2.5 border-t border-border/50 space-y-1.5" onClick={e => e.stopPropagation()}>
+                    <div className="text-[10px] text-muted uppercase tracking-wider font-semibold">Archivos adjuntos</div>
                     {(d.archivos ?? []).map(archivo => (
-                      <div key={archivo.id} className="flex items-center gap-2 rounded-lg bg-black/20 border border-border px-2.5 py-1.5">
+                      <div key={archivo.id} className="flex items-center gap-2 rounded-md bg-surface2 border border-border px-2.5 py-1.5">
                         <span className="text-xs text-foreground truncate flex-1 min-w-0" title={archivo.nombre}>{archivo.nombre}</span>
                         <span className="text-[10px] text-muted flex-shrink-0">{fmtSize(archivo.size)}</span>
                         {esPrevisualizable(archivo.mime) && (
@@ -398,32 +399,32 @@ function DocModal({ row, onClose }: { row: GDRow; onClose: () => void }) {
                             type="button"
                             aria-label={`Ver ${archivo.nombre}`}
                             onClick={() => abrirArchivo(row.id, doc.id, archivo, 'ver').catch(() => push('Error al abrir el archivo', 'error'))}
-                            className="p-1 rounded hover:bg-white/10 text-muted hover:text-accent transition-colors flex-shrink-0"
+                            className="p-1.5 rounded hover:bg-accent/10 text-muted hover:text-accent transition-colors flex-shrink-0"
                           >
-                            <Eye size={14} />
+                            <Eye size={15} />
                           </button>
                         )}
                         <button
                           type="button"
                           aria-label={`Descargar ${archivo.nombre}`}
                           onClick={() => abrirArchivo(row.id, doc.id, archivo, 'descargar').catch(() => push('Error al descargar el archivo', 'error'))}
-                          className="p-1 rounded hover:bg-white/10 text-muted hover:text-accent transition-colors flex-shrink-0"
+                          className="p-1.5 rounded hover:bg-accent/10 text-muted hover:text-accent transition-colors flex-shrink-0"
                         >
-                          <Download size={14} />
+                          <Download size={15} />
                         </button>
                         <button
                           type="button"
                           aria-label={`Eliminar ${archivo.nombre}`}
                           onClick={() => handleDeleteArchivo(doc.id, archivo)}
-                          className="p-1 rounded hover:bg-white/10 text-muted hover:text-danger transition-colors flex-shrink-0"
+                          className="p-1.5 rounded hover:bg-danger/10 text-muted hover:text-danger transition-colors flex-shrink-0"
                         >
-                          <Trash2 size={14} />
+                          <Trash2 size={15} />
                         </button>
                       </div>
                     ))}
-                    <label className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-border py-2 text-xs text-muted hover:text-accent hover:border-accent/40 transition-colors cursor-pointer">
-                      <Paperclip size={14} />
-                      {uploadMut.isPending && uploadMut.variables?.docId === doc.id ? 'Subiendo...' : 'Adjuntar archivo'}
+                    <label className="flex items-center gap-2 bg-surface2 border border-dashed border-border rounded-md px-2.5 py-1.5 text-xs text-muted hover:text-accent hover:border-accent transition-colors cursor-pointer">
+                      <Paperclip size={13} className="flex-shrink-0" />
+                      <span>{uploadMut.isPending && uploadMut.variables?.docId === doc.id ? 'Subiendo...' : 'Adjuntar archivo'}</span>
                       <input
                         type="file"
                         multiple
