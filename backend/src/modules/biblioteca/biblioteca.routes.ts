@@ -30,6 +30,7 @@ const LineaSchema = z.object({
 const GrupoSchema = z.object({
   nombre: z.string().min(1),
   orden: z.number().int().optional(),
+  obsEcommerce: z.string().optional(),
 });
 
 const ItemSchema = z.object({

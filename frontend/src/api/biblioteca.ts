@@ -21,10 +21,10 @@ export const deleteLinea = (id: string) =>
   client.delete(`/api/biblioteca/lineas/${id}`).then((r) => r.data)
 
 // Grupos
-export const createGrupo = (lineaId: string, data: { nombre: string; orden?: number }) =>
+export const createGrupo = (lineaId: string, data: { nombre: string; orden?: number; obsEcommerce?: string }) =>
   client.post<BibliotecaGrupo>(`/api/biblioteca/lineas/${lineaId}/grupos`, data).then((r) => r.data)
 
-export const updateGrupo = (id: string, data: Partial<{ nombre: string; orden: number }>) =>
+export const updateGrupo = (id: string, data: Partial<{ nombre: string; orden: number; obsEcommerce: string }>) =>
   client.put<BibliotecaGrupo>(`/api/biblioteca/grupos/${id}`, data).then((r) => r.data)
 
 export const deleteGrupo = (id: string) =>

@@ -669,9 +669,16 @@ function GrupoPaqueteoSection({
   const qc = useQueryClient()
   const { tipo } = parseGrupoNombre(grupo.nombre)
   const entry = PAQUETEO_SCHEMA[tipo]
+  const [obsEcommerce, setObsEcommerce] = useState(grupo.obsEcommerce ?? '')
   if (!entry) return null
 
   const sortedItems = [...grupo.items].sort((a, b) => a.orden - b.orden)
+
+  const updateObsMut = useAppMutation({
+    mutationFn: () => updateGrupo(grupo.id, { obsEcommerce }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
+    onError: () => toast.error('Error al guardar la observación'),
+  })
 
   const addFilaMut = useAppMutation({
     mutationFn: () => createItem(grupo.id, { nombre: 'fila', tarifa: '', orden: sortedItems.length }),
@@ -708,6 +715,19 @@ function GrupoPaqueteoSection({
         <span className="bib-grupo-badge">{entry.label}</span>
       </div>
       <div className="bib-grupo-body">
+        {entry.hasObs && (
+          <div className="mb-3">
+            <label className="text-2xs text-muted uppercase tracking-widest block mb-1">📝 Observación Ecommerce</label>
+            <textarea
+              className="input w-full text-xs resize-none"
+              rows={2}
+              value={obsEcommerce}
+              onChange={(e) => setObsEcommerce(e.target.value)}
+              onBlur={() => { if (obsEcommerce !== (grupo.obsEcommerce ?? '')) updateObsMut.mutate() }}
+              placeholder="Observación aplicable a este grupo Ecommerce..."
+            />
+          </div>
+        )}
         <TableScrollArea>
         <table className="bib-items-table">
           <PaqueteoTableHead entry={entry} />

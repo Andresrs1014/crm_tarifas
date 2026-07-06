@@ -211,6 +211,7 @@ export interface BibliotecaGrupo {
   lineaId: string
   nombre: string
   orden: number
+  obsEcommerce?: string
   items: BibliotecaItem[]
 }
 

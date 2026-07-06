@@ -140,12 +140,13 @@ model BibliotecaLinea {
 }
 
 model BibliotecaGrupo {
-  id      String           @id @default(uuid())
-  lineaId String           @map("linea_id")
-  linea   BibliotecaLinea  @relation(fields: [lineaId], references: [id], onDelete: Cascade)
-  nombre  String
-  orden   Int              @default(0)
-  items   BibliotecaItem[]
+  id            String           @id @default(uuid())
+  lineaId       String           @map("linea_id")
+  linea         BibliotecaLinea  @relation(fields: [lineaId], references: [id], onDelete: Cascade)
+  nombre        String
+  orden         Int              @default(0)
+  obsEcommerce  String?          @map("obs_ecommerce") // solo aplica a grupos Paqueteo con PAQUETEO_SCHEMA[tipo].hasObs
+  items         BibliotecaItem[]
 
   @@map("biblioteca_grupos")
 }
