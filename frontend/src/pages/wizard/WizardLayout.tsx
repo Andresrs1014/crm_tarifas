@@ -308,6 +308,18 @@ function Paso1({ data, onChange }: { data: WizardData; onChange: (d: Partial<Wiz
           {comerciales.map((c) => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
         </select>
       </div>
+      <div className="form-group">
+        <label>Estado</label>
+        <select
+          className="filter-select w-full"
+          value={data.estado}
+          onChange={(e) => onChange({ estado: e.target.value as EstadoCotizacion })}
+        >
+          {WIZARD_ESTADO_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+      </div>
     </div>
   )
 }
@@ -532,23 +544,13 @@ function Paso5({
         </div>
       )}
 
-      <div className="card p-5 space-y-3">
+      <div className="card p-5 space-y-2">
         <h3 className="text-xs font-bold text-muted uppercase tracking-widest">Estado al guardar</h3>
-        <select
-          className="filter-select w-full max-w-md"
-          value={data.estado}
-          onChange={(e) => onChange({ estado: e.target.value as EstadoCotizacion })}
-        >
-          {WIZARD_ESTADO_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
+        <p className="text-sm text-foreground font-semibold">
+          {WIZARD_ESTADO_OPTIONS.find((o) => o.value === data.estado)?.label}
+        </p>
         <p className="text-xs text-muted">
-          {data.estado === 'enviada'
-            ? 'Al confirmar, la cotización quedará marcada como enviada. Puedes usar «Guardar borrador» en cualquier paso si aún no quieres enviarla.'
-            : data.estado === 'borrador'
-              ? 'Al confirmar, la cotización quedará en borrador. Cambia el estado arriba o márcala después desde la lista.'
-              : `Al confirmar, la cotización quedará marcada como "${WIZARD_ESTADO_OPTIONS.find((o) => o.value === data.estado)?.label}".`}
+          Definido en «Datos básicos» — vuelve al paso 1 para cambiarlo antes de confirmar.
         </p>
       </div>
     </div>
