@@ -47,11 +47,13 @@ export interface DocEstado {
   archivos?: GDArchivo[];
 }
 
-function calcCumplimiento(docs: Record<string, DocEstado>, tipoCliente: string, cicloActual: number): number {
+/**
+ * El % de cumplimiento refleja el estado REAL de los documentos, independiente del
+ * "ciclo documental" (año de renovación). Un ciclo desactualizado se señaliza aparte
+ * (ver `vencimiento` en enrichRow) — no debe ocultar el avance ya diligenciado.
+ */
+function calcCumplimiento(docs: Record<string, DocEstado>, tipoCliente: string): number {
   const esReferido = tipoCliente === 'referido';
-  const anoActual = new Date().getFullYear();
-  if (cicloActual < anoActual) return 0;
-
   const aplicables = GD_DOCS.filter(d => esReferido ? d.aplica === 'todos' : true);
   let totalPond = 0, cumplido = 0;
   for (const d of aplicables) {
@@ -107,7 +109,7 @@ function enrichRow(r: {
   const gd = r.gestionDocumental;
   const docs: Record<string, DocEstado> = gd ? (gd.docs as Record<string, DocEstado>) : {};
   const cicloActual = gd?.cicloActual ?? new Date().getFullYear();
-  const cumplimiento = calcCumplimiento(docs, r.tipoCliente, cicloActual);
+  const cumplimiento = calcCumplimiento(docs, r.tipoCliente);
   const vencimiento  = calcVencimiento(docs);
   const estadoDocs   = calcEstadoDocs(docs, r.tipoCliente);
 

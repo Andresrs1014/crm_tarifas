@@ -54,18 +54,48 @@ function fmtSize(bytes: number): string {
 
 const ARCHIVOS_ACCEPT = '.pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx'
 
+/** PDF e imágenes tienen visor nativo en el navegador; Word/Excel no — ahí solo tiene sentido descargar. */
+function esPrevisualizable(mime: string): boolean {
+  return mime === 'application/pdf' || mime.startsWith('image/')
+}
+
 async function abrirArchivo(recordId: string, docId: string, archivo: GDArchivo, modo: 'ver' | 'descargar') {
-  const blob = await fetchGDArchivoBlob(recordId, docId, archivo.id)
-  const url = window.URL.createObjectURL(blob)
+  // La pestaña debe abrirse de forma SÍNCRONA (antes del await) o el navegador la
+  // degrada a descarga forzada en vez de mostrar el visor — por eso "Ver" y
+  // "Descargar" se sentían iguales.
+  let preview: Window | null = null
   if (modo === 'ver') {
-    window.open(url, '_blank', 'noopener,noreferrer')
-  } else {
-    const a = document.createElement('a')
-    a.href = url
-    a.download = archivo.nombre
-    a.click()
+    preview = window.open('', '_blank')
+    if (preview) preview.opener = null
   }
-  setTimeout(() => window.URL.revokeObjectURL(url), 30_000)
+  try {
+    const blob = await fetchGDArchivoBlob(recordId, docId, archivo.id)
+    const url = window.URL.createObjectURL(blob)
+    if (modo === 'ver') {
+      if (preview) {
+        // Un blob: URL no lleva el nombre del archivo — se envuelve en un documento
+        // propio para que la pestaña muestre el nombre real en vez del blob: URL.
+        preview.document.title = archivo.nombre
+        preview.document.body.style.margin = '0'
+        const frame = preview.document.createElement('iframe')
+        frame.src = url
+        frame.title = archivo.nombre
+        frame.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;border:0'
+        preview.document.body.appendChild(frame)
+      } else {
+        window.open(url, '_blank', 'noopener,noreferrer')
+      }
+    } else {
+      const a = document.createElement('a')
+      a.href = url
+      a.download = archivo.nombre
+      a.click()
+    }
+    setTimeout(() => window.URL.revokeObjectURL(url), 30_000)
+  } catch (err) {
+    preview?.close()
+    throw err
+  }
 }
 
 // ─── Excel export ─────────────────────────────────────────────────────────────
@@ -179,14 +209,13 @@ function DocModal({ row, onClose }: { row: GDRow; onClose: () => void }) {
     })
   }
 
-  // Compute live compliance
+  // Compute live compliance — refleja el estado real de los docs, el ciclo se señaliza aparte (ver banner abajo)
   const desactualizado = ciclo < anoActual
   let totalPond = 0, cumplido = 0
   for (const d of docs) {
     const pond = esReferido ? d.pond_ref : d.pond_di
     if (!pond) continue
     totalPond += pond
-    if (desactualizado) continue
     const est = draft[d.id]?.estado ?? ''
     if (est === 'completo')        cumplido += pond
     else if (est === 'incompleto') cumplido += pond * 0.5
@@ -364,18 +393,20 @@ function DocModal({ row, onClose }: { row: GDRow; onClose: () => void }) {
                       <div key={archivo.id} className="flex items-center gap-2 rounded-lg bg-black/20 border border-border px-2.5 py-1.5">
                         <span className="text-xs text-foreground truncate flex-1 min-w-0" title={archivo.nombre}>{archivo.nombre}</span>
                         <span className="text-[10px] text-muted flex-shrink-0">{fmtSize(archivo.size)}</span>
-                        <button
-                          type="button"
-                          aria-label={`Ver ${archivo.nombre}`}
-                          onClick={() => abrirArchivo(row.id, doc.id, archivo, 'ver')}
-                          className="p-1 rounded hover:bg-white/10 text-muted hover:text-accent transition-colors flex-shrink-0"
-                        >
-                          <Eye size={14} />
-                        </button>
+                        {esPrevisualizable(archivo.mime) && (
+                          <button
+                            type="button"
+                            aria-label={`Ver ${archivo.nombre}`}
+                            onClick={() => abrirArchivo(row.id, doc.id, archivo, 'ver').catch(() => push('Error al abrir el archivo', 'error'))}
+                            className="p-1 rounded hover:bg-white/10 text-muted hover:text-accent transition-colors flex-shrink-0"
+                          >
+                            <Eye size={14} />
+                          </button>
+                        )}
                         <button
                           type="button"
                           aria-label={`Descargar ${archivo.nombre}`}
-                          onClick={() => abrirArchivo(row.id, doc.id, archivo, 'descargar')}
+                          onClick={() => abrirArchivo(row.id, doc.id, archivo, 'descargar').catch(() => push('Error al descargar el archivo', 'error'))}
                           className="p-1 rounded hover:bg-white/10 text-muted hover:text-accent transition-colors flex-shrink-0"
                         >
                           <Download size={14} />
