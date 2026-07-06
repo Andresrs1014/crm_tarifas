@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAppMutation } from '../hooks/useAppMutation'
 import { getSacContactos, getSacFda, updateSacFotos, updateSacContacto } from '../api/sac'
 import { toast } from '../store/toastStore'
 import type { ContactoSAC } from '../types'
@@ -63,13 +64,13 @@ function EditModal({
   const [direccion, setDireccion] = useState(contacto.direccion ?? '')
   const [fotos,     setFotos]     = useState<string[]>(contacto.fotosEntrega ?? [])
 
-  const datosMut = useMutation({
+  const datosMut = useAppMutation({
     mutationFn: () => updateSacContacto(contacto.id, { cargo, telefono, email, direccion }),
     onSuccess: () => { toast.success('Contacto actualizado'); onSaved(); onClose() },
     onError:   () => toast.error('Error al guardar'),
   })
 
-  const fotosMut = useMutation({
+  const fotosMut = useAppMutation({
     mutationFn: (nuevasFotos: string[]) => updateSacFotos(contacto.id, { fotos: nuevasFotos }),
     onSuccess: (_data, nuevasFotos) => { setFotos(nuevasFotos); toast.success('Fotos actualizadas') },
     onError:   () => toast.error('Error al actualizar fotos'),
@@ -204,7 +205,7 @@ export default function SAC() {
     queryFn: getSacFda,
   })
 
-  const updateMut = useMutation({
+  const updateMut = useAppMutation({
     mutationFn: ({ id, data }: { id: string; data: { fdaEntregado?: boolean } }) =>
       updateSacFotos(id, data),
     onSuccess: () => {

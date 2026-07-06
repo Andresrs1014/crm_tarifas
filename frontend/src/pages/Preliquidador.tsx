@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAppMutation } from '../hooks/useAppMutation'
 import { Calculator, Search, ChevronRight, ChevronDown, Check, X, Printer, History, Trash2 } from 'lucide-react'
 import { getCotizaciones } from '../api/cotizaciones'
 import { getBiblioteca } from '../api/biblioteca'
@@ -269,7 +270,7 @@ export default function Preliquidador() {
     staleTime: 30_000,
   })
 
-  const saveMut = useMutation({
+  const saveMut = useAppMutation({
     mutationFn: savePreliqHistorial,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['preliq-historial'] })
@@ -278,12 +279,13 @@ export default function Preliquidador() {
     onError: () => toast.error('Error al guardar en historial'),
   })
 
-  const deleteMut = useMutation({
+  const deleteMut = useAppMutation({
     mutationFn: deletePreliqEntry,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['preliq-historial'] })
       toast.success('Entrada eliminada')
     },
+    onError: () => toast.error('Error al eliminar'),
   })
 
   const filtered = useMemo(() => {
@@ -349,19 +351,18 @@ export default function Preliquidador() {
     const lines = calcPreliq(checkedItems, form, allItemsByLinea)
     setResult(lines)
     setStep(3)
-    // Auto-save to historial
-    if (selectedCot) {
-      const total = lines.filter(l => !l._seccion).reduce((s, l) => s + (l.resultado ?? 0), 0)
-      const servicios = [...new Set(checkedItems.map(i => i._linea))]
-      saveMut.mutate({
-        empresa:    selectedCot.empresa,
-        cotNumero:  selectedCot.numero,
-        servicios,
-        parametros: { ...form },
-        lineas:     lines,
-        total,
-      })
-    }
+    if (!selectedCot) return
+
+    const total = lines.filter(l => !l._seccion).reduce((s, l) => s + (l.resultado ?? 0), 0)
+    const servicios = [...new Set(checkedItems.map(i => i._linea))]
+    saveMut.mutate({
+      empresa:    selectedCot.empresa,
+      cotNumero:  selectedCot.numero,
+      servicios,
+      parametros: { ...form },
+      lineas:     lines,
+      total,
+    })
   }
 
   function loadFromHistory(entry: PreliqEntry) {

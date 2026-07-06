@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAppMutation } from '../hooks/useAppMutation'
 import {
   getComercialesApi, createComercial, updateComercial, deleteComercial,
 } from '../api/comerciales'
@@ -144,7 +145,7 @@ export default function Equipo() {
     queryFn: getComercialesApi,
   })
 
-  const createMut = useMutation({
+  const createMut = useAppMutation({
     mutationFn: createComercial,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['comerciales'] })
@@ -154,7 +155,7 @@ export default function Equipo() {
     onError: () => toast.error('Error al crear comercial'),
   })
 
-  const updateMut = useMutation({
+  const updateMut = useAppMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<ComercialCreate> }) =>
       updateComercial(id, data),
     onSuccess: () => {
@@ -165,7 +166,7 @@ export default function Equipo() {
     onError: () => toast.error('Error al actualizar'),
   })
 
-  const deleteMut = useMutation({
+  const deleteMut = useAppMutation({
     mutationFn: deleteComercial,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['comerciales'] })

@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAppMutation } from '../hooks/useAppMutation'
 import { Link, useNavigate } from 'react-router-dom'
 import { getRecords, deleteRecord } from '../api/records'
 import { getComercialesApi } from '../api/comerciales'
@@ -33,7 +34,7 @@ export default function Prospectos() {
     queryFn: getComercialesApi,
   })
 
-  const deleteMut = useMutation({
+  const deleteMut = useAppMutation({
     mutationFn: deleteRecord,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['records'] })

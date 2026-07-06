@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAppMutation } from '../hooks/useAppMutation'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   getCotizaciones, deleteCotizacion, duplicarCotizacion, updateCotizacion, getCotizacion,
@@ -121,7 +122,7 @@ export default function Cotizaciones() {
   // Lista única de comerciales para el filtro
   const comercialesUnicos = [...new Set(cotizaciones.map((c) => c.comercial).filter(Boolean))].sort()
 
-  const deleteMut = useMutation({
+  const deleteMut = useAppMutation({
     mutationFn: deleteCotizacion,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['cotizaciones'] })
@@ -131,7 +132,7 @@ export default function Cotizaciones() {
     onError: () => toast.error('Error al eliminar'),
   })
 
-  const duplicarMut = useMutation({
+  const duplicarMut = useAppMutation({
     mutationFn: duplicarCotizacion,
     onSuccess: (cot) => {
       qc.invalidateQueries({ queryKey: ['cotizaciones'] })
@@ -141,7 +142,7 @@ export default function Cotizaciones() {
     onError: () => toast.error('Error al duplicar'),
   })
 
-  const avanzarMut = useMutation({
+  const avanzarMut = useAppMutation({
     mutationFn: ({ id, estado }: { id: string; estado: EstadoCotizacion }) =>
       updateCotizacion(id, { estado }),
     onSuccess: () => {
@@ -151,7 +152,7 @@ export default function Cotizaciones() {
     onError: () => toast.error('Error al actualizar'),
   })
 
-  const rechazarMut = useMutation({
+  const rechazarMut = useAppMutation({
     mutationFn: (id: string) => updateCotizacion(id, { estado: 'rechazada' }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['cotizaciones'] })
@@ -173,7 +174,7 @@ export default function Cotizaciones() {
     return buildPreview(normalizeSnapshot(cotActualizar.itemsSnapshot), pct)
   }, [cotActualizar, pct])
 
-  const actualizarMut = useMutation({
+  const actualizarMut = useAppMutation({
     mutationFn: ({ id, inc }: { id: string; inc: number }) => actualizarTarifas(id, inc),
     onSuccess: ({ cotizacion, itemsActualizados }) => {
       qc.invalidateQueries({ queryKey: ['cotizaciones'] })

@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAppMutation } from '../hooks/useAppMutation'
 import {
   getBiblioteca, createLinea, updateLinea, deleteLinea,
   createGrupo, updateGrupo, deleteGrupo,
@@ -232,19 +233,19 @@ function GrupoSection({
 
   const sortedItems = [...grupo.items].sort((a, b) => a.orden - b.orden)
 
-  const updateGrupoMut = useMutation({
+  const updateGrupoMut = useAppMutation({
     mutationFn: () => updateGrupo(grupo.id, { nombre }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
     onError: () => toast.error('Error al guardar'),
   })
 
-  const deleteGrupoMut = useMutation({
+  const deleteGrupoMut = useAppMutation({
     mutationFn: () => deleteGrupo(grupo.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
     onError: () => toast.error('Error al eliminar'),
   })
 
-  const addItemMut = useMutation({
+  const addItemMut = useAppMutation({
     mutationFn: () => createItem(grupo.id, {
       nombre: newItem.nombre, tarifa: newItem.tarifa,
       tipoTarifa: newItem.tipoTarifa, obs: newItem.obs || undefined, orden: sortedItems.length,
@@ -258,13 +259,13 @@ function GrupoSection({
     onError: () => toast.error('Error al agregar'),
   })
 
-  const deleteItemMut = useMutation({
+  const deleteItemMut = useAppMutation({
     mutationFn: deleteItem,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
     onError: () => toast.error('Error al eliminar'),
   })
 
-  const reorderItemMut = useMutation({
+  const reorderItemMut = useAppMutation({
     mutationFn: async ({ index, direction }: { index: number; direction: -1 | 1 }) => {
       const j = index + direction
       if (j < 0 || j >= sortedItems.length) return
@@ -382,7 +383,7 @@ function ColumnasSection({ linea }: { linea: BibliotecaLinea }) {
 
   const extra = parsed.extra
 
-  const saveMut = useMutation({
+  const saveMut = useAppMutation({
     mutationFn: (cols: string[]) => updateLinea(linea.id, { columnas: cols }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
     onError: () => toast.error('Error al guardar columnas'),
@@ -464,25 +465,25 @@ function GrupoTransporteSection({
   const sortedItems = [...grupo.items].sort((a, b) => a.orden - b.orden)
   const badge = tipo === 'local' ? '🚛' : '📦'
 
-  const deleteGrupoMut = useMutation({
+  const deleteGrupoMut = useAppMutation({
     mutationFn: () => deleteGrupo(grupo.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
     onError: () => toast.error('Error al eliminar'),
   })
 
-  const addFilaMut = useMutation({
+  const addFilaMut = useAppMutation({
     mutationFn: () => createItem(grupo.id, { nombre: 'fila', tarifa: '', orden: sortedItems.length }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
     onError: () => toast.error('Error al agregar fila'),
   })
 
-  const deleteItemMut = useMutation({
+  const deleteItemMut = useAppMutation({
     mutationFn: deleteItem,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
     onError: () => toast.error('Error al eliminar'),
   })
 
-  const reorderItemMut = useMutation({
+  const reorderItemMut = useAppMutation({
     mutationFn: async ({ index, direction }: { index: number; direction: -1 | 1 }) => {
       const j = index + direction
       if (j < 0 || j >= sortedItems.length) return
@@ -555,14 +556,14 @@ function BibTransporteSection({ linea }: { linea: BibliotecaLinea }) {
   const qc = useQueryClient()
   const sortedGrupos = [...linea.grupos].sort((a, b) => a.orden - b.orden)
 
-  const addGrupoMut = useMutation({
+  const addGrupoMut = useAppMutation({
     mutationFn: (tipo: keyof typeof TRANSP_SCHEMA) =>
       createGrupo(linea.id, { nombre: encodeGrupoNombre(tipo, TRANSP_SCHEMA[tipo].label), orden: sortedGrupos.length }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['biblioteca'] }); toast.success('Grupo agregado') },
     onError: () => toast.error('Error al agregar grupo'),
   })
 
-  const reorderGrupoMut = useMutation({
+  const reorderGrupoMut = useAppMutation({
     mutationFn: async ({ index, direction }: { index: number; direction: -1 | 1 }) => {
       const j = index + direction
       if (j < 0 || j >= sortedGrupos.length) return
@@ -575,7 +576,7 @@ function BibTransporteSection({ linea }: { linea: BibliotecaLinea }) {
     onError: () => toast.error('Error al reordenar'),
   })
 
-  const dropReorderGrupoMut = useMutation({
+  const dropReorderGrupoMut = useAppMutation({
     mutationFn: async ({ fromId, toId }: { fromId: string; toId: string }) => {
       const ids = sortedGrupos.map((g) => g.id)
       const fi = ids.indexOf(fromId); const ti = ids.indexOf(toId)
@@ -672,19 +673,19 @@ function GrupoPaqueteoSection({
 
   const sortedItems = [...grupo.items].sort((a, b) => a.orden - b.orden)
 
-  const addFilaMut = useMutation({
+  const addFilaMut = useAppMutation({
     mutationFn: () => createItem(grupo.id, { nombre: 'fila', tarifa: '', orden: sortedItems.length }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
     onError: () => toast.error('Error al agregar fila'),
   })
 
-  const deleteItemMut = useMutation({
+  const deleteItemMut = useAppMutation({
     mutationFn: deleteItem,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
     onError: () => toast.error('Error al eliminar'),
   })
 
-  const reorderItemMut = useMutation({
+  const reorderItemMut = useAppMutation({
     mutationFn: async ({ index, direction }: { index: number; direction: -1 | 1 }) => {
       const j = index + direction
       if (j < 0 || j >= sortedItems.length) return
@@ -755,7 +756,7 @@ function BibPaqueteoSection({ linea }: { linea: BibliotecaLinea }) {
     (PAQUETEO_TAB_GRUPOS[tab] as readonly string[]).includes(parseGrupoNombre(g.nombre).tipo)
   )
 
-  const seedMut = useMutation({
+  const seedMut = useAppMutation({
     mutationFn: async () => {
       const allTipos = [...PAQUETEO_GRUPOS_COORD, ...PAQUETEO_GRUPOS_TCC, ...PAQUETEO_GRUPOS_SERVIENTREGA]
       let orden = allGrupos.length
@@ -769,7 +770,7 @@ function BibPaqueteoSection({ linea }: { linea: BibliotecaLinea }) {
     onError: () => toast.error('Error al inicializar'),
   })
 
-  const reorderGrupoMut = useMutation({
+  const reorderGrupoMut = useAppMutation({
     mutationFn: async ({ index, direction }: { index: number; direction: -1 | 1 }) => {
       const j = index + direction
       if (j < 0 || j >= tabGrupos.length) return
@@ -828,7 +829,7 @@ function ObsCard({ obs, onDelete }: { obs: BibliotecaObs; onDelete: () => void }
   const [nombre, setNombre] = useState(obs.nombre)
   const [html, setHtml] = useState(obs.html)
 
-  const saveMut = useMutation({
+  const saveMut = useAppMutation({
     mutationFn: () => updateObs(obs.id, { nombre, html }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['biblioteca'] }); setEditing(false) },
     onError: () => toast.error('Error al guardar'),
@@ -876,7 +877,7 @@ function ObsSection({ linea }: { linea: BibliotecaLinea }) {
   const [newNombre, setNewNombre] = useState('')
   const [newHtml, setNewHtml] = useState('')
 
-  const addMut = useMutation({
+  const addMut = useAppMutation({
     mutationFn: () => createObs(linea.id, { nombre: newNombre, html: newHtml }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['biblioteca'] })
@@ -886,7 +887,7 @@ function ObsSection({ linea }: { linea: BibliotecaLinea }) {
     onError: () => toast.error('Error al agregar'),
   })
 
-  const delMut = useMutation({
+  const delMut = useAppMutation({
     mutationFn: deleteObs,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
     onError: () => toast.error('Error al eliminar'),
@@ -953,13 +954,13 @@ function LineaSection({ linea }: { linea: BibliotecaLinea }) {
   const sortedGrupos = [...linea.grupos].sort((a, b) => a.orden - b.orden)
   const totalItems = linea.grupos.reduce((s, g) => s + g.items.length, 0)
 
-  const deleteLineaMut = useMutation({
+  const deleteLineaMut = useAppMutation({
     mutationFn: () => deleteLinea(linea.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
     onError: () => toast.error('Error al eliminar'),
   })
 
-  const addGrupoMut = useMutation({
+  const addGrupoMut = useAppMutation({
     mutationFn: () => createGrupo(linea.id, { nombre: nuevoGrupo, orden: sortedGrupos.length }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['biblioteca'] })
@@ -969,7 +970,7 @@ function LineaSection({ linea }: { linea: BibliotecaLinea }) {
     onError: () => toast.error('Error al agregar grupo'),
   })
 
-  const reorderGrupoMut = useMutation({
+  const reorderGrupoMut = useAppMutation({
     mutationFn: async ({ index, direction }: { index: number; direction: -1 | 1 }) => {
       const j = index + direction
       if (j < 0 || j >= sortedGrupos.length) return
@@ -982,7 +983,7 @@ function LineaSection({ linea }: { linea: BibliotecaLinea }) {
     onError: () => toast.error('Error al reordenar'),
   })
 
-  const dropReorderGrupoMut = useMutation({
+  const dropReorderGrupoMut = useAppMutation({
     mutationFn: async ({ fromId, toId }: { fromId: string; toId: string }) => {
       const ids = sortedGrupos.map((g) => g.id)
       const fi = ids.indexOf(fromId); const ti = ids.indexOf(toId)
@@ -1084,7 +1085,7 @@ export default function Biblioteca() {
     queryFn: getBiblioteca,
   })
 
-  const addLineaMut = useMutation({
+  const addLineaMut = useAppMutation({
     mutationFn: () => createLinea({ nombre: nuevaLinea }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['biblioteca'] })

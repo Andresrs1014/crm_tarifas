@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAppMutation } from '../hooks/useAppMutation'
 import { CalendarDays, ChevronLeft, ChevronRight, Check, Clock, MapPin } from 'lucide-react'
 import { getActividadesCalendario, updateActividad, ActividadCalendario } from '../api/actividades'
 import { getComercialesApi } from '../api/comerciales'
@@ -28,7 +29,7 @@ function DayPanel({
   const { push } = useToastStore()
   const navigate = useNavigate()
 
-  const mutateHecho = useMutation({
+  const mutateHecho = useAppMutation({
     mutationFn: ({ id, hecho }: { id: string; hecho: boolean }) => updateActividad(id, { hecho }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['actividades-calendario'] }); push('Visita actualizada', 'success') },
     onError: () => push('Error al actualizar', 'error'),

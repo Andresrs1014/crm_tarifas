@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAppMutation } from '../../hooks/useAppMutation'
 import { getCotizacion, createCotizacion, updateCotizacion } from '../../api/cotizaciones'
 import { getBiblioteca } from '../../api/biblioteca'
 import { getComercialesApi } from '../../api/comerciales'
@@ -599,7 +600,7 @@ export default function WizardLayout() {
   }
 
   // Mutations
-  const saveMut = useMutation({
+  const saveMut = useAppMutation({
     mutationFn: () => persistCotizacion({
       isEdit,
       cotId: id,
@@ -628,7 +629,7 @@ export default function WizardLayout() {
     onError: () => toast.error('Error al guardar la cotización'),
   })
 
-  const draftMut = useMutation({
+  const draftMut = useAppMutation({
     mutationFn: () => persistCotizacion({
       isEdit,
       cotId: id,

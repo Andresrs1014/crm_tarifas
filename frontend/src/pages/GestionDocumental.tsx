@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAppMutation } from '../hooks/useAppMutation'
 import { FolderOpen, X, ChevronRight, RefreshCw, AlertTriangle, Clock, CheckCircle, Circle, Download } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { listGD, upsertGD, GD_DOCS, GDRow, DocEstado } from '../api/gestionDocumental'
@@ -77,7 +78,7 @@ function DocModal({ row, onClose }: { row: GDRow; onClose: () => void }) {
   const [ciclo, setCiclo] = useState(row.gd.cicloActual)
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
-  const mutate = useMutation({
+  const mutate = useAppMutation({
     mutationFn: () => upsertGD(row.id, { docs: draft, cicloActual: ciclo }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['gestion-documental'] })

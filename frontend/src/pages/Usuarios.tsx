@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAppMutation } from '../hooks/useAppMutation'
 import { getUsers, createUser, updateUser, deleteUser } from '../api/users'
 import { useAuthStore } from '../store/authStore'
 import { toast } from '../store/toastStore'
@@ -47,7 +48,7 @@ function UserRow({
     tel: '',
   })
 
-  const updateMut = useMutation({
+  const updateMut = useAppMutation({
     mutationFn: () => updateUser(user.id, {
       username: form.username,
       role: form.role,
@@ -212,7 +213,7 @@ export default function Usuarios() {
     queryFn: getUsers,
   })
 
-  const createMut = useMutation({
+  const createMut = useAppMutation({
     mutationFn: () => createUser({
       username: form.username,
       password: form.password,
@@ -235,7 +236,7 @@ export default function Usuarios() {
     onError: () => toast.error('Error al crear usuario'),
   })
 
-  const deleteMut = useMutation({
+  const deleteMut = useAppMutation({
     mutationFn: deleteUser,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['usuarios'] })
