@@ -1,9 +1,18 @@
 import client from './client'
 
+export interface GDArchivo {
+  id: string
+  nombre: string
+  size: number
+  mime: string
+  uploadedAt: string
+}
+
 export interface DocEstado {
   estado?: 'completo' | 'incompleto' | 'pendiente'
   obs?: string
   fecha?: string
+  archivos?: GDArchivo[]
 }
 
 interface GDData {
@@ -70,3 +79,23 @@ export const upsertGD = (recordId: string, data: { docs?: Record<string, DocEsta
   client.put<{ id: string; docs: Record<string, DocEstado>; cicloActual: number }>(
     `/api/gestion-documental/${recordId}`, data
   ).then(r => r.data)
+
+export const uploadGDArchivos = (recordId: string, docId: string, files: File[]) => {
+  const form = new FormData()
+  files.forEach(f => form.append('archivos', f))
+  return client.post<{ id: string; docs: Record<string, DocEstado>; cicloActual: number }>(
+    `/api/gestion-documental/${recordId}/docs/${docId}/archivos`, form,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  ).then(r => r.data)
+}
+
+export const deleteGDArchivo = (recordId: string, docId: string, archivoId: string) =>
+  client.delete<{ id: string; docs: Record<string, DocEstado>; cicloActual: number }>(
+    `/api/gestion-documental/${recordId}/docs/${docId}/archivos/${archivoId}`
+  ).then(r => r.data)
+
+const gdArchivoUrl = (recordId: string, docId: string, archivoId: string) =>
+  `/api/gestion-documental/${recordId}/docs/${docId}/archivos/${archivoId}`
+
+export const fetchGDArchivoBlob = (recordId: string, docId: string, archivoId: string) =>
+  client.get(gdArchivoUrl(recordId, docId, archivoId), { responseType: 'blob' }).then(r => r.data as Blob)
