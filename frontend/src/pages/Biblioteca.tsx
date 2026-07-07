@@ -42,6 +42,22 @@ function parseColumnas(raw: string[]): { headers: [string, string, string]; extr
   return { headers, extra }
 }
 
+function placeholderByTipo(tipo: string): string {
+  return tipo === 'porcentaje' ? '0,36%' : '$559.900'
+}
+
+/** Ajusta el valor de tarifa al tipo $/% seleccionado — mismo criterio que fmtTarifa() del
+ *  HTML original, aplicado también al escribir/cambiar de tipo (antes no pasaba nada: se podía
+ *  guardar cualquier texto bajo cualquier tipo, sin relación entre el selector y el valor). */
+function normalizeTarifa(value: string, tipo: string): string {
+  const trimmed = (value ?? '').trim()
+  if (!trimmed) return trimmed
+  const stripped = trimmed.replace(/[$%]/g, '').trim()
+  if (tipo === 'porcentaje') return `${stripped}%`
+  const n = parseFloat(stripped.replace(/\./g, '').replace(',', '.'))
+  return isNaN(n) ? stripped : `$${Math.round(n).toLocaleString('es-CO')}`
+}
+
 function encodeColumnas(headers: [string, string, string], extra: string[]): string[] {
   const out: string[] = []
   if (headers[0] !== COL_DEFAULTS[0]) out.push(`__h1:${headers[0]}`)
@@ -164,6 +180,7 @@ function ItemRow({
   onMoveDown: () => void
 }) {
   const qc = useQueryClient()
+  const [tipoTarifa, setTipoTarifa] = useState(item.tipoTarifa || 'moneda')
 
   function saveField(field: 'nombre' | 'tarifa' | 'obs' | 'tipoTarifa', value: string) {
     const current = field === 'obs' ? (item.obs ?? '') : String(item[field] ?? '')
@@ -171,6 +188,12 @@ function ItemRow({
     updateItem(item.id, { [field]: value || undefined })
       .then(() => qc.invalidateQueries({ queryKey: ['biblioteca'] }))
       .catch(() => toast.error('Error al guardar'))
+  }
+
+  function handleTipoChange(nextTipo: 'moneda' | 'porcentaje') {
+    setTipoTarifa(nextTipo)
+    saveField('tipoTarifa', nextTipo)
+    saveField('tarifa', normalizeTarifa(item.tarifa, nextTipo))
   }
 
   return (
@@ -188,14 +211,15 @@ function ItemRow({
       <td style={{ width: 150 }}>
         <div className="flex items-center gap-1">
           <select className="filter-select text-xs py-0.5" style={{ width: 44, minWidth: 44 }}
-            defaultValue={item.tipoTarifa}
-            onChange={(e) => saveField('tipoTarifa', e.target.value)}>
+            value={tipoTarifa}
+            onChange={(e) => handleTipoChange(e.target.value as 'moneda' | 'porcentaje')}>
             {TIPO_TARIFA_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.value === 'moneda' ? '$' : '%'}</option>
             ))}
           </select>
-          <input className="bib-cell-input bib-cell-input--tarifa" defaultValue={item.tarifa}
-            onBlur={(e) => saveField('tarifa', e.target.value.trim())} />
+          <input key={item.tarifa} className="bib-cell-input bib-cell-input--tarifa" defaultValue={item.tarifa}
+            placeholder={placeholderByTipo(tipoTarifa)}
+            onBlur={(e) => saveField('tarifa', normalizeTarifa(e.target.value, tipoTarifa))} />
         </div>
       </td>
       <td>
@@ -338,13 +362,14 @@ function GrupoSection({
               </div>
               <div>
                 <label className="text-2xs text-muted block mb-0.5">Tarifa</label>
-                <input className="input w-full text-sm font-mono" placeholder="$559.900" value={newItem.tarifa}
-                  onChange={(e) => setNewItem((s) => ({ ...s, tarifa: e.target.value }))} />
+                <input className="input w-full text-sm font-mono" placeholder={placeholderByTipo(newItem.tipoTarifa)} value={newItem.tarifa}
+                  onChange={(e) => setNewItem((s) => ({ ...s, tarifa: e.target.value }))}
+                  onBlur={(e) => setNewItem((s) => ({ ...s, tarifa: normalizeTarifa(e.target.value, s.tipoTarifa) }))} />
               </div>
               <div>
                 <label className="text-2xs text-muted block mb-0.5">Tipo</label>
                 <select className="filter-select w-full text-sm" value={newItem.tipoTarifa}
-                  onChange={(e) => setNewItem((s) => ({ ...s, tipoTarifa: e.target.value }))}>
+                  onChange={(e) => setNewItem((s) => ({ ...s, tipoTarifa: e.target.value, tarifa: normalizeTarifa(s.tarifa, e.target.value) }))}>
                   {TIPO_TARIFA_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </div>
