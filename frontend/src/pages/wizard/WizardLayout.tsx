@@ -374,20 +374,6 @@ function Paso1({ data, onChange }: { data: WizardData; onChange: (d: Partial<Wiz
           onChange={(e) => onChange({ asunto: e.target.value })} placeholder="Asunto opcional de la cotización" />
       </div>
       <div className="form-group">
-        <label>Paqueteadora</label>
-        <select
-          className="filter-select w-full"
-          value={data.paqueteadora}
-          onChange={(e) => onChange({ paqueteadora: e.target.value })}
-        >
-          <option value="">— Ninguna / otra —</option>
-          {PAQUETEO_PAQUETEADORAS.map((p) => (
-            <option key={p} value={p}>{p}</option>
-          ))}
-        </select>
-        <p className="text-2xs text-muted mt-1">Requerida si cotizas línea Paqueteo (filtra grupos en paso 3).</p>
-      </div>
-      <div className="form-group">
         <label>Comercial <span className="text-danger">*</span></label>
         <select className="filter-select w-full" value={data.comercial}
           onChange={(e) => onChange({ comercial: e.target.value })}>
@@ -463,6 +449,23 @@ function Paso2({
           <p className="text-sm text-muted">No hay líneas en la biblioteca. Configúralas en Biblioteca de Tarifas.</p>
         )}
       </div>
+
+      {data.lineas.includes('Paqueteo') && (
+        <div className="form-group max-w-xs">
+          <label>Paqueteadora <span className="text-danger">*</span></label>
+          <select
+            className="filter-select w-full"
+            value={data.paqueteadora}
+            onChange={(e) => onChange({ paqueteadora: e.target.value })}
+          >
+            <option value="">— Seleccionar —</option>
+            {PAQUETEO_PAQUETEADORAS.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+          <p className="text-2xs text-muted mt-1">Filtra los grupos de Paqueteo en el paso siguiente.</p>
+        </div>
+      )}
 
       {data.lineas.length > 0 && (
         <div className="rounded-xl border border-gold/30 overflow-hidden">
@@ -965,20 +968,19 @@ export default function WizardLayout() {
       isEdit,
       cotId: id,
       data,
-      estado: 'borrador',
+      estado: data.estado,
       biblioteca,
     }),
     onSuccess: (cot) => {
       qc.invalidateQueries({ queryKey: ['cotizaciones'] })
-      onChange({ estado: 'borrador' })
       if (!isEdit) {
-        toast.success(`Borrador ${cot.numero} guardado — puedes continuar después`)
+        toast.success(`Cotización ${cot.numero} guardada — puedes continuar después`)
         navigate(`/cotizaciones/${cot.id}/editar?step=${step}`, { replace: true })
       } else {
-        toast.success(`Borrador ${cot.numero} actualizado`)
+        toast.success('Cotización actualizada')
       }
     },
-    onError: () => toast.error('Error al guardar el borrador'),
+    onError: () => toast.error('Error al guardar'),
   })
 
   const stepComponents = [

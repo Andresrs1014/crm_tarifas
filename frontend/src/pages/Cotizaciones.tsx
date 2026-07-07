@@ -389,8 +389,8 @@ export default function Cotizaciones() {
                         <button
                           type="button"
                           className="btn-secondary btn-sm cot-action-btn"
-                          onClick={() => navigate(`/cotizaciones/${cot.id}/editar?step=4`)}
-                          title="Ver / Editar (Vista Previa)"
+                          onClick={() => navigate(`/cotizaciones/${cot.id}/editar`)}
+                          title="Editar"
                         >
                           ✏️
                         </button>

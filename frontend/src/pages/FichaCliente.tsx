@@ -132,7 +132,7 @@ export default function FichaCliente() {
             </thead>
             <tbody>
               {pagination.pageItems.map((f) => (
-                <tr key={f.id}>
+                <tr key={f.recordId}>
                   <td className="font-semibold text-foreground">{f.record.empresa}</td>
                   <td className="text-sm text-muted">{f.record.comercial.nombre}</td>
                   <td className="text-sm capitalize">{f.record.tipoCliente}</td>
@@ -145,7 +145,7 @@ export default function FichaCliente() {
                       <span className="text-xs font-mono text-muted">{f.pct}%</span>
                     </div>
                   </td>
-                  <td className="text-xs text-muted">{new Date(f.updatedAt).toLocaleDateString('es-CO')}</td>
+                  <td className="text-xs text-muted">{f.updatedAt ? new Date(f.updatedAt).toLocaleDateString('es-CO') : '—'}</td>
                   <td>
                     <Link to={`/fichas/${f.record.id}`} className="btn-primary btn-sm text-xs px-3 py-1">
                       Abrir

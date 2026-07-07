@@ -8,12 +8,11 @@ export interface Analista {
 }
 
 export interface FichaListItem {
-  id: string
+  id: string | null
   recordId: string
   estado: string
   pct: number
-  createdAt: string
-  updatedAt: string
+  updatedAt: string | null
   record: {
     id: string
     empresa: string
@@ -23,7 +22,9 @@ export interface FichaListItem {
   }
 }
 
-export interface FichaDetalle extends FichaListItem {
+export interface FichaDetalle extends Omit<FichaListItem, 'id' | 'updatedAt'> {
+  id: string
+  updatedAt: string
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: Record<string, any>
 }

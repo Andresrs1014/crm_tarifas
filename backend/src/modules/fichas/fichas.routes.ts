@@ -33,23 +33,34 @@ router.delete('/analistas/:id', async (req: Request, res: Response, next: NextFu
   } catch (err) { next(err); }
 });
 
-// GET /api/fichas — list all fichas with record info
+// GET /api/fichas — lista TODOS los clientes activos (paridad HTML renderFichas: no solo
+// los que ya tienen fila en fichas_cliente — un cliente nuevo aparece con estado "pendiente"/0%).
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { estado, comercialId } = req.query as { estado?: string; comercialId?: string };
-    const fichas = await prisma.fichaCliente.findMany({
-      where: {
-        ...(estado ? { estado } : {}),
-        record: comercialId ? { comercialId } : undefined,
-      },
-      include: {
-        record: {
-          select: { id: true, empresa: true, ciudad: true, tipoCliente: true, comercial: { select: { nombre: true } } },
-        },
-      },
-      orderBy: { updatedAt: 'desc' },
+    const clientes = await prisma.record.findMany({
+      where: { tipo: 'cliente', ...(comercialId ? { comercialId } : {}) },
+      select: { id: true, empresa: true, ciudad: true, tipoCliente: true, comercial: { select: { nombre: true } } },
+      orderBy: { empresa: 'asc' },
     });
-    res.json(fichas);
+    const fichas = await prisma.fichaCliente.findMany({
+      where: { recordId: { in: clientes.map((c) => c.id) } },
+    });
+    const fichaByRecordId = new Map(fichas.map((f) => [f.recordId, f]));
+
+    const result = clientes.map((c) => {
+      const f = fichaByRecordId.get(c.id);
+      return {
+        id: f?.id ?? null,
+        recordId: c.id,
+        estado: f?.estado ?? 'pendiente',
+        pct: f?.pct ?? 0,
+        updatedAt: f?.updatedAt ?? null,
+        record: c,
+      };
+    }).filter((f) => !estado || f.estado === estado);
+
+    res.json(result);
   } catch (err) { next(err); }
 });
 

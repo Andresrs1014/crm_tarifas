@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAppMutation } from '../hooks/useAppMutation'
 import { getFichaByRecord, updateFicha, getAnalistas, createAnalista, deleteAnalista } from '../api/fichas'
 import { getRecord } from '../api/records'
+import { getCotizaciones } from '../api/cotizaciones'
 import { toast } from '../store/toastStore'
 import { usePagination } from '../hooks/usePagination'
 import { DataListPanel, TableScrollArea } from '../components/ui/DataListPanel'
@@ -22,7 +23,7 @@ interface KickoffAsistente {
 const EMPTY_DATA = {
   // Info General
   tipoCliente: '', manejo: [] as string[], sector: '', canal: '',
-  propuesta: '', enlace: '',
+  propuesta: '', enlace: '', propuestasIds: [] as string[],
   lineasNegocio: { deposito: false, zf: false, tlocal: false, cedi: false },
   fechaProceso: '', analistaId: '', obsGeneral: '',
   // Contactos
@@ -49,16 +50,18 @@ const EMPTY_DATA = {
 
 type FichaData = typeof EMPTY_DATA
 
-function calcPct(d: FichaData): number {
+/** Paridad exacta HTML v6 fichaCalcPct(): 14 campos puntuales + fc-propuesta (legado oculto,
+ *  el HTML nunca lo asigna desde ninguna UI visible — se replica igual, tope real ~93% salvo
+ *  que el estado se marque "Completada", que fuerza 100%). */
+function calcPct(d: FichaData, estado: string): number {
+  if (estado === 'completada') return 100
   const checks = [
     d.tipoCliente, d.manejo.length > 0 ? 'ok' : '', d.sector, d.canal,
-    d.fechaProceso, d.analistaId, d.obsGeneral,
-    d.formaPago, d.facturarA, d.buzon, d.tipoTarifa, d.comision, d.seguro,
-    d.tipoProducto, d.embalaje, d.controlInv, d.nacionaliza, d.manipulacion,
-    d.despachos, d.entregaTipo, d.horarios,
-    d.contactos.length > 0 ? 'ok' : '',
+    '', // fc-propuesta (legado oculto, nunca asignado)
+    d.formaPago, d.facturarA, d.buzon, d.tipoTarifa,
+    d.tipoProducto, d.embalaje, d.controlInv, d.agencia, d.analistaId,
   ]
-  const filled = checks.filter(Boolean).length
+  const filled = checks.filter((v) => v.trim() !== '').length
   return Math.round((filled / checks.length) * 100)
 }
 
@@ -105,6 +108,11 @@ export default function FichaDetalle() {
     queryFn: getAnalistas,
   })
 
+  const { data: cotizacionesAll = [] } = useQuery({
+    queryKey: ['cotizaciones-all-ficha'],
+    queryFn: () => getCotizaciones(),
+  })
+
   useEffect(() => {
     if (ficha) {
       qc.invalidateQueries({ queryKey: ['fichas'] })
@@ -116,7 +124,7 @@ export default function FichaDetalle() {
     }
   }, [ficha])
 
-  const pct = calcPct(data)
+  const pct = calcPct(data, estado)
 
   const contactosPagination = usePagination(data.contactos, { resetDeps: [tab] })
   const asistentesPagination = usePagination(data.asistentes, { resetDeps: [tab] })
@@ -187,7 +195,33 @@ export default function FichaDetalle() {
     })
   }
 
+  function toggleCotizacion(cotId: string) {
+    setData((d) => ({
+      ...d,
+      propuestasIds: d.propuestasIds.includes(cotId)
+        ? d.propuestasIds.filter((id) => id !== cotId)
+        : [...d.propuestasIds, cotId],
+    }))
+  }
+
+  function copiarLinkCotizacion(numero: string) {
+    const url = `${window.location.origin}/cot/${numero}`
+    navigator.clipboard.writeText(url).then(() => toast.success('Link copiado'))
+  }
+
   const analistaActual = analistas.find((a) => a.id === data.analistaId)
+  const empresaNombre = (record?.empresa ?? '').toLowerCase()
+  const cotizacionesCliente = empresaNombre
+    ? cotizacionesAll.filter((c) => {
+        const emp = (c.empresa ?? '').toLowerCase()
+        return emp.includes(empresaNombre) || empresaNombre.includes(emp)
+      })
+    : []
+  const cotizacionesOrdenadas = [...cotizacionesCliente].sort((a, b) => {
+    const aActiva = data.propuestasIds.includes(a.id) ? 0 : 1
+    const bActiva = data.propuestasIds.includes(b.id) ? 0 : 1
+    return aActiva - bActiva
+  })
   const lineasActivas = [
     data.lineasNegocio.deposito && '📦 Depósito Aduanero',
     data.lineasNegocio.zf && '🏛 Zona Franca',
@@ -298,6 +332,74 @@ export default function FichaDetalle() {
                 <option value="">— Seleccionar —</option>
                 <option>Directo</option><option>Intermediario</option><option>Referido</option>
               </select>
+            </Field>
+
+            <Field label="Propuestas Comerciales Activas" className="md:col-span-2">
+              <div className="rounded-lg border border-border overflow-hidden mt-1">
+                {cotizacionesOrdenadas.length === 0 ? (
+                  <p className="text-2xs text-muted p-3">No hay propuestas creadas para este cliente</p>
+                ) : (
+                  <TableScrollArea>
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-surface2">
+                          <th className="w-8 p-2"></th>
+                          <th className="text-left p-2 text-2xs text-muted uppercase tracking-widest">N° Cotización</th>
+                          <th className="text-left p-2 text-2xs text-muted uppercase tracking-widest">Servicios</th>
+                          <th className="text-left p-2 text-2xs text-muted uppercase tracking-widest">Fecha</th>
+                          <th className="text-center p-2 text-2xs text-muted uppercase tracking-widest">Estado</th>
+                          <th className="w-12 p-2"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cotizacionesOrdenadas.map((c) => {
+                          const activa = data.propuestasIds.includes(c.id)
+                          return (
+                            <tr key={c.id} className={activa ? 'bg-accent/5' : ''}>
+                              <td className="text-center p-2">
+                                <input type="checkbox" checked={activa} onChange={() => toggleCotizacion(c.id)} />
+                              </td>
+                              <td className={`p-2 font-bold ${activa ? 'text-accent' : 'text-foreground'}`}>{c.numero || 'BORRADOR'}</td>
+                              <td className="p-2 text-muted truncate max-w-[180px]">{(c.lineas ?? []).join(', ') || '—'}</td>
+                              <td className="p-2 text-muted whitespace-nowrap">{c.fecha?.slice(0, 10) ?? '—'}</td>
+                              <td className="text-center p-2">
+                                {activa ? <span className="badge-blue">✓ Activa</span> : <span className="badge-gray">Inactiva</span>}
+                              </td>
+                              <td className="text-center p-2">
+                                <Link to={`/cotizaciones/${c.id}/editar`} className="btn-secondary btn-sm text-2xs px-2 py-0.5">👁</Link>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </TableScrollArea>
+                )}
+              </div>
+            </Field>
+
+            <Field label="Enlace Propuesta" className="md:col-span-2">
+              <div className="flex flex-col gap-1.5 mt-1">
+                {data.propuestasIds.length === 0 && (
+                  <p className="text-2xs text-muted italic">Los enlaces se generan automáticamente al seleccionar propuestas activas</p>
+                )}
+                {data.propuestasIds.map((cotId) => {
+                  const cot = cotizacionesAll.find((c) => c.id === cotId)
+                  if (!cot) return null
+                  const link = `${window.location.origin}/cot/${cot.numero}`
+                  return (
+                    <div key={cotId} className="flex items-center gap-2 bg-surface2 border border-border rounded-lg px-3 py-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-2xs font-bold text-accent mb-0.5">{cot.numero || 'BORRADOR'}</div>
+                        <div className="text-2xs text-muted truncate">{link}</div>
+                      </div>
+                      <button type="button" className="btn-secondary btn-sm text-2xs px-2 py-1 flex-shrink-0" onClick={() => copiarLinkCotizacion(cot.numero)}>
+                        📋 Copiar
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
             </Field>
 
             <Field label="Líneas de negocio" className="md:col-span-2">
