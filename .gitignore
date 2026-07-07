@@ -13,6 +13,10 @@ __pycache__/
 !.env.example
 !.env.docker.local
 
+# ─── Backups de datos reales (clientes, fotos) — no versionar ──
+docs/backup_*.json
+backup.json
+
 # ─── VSCode / IDE ────────────────────────────
 .vscode/
 .idea/
