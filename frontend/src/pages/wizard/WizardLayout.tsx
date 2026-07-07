@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAppMutation } from '../../hooks/useAppMutation'
@@ -12,13 +12,13 @@ import {
   deleteTarifaEspecial as apiDeleteTarifaEspecial,
 } from '../../api/tarifasEspeciales'
 import { toast } from '../../store/toastStore'
-import type { BibliotecaLinea, CRMRecord, EstadoCotizacion, TarifaEspecial, TarifaEspecialGrupoMeta } from '../../types'
+import type { BibliotecaLinea, Contacto, CRMRecord, EstadoCotizacion, TarifaEspecial, TarifaEspecialGrupoMeta } from '../../types'
 import { PAQUETEO_PAQUETEADORAS } from '../../lib/htmlV6/constants'
 import { COTIZACION_ESTADO_OPTIONS } from '../../lib/htmlV6/domainConfig'
 import {
   type CotItemsSnapshot,
   type CotSnapshotItem,
-  ensureTransportePaqueteoSnapshot,
+  ensureItemsSnapshotDefaults,
   isItemSelected,
   isPaqueteoLine,
   paqueteoGrupoMatches,
@@ -27,12 +27,9 @@ import {
   espKeyFor,
 } from '../../lib/cotizacion/snapshot'
 import { buildCotHTML, flattenSnapshot } from '../../lib/cotizacion/buildCotHTML'
-import {
-  WizardPaso3,
-  countSelectedInSnapshot,
-  summarizeSnapshotItem,
-  itemDisplayTarifa,
-} from './WizardPaso3'
+import { exportCotizacionPDF } from '../../utils/exportPDF'
+import { exportCotizacionDetalladoExcel } from '../../utils/exportExcel'
+import { WizardPaso3 } from './WizardPaso3'
 import { LineaTarifaEspecialPanel } from './TarifaEspecialPanel'
 
 // ─── Tipos wizard ──────────────────────────────────────────────────────────────
@@ -59,8 +56,9 @@ interface WizardData {
   tarifaEspecialGrupos: Record<string, TarifaEspecialGrupoMeta[]> // metadata de grupo congelada para líneas en modo especial
   // Paso 3: Items seleccionados por línea (snapshot) — también usado por especial (itemsSnapshot[linea][gid])
   itemsSnapshot: CotItemsSnapshot
-  // Paso 4: Observaciones por línea + libres
-  obsHtml: Record<string, string>
+  // Paso 4: Observaciones por línea (plantillas predefinidas por id + texto manual) + libres
+  obsPlantillasPorLinea: Record<string, string[]>
+  obsManualPorLinea: Record<string, string>
   obsLibre: string
   // Paso 5: Estado
   estado: EstadoCotizacion
@@ -80,8 +78,52 @@ const EMPTY: WizardData = {
   empresa: '', nit: '', ciudad: '', contacto: '', cargo: '', telefono: '', email: '',
   comercial: '', paqueteadora: '', recordId: '', fecha: '', vigencia: '', asunto: '',
   lineas: [], tarifaTipoPorLinea: {}, tarifaEspecialIdPorLinea: {}, tarifaEspecialGrupos: {},
-  itemsSnapshot: {}, obsHtml: {}, obsLibre: '',
+  itemsSnapshot: {}, obsPlantillasPorLinea: {}, obsManualPorLinea: {}, obsLibre: '',
   estado: 'borrador',
+}
+
+/** Ensambla el HTML final de observaciones por línea (plantillas seleccionadas + texto manual) — lo que se envía al backend/PDF. */
+function computeObsHtmlPorLinea(
+  lineas: string[],
+  obsPlantillasPorLinea: Record<string, string[]>,
+  obsManualPorLinea: Record<string, string>,
+  biblioteca: BibliotecaLinea[],
+): Record<string, string> {
+  const result: Record<string, string> = {}
+  for (const lineaNombre of lineas) {
+    const linea = biblioteca.find((l) => l.nombre === lineaNombre)
+    const ids = obsPlantillasPorLinea[lineaNombre] ?? []
+    const predefinidas = ids
+      .map((id) => linea?.obs.find((o) => o.id === id)?.html)
+      .filter((html): html is string => Boolean(html))
+    const manual = obsManualPorLinea[lineaNombre]?.trim()
+    result[lineaNombre] = [...predefinidas, ...(manual ? [manual] : [])].join('\n')
+  }
+  return result
+}
+
+/** Reconstruye el estado separado (plantillas/manual) a partir del obsHtml ya fusionado que guardó el backend — solo para precargar una cotización existente. */
+function reconstructObsState(
+  lineas: string[],
+  obsHtmlPorLinea: Record<string, string>,
+  biblioteca: BibliotecaLinea[],
+): { obsPlantillasPorLinea: Record<string, string[]>; obsManualPorLinea: Record<string, string> } {
+  const obsPlantillasPorLinea: Record<string, string[]> = {}
+  const obsManualPorLinea: Record<string, string> = {}
+  for (const lineaNombre of lineas) {
+    const linea = biblioteca.find((l) => l.nombre === lineaNombre)
+    let remaining = obsHtmlPorLinea[lineaNombre] ?? ''
+    const ids: string[] = []
+    for (const obs of linea?.obs ?? []) {
+      if (obs.html && remaining.includes(obs.html)) {
+        ids.push(obs.id)
+        remaining = remaining.replace(obs.html, '')
+      }
+    }
+    obsPlantillasPorLinea[lineaNombre] = ids
+    obsManualPorLinea[lineaNombre] = remaining.replace(/\n{2,}/g, '\n').trim()
+  }
+  return { obsPlantillasPorLinea, obsManualPorLinea }
 }
 
 const STEPS = ['Datos básicos', 'Servicios', 'Tarifas', 'Observaciones', 'Resumen']
@@ -92,7 +134,7 @@ function canSaveDraftBasics(data: WizardData): boolean {
   return data.empresa.trim() !== '' && data.comercial.trim() !== ''
 }
 
-function buildWizardPayload(data: WizardData, estado: EstadoCotizacion) {
+function buildWizardPayload(data: WizardData, estado: EstadoCotizacion, biblioteca: BibliotecaLinea[]) {
   return {
     empresa: data.empresa,
     nit: data.nit || undefined,
@@ -115,7 +157,7 @@ function buildWizardPayload(data: WizardData, estado: EstadoCotizacion) {
     asunto: data.asunto || undefined,
     lineas: data.lineas,
     itemsSnapshot: data.itemsSnapshot,
-    obsHtml: data.obsHtml,
+    obsHtml: computeObsHtmlPorLinea(data.lineas, data.obsPlantillasPorLinea, data.obsManualPorLinea, biblioteca),
     obsLibre: data.obsLibre || undefined,
   }
 }
@@ -129,7 +171,8 @@ async function persistCotizacion(
     biblioteca: BibliotecaLinea[]
   },
 ) {
-  const basePayload = buildWizardPayload(opts.data, opts.estado)
+  const obsHtml = computeObsHtmlPorLinea(opts.data.lineas, opts.data.obsPlantillasPorLinea, opts.data.obsManualPorLinea, opts.biblioteca)
+  const basePayload = buildWizardPayload(opts.data, opts.estado, opts.biblioteca)
 
   let cot = opts.isEdit && opts.cotId
     ? await updateCotizacion(opts.cotId, basePayload)
@@ -151,7 +194,7 @@ async function persistCotizacion(
     paqueteadora: opts.data.paqueteadora,
     lineas: opts.data.lineas,
     itemsSnapshot: opts.data.itemsSnapshot,
-    obsHtml: opts.data.obsHtml,
+    obsHtml,
     obsLibre: opts.data.obsLibre,
     tarifaTipoPorLinea: opts.data.tarifaTipoPorLinea,
     tarifaEspecialGrupos: opts.data.tarifaEspecialGrupos,
@@ -164,6 +207,15 @@ async function persistCotizacion(
   return cot
 }
 
+function contactoPartial(c?: Contacto): Pick<WizardData, 'contacto' | 'cargo' | 'telefono' | 'email'> {
+  return {
+    contacto: c?.nombre ?? '',
+    cargo: c?.cargo ?? '',
+    telefono: c?.telefono ?? '',
+    email: c?.email ?? '',
+  }
+}
+
 function applyRecordToWizard(record: CRMRecord): Partial<WizardData> {
   const contact =
     record.contactos?.find((c) => c.cargo?.toLowerCase().includes('comercial'))
@@ -173,10 +225,7 @@ function applyRecordToWizard(record: CRMRecord): Partial<WizardData> {
     empresa: record.empresa,
     nit: record.nit ?? '',
     ciudad: record.ciudad ?? '',
-    contacto: contact?.nombre ?? '',
-    cargo: contact?.cargo ?? '',
-    telefono: contact?.telefono ?? '',
-    email: contact?.email ?? '',
+    ...contactoPartial(contact),
     comercial: record.comercial?.nombre ?? '',
     paqueteadora: record.servicios?.includes('Paqueteo') ? 'COORDINADORA' : '',
   }
@@ -187,6 +236,7 @@ function applyRecordToWizard(record: CRMRecord): Partial<WizardData> {
 function Paso1({ data, onChange }: { data: WizardData; onChange: (d: Partial<WizardData>) => void }) {
   const [empresaQuery, setEmpresaQuery] = useState(data.empresa)
   const [showEmpresaList, setShowEmpresaList] = useState(false)
+  const [linkedRecord, setLinkedRecord] = useState<CRMRecord | null>(null)
 
   const { data: comerciales = [] } = useQuery({
     queryKey: ['comerciales'],
@@ -213,6 +263,7 @@ function Paso1({ data, onChange }: { data: WizardData; onChange: (d: Partial<Wiz
     onChange(applyRecordToWizard(record))
     setEmpresaQuery(record.empresa)
     setShowEmpresaList(false)
+    setLinkedRecord(record)
   }
 
   function onEmpresaInput(value: string) {
@@ -221,8 +272,10 @@ function Paso1({ data, onChange }: { data: WizardData; onChange: (d: Partial<Wiz
     const exact = records.find((r) => r.empresa.toLowerCase() === value.toLowerCase())
     if (exact) {
       onChange(applyRecordToWizard(exact))
+      setLinkedRecord(exact)
     } else {
       onChange({ empresa: value, recordId: '' })
+      setLinkedRecord(null)
     }
   }
 
@@ -271,6 +324,20 @@ function Paso1({ data, onChange }: { data: WizardData; onChange: (d: Partial<Wiz
         <input className="filter-input w-full" value={data.ciudad}
           onChange={(e) => onChange({ ciudad: e.target.value })} placeholder="Bogotá" />
       </div>
+      {linkedRecord && linkedRecord.contactos.length > 1 && (
+        <div className="form-group full">
+          <label>Seleccionar contacto</label>
+          <select
+            className="filter-select w-full"
+            defaultValue="0"
+            onChange={(e) => onChange(contactoPartial(linkedRecord.contactos[Number(e.target.value)]))}
+          >
+            {linkedRecord.contactos.map((c, i) => (
+              <option key={c.id} value={i}>{c.nombre}{c.cargo ? ` — ${c.cargo}` : ''}</option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="form-group">
         <label>Contacto</label>
         <input className="filter-input w-full" value={data.contacto}
@@ -436,9 +503,17 @@ function Paso4({
 }) {
   const [activeLinea, setActiveLinea] = useState(data.lineas[0] ?? '')
   const linea = lineasDisponibles.find((l) => l.nombre === activeLinea)
+  const seleccionadas = data.obsPlantillasPorLinea[activeLinea] ?? []
 
-  function setObsLinea(lineaNombre: string, html: string) {
-    onChange({ obsHtml: { ...data.obsHtml, [lineaNombre]: html } })
+  function toggleObsPredefinida(obsId: string) {
+    const next = seleccionadas.includes(obsId)
+      ? seleccionadas.filter((id) => id !== obsId)
+      : [...seleccionadas, obsId]
+    onChange({ obsPlantillasPorLinea: { ...data.obsPlantillasPorLinea, [activeLinea]: next } })
+  }
+
+  function setObsManual(lineaNombre: string, texto: string) {
+    onChange({ obsManualPorLinea: { ...data.obsManualPorLinea, [lineaNombre]: texto } })
   }
 
   return (
@@ -467,13 +542,9 @@ function Paso4({
           {linea.obs.map((obs) => (
             <div
               key={obs.id}
-              onClick={() => {
-                const current = data.obsHtml[activeLinea] ?? ''
-                const already = current.includes(obs.html)
-                setObsLinea(activeLinea, already ? current.replace(obs.html, '') : current + '\n' + obs.html)
-              }}
+              onClick={() => toggleObsPredefinida(obs.id)}
               className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                (data.obsHtml[activeLinea] ?? '').includes(obs.html)
+                seleccionadas.includes(obs.id)
                   ? 'border-accent/40 bg-accent/5'
                   : 'border-border hover:border-muted'
               }`}
@@ -492,8 +563,8 @@ function Paso4({
         <textarea
           className="input w-full h-28 resize-none"
           placeholder="Escribe observaciones específicas para esta línea..."
-          value={data.obsHtml[activeLinea] ?? ''}
-          onChange={(e) => setObsLinea(activeLinea, e.target.value)}
+          value={data.obsManualPorLinea[activeLinea] ?? ''}
+          onChange={(e) => setObsManual(activeLinea, e.target.value)}
         />
       </div>
 
@@ -511,88 +582,99 @@ function Paso4({
   )
 }
 
-// ─── Paso 5: Resumen ───────────────────────────────────────────────────────────
+// ─── Paso 5: Vista Previa — documento real (paridad HTML: renderCotPreview) ────
 
 function Paso5({
-  data, onChange,
+  data, biblioteca, numero,
 }: {
   data: WizardData
-  onChange: (d: Partial<WizardData>) => void
+  biblioteca: BibliotecaLinea[]
+  numero: string
 }) {
-  const totalItems = countSelectedInSnapshot(data.itemsSnapshot)
+  const [pdfLoading, setPdfLoading] = useState(false)
+
+  const obsHtml = useMemo(
+    () => computeObsHtmlPorLinea(data.lineas, data.obsPlantillasPorLinea, data.obsManualPorLinea, biblioteca),
+    [data.lineas, data.obsPlantillasPorLinea, data.obsManualPorLinea, biblioteca],
+  )
+
+  const html = useMemo(() => buildCotHTML({
+    numero: numero || 'BORRADOR',
+    fecha: data.fecha,
+    vigencia: data.vigencia,
+    asunto: data.asunto,
+    empresa: data.empresa,
+    nit: data.nit,
+    ciudad: data.ciudad,
+    contacto: data.contacto,
+    cargo: data.cargo,
+    telefono: data.telefono,
+    email: data.email,
+    comercial: data.comercial,
+    paqueteadora: data.paqueteadora,
+    lineas: data.lineas,
+    itemsSnapshot: data.itemsSnapshot,
+    obsHtml,
+    obsLibre: data.obsLibre,
+    tarifaTipoPorLinea: data.tarifaTipoPorLinea,
+    tarifaEspecialGrupos: data.tarifaEspecialGrupos,
+  }, biblioteca), [data, biblioteca, numero, obsHtml])
+
+  async function handlePDF() {
+    setPdfLoading(true)
+    try {
+      await exportCotizacionPDF(html, `cotizacion-${numero || 'borrador'}.pdf`)
+    } catch {
+      toast.error('Error generando PDF')
+    } finally {
+      setPdfLoading(false)
+    }
+  }
+
+  function handleExcel() {
+    try {
+      exportCotizacionDetalladoExcel({
+        numero: numero || 'BORRADOR',
+        empresa: data.empresa,
+        nit: data.nit,
+        contacto: data.contacto,
+        fecha: data.fecha,
+        vigencia: data.vigencia,
+        estado: data.estado,
+        comercial: data.comercial,
+        lineas: data.lineas,
+        itemsSnapshot: data.itemsSnapshot,
+        tarifaTipoPorLinea: data.tarifaTipoPorLinea,
+        tarifaEspecialGrupos: data.tarifaEspecialGrupos,
+      }, biblioteca)
+    } catch {
+      toast.error('Error generando Excel')
+    }
+  }
+
+  function handleCopiarLink() {
+    if (!numero) {
+      toast.error('Guarda la cotización primero para generar el link')
+      return
+    }
+    const url = `${window.location.origin}/cot/${numero}`
+    navigator.clipboard.writeText(url).then(() => toast.success('Link copiado'))
+  }
 
   return (
-    <div className="space-y-5">
-      <div className="card p-5 space-y-4">
-        <h3 className="text-xs font-bold text-muted uppercase tracking-widest">Datos</h3>
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div><span className="text-muted">Empresa:</span> <span className="text-foreground font-semibold">{data.empresa}</span></div>
-          {data.nit && <div><span className="text-muted">NIT:</span> <span className="font-mono text-foreground">{data.nit}</span></div>}
-          {data.ciudad && <div><span className="text-muted">Ciudad:</span> <span className="text-foreground">{data.ciudad}</span></div>}
-          {data.contacto && <div><span className="text-muted">Contacto:</span> <span className="text-foreground">{data.contacto}{data.cargo ? ` (${data.cargo})` : ''}</span></div>}
-          {data.telefono && <div><span className="text-muted">Teléfono:</span> <span className="text-foreground">{data.telefono}</span></div>}
-          <div><span className="text-muted">Comercial:</span> <span className="text-foreground">{data.comercial}</span></div>
-          <div className="col-span-2">
-            <span className="text-muted">Tarifa:</span>{' '}
-            <span className="text-foreground">
-              {data.lineas.map((l) => `${l}: ${data.tarifaTipoPorLinea[l] === 'especial' ? 'Especial' : 'Biblioteca'}`).join(' · ')}
-            </span>
-          </div>
-          {data.fecha && <div><span className="text-muted">Fecha:</span> <span className="text-foreground">{data.fecha}</span></div>}
-          {data.vigencia && <div><span className="text-muted">Válida hasta:</span> <span className="text-foreground">{data.vigencia}</span></div>}
-          {data.asunto && <div className="col-span-2"><span className="text-muted">Asunto:</span> <span className="text-foreground">{data.asunto}</span></div>}
-          {!data.recordId && (
-            <div className="col-span-2 text-xs text-gold">
-              Sin vínculo CRM — la cotización quedará sin prospecto/cliente asociado.
-            </div>
-          )}
-        </div>
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2 justify-end">
+        <button type="button" className="btn-secondary btn-sm" disabled={pdfLoading} onClick={handlePDF}>
+          {pdfLoading ? 'Generando...' : '📥 PDF'}
+        </button>
+        <button type="button" className="btn-secondary btn-sm" onClick={handleExcel}>
+          📊 Excel
+        </button>
+        <button type="button" className="btn-secondary btn-sm" onClick={handleCopiarLink}>
+          🔗 Copiar Link
+        </button>
       </div>
-
-      <div className="card p-5 space-y-3">
-        <h3 className="text-xs font-bold text-muted uppercase tracking-widest">Líneas seleccionadas</h3>
-        {data.lineas.map((l) => {
-          const lineSnap = data.itemsSnapshot[l]
-          const items = lineSnap
-            ? Object.values(lineSnap).flat().filter(isItemSelected)
-            : []
-          return (
-            <div key={l} className="border-b border-border last:border-0 pb-3 last:pb-0">
-              <p className="text-sm font-semibold text-foreground mb-1">{l}</p>
-              {items.length > 0 ? (
-                <div className="space-y-0.5">
-                  {items.map((item) => (
-                    <div key={item.id} className="flex justify-between text-xs">
-                      <span className="text-muted">{summarizeSnapshotItem(item)}</span>
-                      <span className="font-mono text-accent">{itemDisplayTarifa(item)}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-muted">Sin items seleccionados</p>
-              )}
-            </div>
-          )
-        })}
-        <p className="text-xs text-muted pt-1">{totalItems} item{totalItems !== 1 ? 's' : ''} en total</p>
-      </div>
-
-      {(data.obsLibre || Object.values(data.obsHtml).some(Boolean)) && (
-        <div className="card p-5 space-y-2">
-          <h3 className="text-xs font-bold text-muted uppercase tracking-widest">Observaciones</h3>
-          {data.obsLibre && <p className="text-sm text-foreground whitespace-pre-wrap">{data.obsLibre}</p>}
-        </div>
-      )}
-
-      <div className="card p-5 space-y-2">
-        <h3 className="text-xs font-bold text-muted uppercase tracking-widest">Estado al guardar</h3>
-        <p className="text-sm text-foreground font-semibold">
-          {WIZARD_ESTADO_OPTIONS.find((o) => o.value === data.estado)?.label}
-        </p>
-        <p className="text-xs text-muted">
-          Definido en «Datos básicos» — vuelve al paso 1 para cambiarlo antes de confirmar.
-        </p>
-      </div>
+      <div dangerouslySetInnerHTML={{ __html: html }} />
     </div>
   )
 }
@@ -636,8 +718,19 @@ export default function WizardLayout() {
     }
   }, [recordPrefill, isEdit, cotExistente])
 
+  // Líneas disponibles
+  const { data: biblioteca = [] } = useQuery({
+    queryKey: ['biblioteca'],
+    queryFn: getBiblioteca,
+  })
+
   useEffect(() => {
     if (cotExistente) {
+      const { obsPlantillasPorLinea, obsManualPorLinea } = reconstructObsState(
+        cotExistente.lineas,
+        cotExistente.obsHtml,
+        biblioteca,
+      )
       setData({
         empresa: cotExistente.empresa,
         nit: cotExistente.nit ?? '',
@@ -657,18 +750,13 @@ export default function WizardLayout() {
         tarifaEspecialIdPorLinea: cotExistente.tarifaEspecialIdPorLinea ?? {},
         tarifaEspecialGrupos: cotExistente.tarifaEspecialGrupos ?? {},
         itemsSnapshot: flattenSnapshot(cotExistente.itemsSnapshot),
-        obsHtml: cotExistente.obsHtml,
+        obsPlantillasPorLinea,
+        obsManualPorLinea,
         obsLibre: cotExistente.obsLibre ?? '',
         estado: cotExistente.estado,
       })
     }
-  }, [cotExistente])
-
-  // Líneas disponibles
-  const { data: biblioteca = [] } = useQuery({
-    queryKey: ['biblioteca'],
-    queryFn: getBiblioteca,
-  })
+  }, [cotExistente, biblioteca])
 
   function onChange(partial: Partial<WizardData>) {
     setData((prev) => ({ ...prev, ...partial }))
@@ -818,11 +906,12 @@ export default function WizardLayout() {
 
   function advanceStep() {
     if (step === 1 && biblioteca.length) {
-      const ensured = ensureTransportePaqueteoSnapshot(
+      const ensured = ensureItemsSnapshotDefaults(
         data.itemsSnapshot,
         data.lineas,
         biblioteca,
         data.paqueteadora,
+        data.tarifaTipoPorLinea,
       )
       if (ensured !== data.itemsSnapshot) {
         onChange({ itemsSnapshot: ensured })
@@ -919,7 +1008,7 @@ export default function WizardLayout() {
       guardandoLinea={guardarTarifaEspecialMut.isPending ? guardarTarifaEspecialMut.variables?.linea : undefined}
     />,
     <Paso4 key={3} data={data} onChange={onChange} lineasDisponibles={biblioteca} />,
-    <Paso5 key={4} data={data} onChange={onChange} />,
+    <Paso5 key={4} data={data} biblioteca={biblioteca} numero={cotExistente?.numero ?? ''} />,
   ]
 
   const saveDraftEnabled = canSaveDraftBasics(data)

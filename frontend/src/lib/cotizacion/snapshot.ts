@@ -138,19 +138,23 @@ export function findSnapshotItem(
   return items?.find((i) => i.id === itemId)
 }
 
-/** Auto-selecciona filas Transporte/Paqueteo al entrar al paso 3. */
-export function ensureTransportePaqueteoSnapshot(
+/** Auto-selecciona todas las filas de biblioteca al entrar al paso 3 (paridad HTML: items nacen con sel:true).
+ *  Sin esto, un ítem que se ve marcado por defecto nunca queda escrito en el snapshot hasta que el usuario
+ *  lo toca, y la cotización final sale vacía aunque todo se vea seleccionado. */
+export function ensureItemsSnapshotDefaults(
   snapshot: CotItemsSnapshot,
   lineas: string[],
   biblioteca: BibliotecaLinea[],
   paqueteadora: string,
+  tarifaTipoPorLinea: Record<string, string>,
 ): CotItemsSnapshot {
   let next = snapshot
   let anyChanged = false
 
   for (const lineaNombre of lineas) {
+    if (tarifaTipoPorLinea[lineaNombre] === 'especial') continue
     const linea = biblioteca.find((l) => l.nombre === lineaNombre)
-    if (!linea || (!isTransporteLine(linea.nombre) && !isPaqueteoLine(linea.nombre))) continue
+    if (!linea) continue
 
     const lineSnap = { ...(next[lineaNombre] ?? {}) }
     let lineChanged = false

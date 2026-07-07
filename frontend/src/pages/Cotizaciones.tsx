@@ -13,6 +13,7 @@ import { isMonedaCampo } from '../lib/cotizacion/snapshot'
 import { toast } from '../store/toastStore'
 import type { EstadoCotizacion } from '../types'
 import { exportCotizacionPDF } from '../utils/exportPDF'
+import { exportCotizacionDetalladoExcel } from '../utils/exportExcel'
 import { fmtEstado } from '../utils/fmtEstado'
 import {
   COTIZACION_BADGE,
@@ -107,6 +108,7 @@ export default function Cotizaciones() {
   const [search, setSearch] = useState('')
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [pdfLoading, setPdfLoading] = useState<string | null>(null)
+  const [excelLoading, setExcelLoading] = useState<string | null>(null)
   const [actualizarId, setActualizarId] = useState<string | null>(null)
   const [incremento, setIncremento] = useState('')
 
@@ -237,6 +239,31 @@ export default function Cotizaciones() {
     }
   }
 
+  async function handleExcel(cotId: string) {
+    setExcelLoading(cotId)
+    try {
+      const [cot, biblioteca] = await Promise.all([getCotizacion(cotId), getBiblioteca()])
+      exportCotizacionDetalladoExcel({
+        numero: cot.numero,
+        empresa: cot.empresa,
+        nit: cot.nit,
+        contacto: cot.contacto,
+        fecha: cot.fecha ?? cot.createdAt,
+        vigencia: cot.vigencia,
+        estado: cot.estado,
+        comercial: cot.comercial,
+        lineas: cot.lineas,
+        itemsSnapshot: flattenSnapshot(cot.itemsSnapshot),
+        tarifaTipoPorLinea: cot.tarifaTipoPorLinea,
+        tarifaEspecialGrupos: cot.tarifaEspecialGrupos,
+      }, biblioteca)
+    } catch {
+      toast.error('Error generando Excel')
+    } finally {
+      setExcelLoading(null)
+    }
+  }
+
   // KPIs rápidos (sobre la lista ya filtrada)
   const aprobadas   = cotizacionesFiltradas.filter((c) => c.estado === 'aprobada').length
   const enviadas    = cotizacionesFiltradas.filter((c) => c.estado === 'enviada').length
@@ -359,26 +386,23 @@ export default function Cotizaciones() {
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <div className="cot-row-actions">
-                        {cot.estado === 'borrador' ? (
-                          <button
-                            type="button"
-                            className="btn-secondary btn-sm cot-action-btn"
-                            onClick={() => navigate(`/cotizaciones/${cot.id}/editar`)}
-                            title="Editar"
-                          >
-                            ✏️
-                          </button>
-                        ) : (
-                          <a
-                            href={`/cot/${cot.numero}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="btn-secondary btn-sm cot-action-btn"
-                            title="Ver cotización"
-                          >
-                            👁
-                          </a>
-                        )}
+                        <button
+                          type="button"
+                          className="btn-secondary btn-sm cot-action-btn"
+                          onClick={() => navigate(`/cotizaciones/${cot.id}/editar?step=4`)}
+                          title="Ver / Editar (Vista Previa)"
+                        >
+                          ✏️
+                        </button>
+                        <a
+                          href={`/cot/${cot.numero}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn-secondary btn-sm cot-action-btn"
+                          title="Ver enlace público"
+                        >
+                          👁
+                        </a>
 
                         <button
                           type="button"
@@ -388,6 +412,16 @@ export default function Cotizaciones() {
                           title="Descargar PDF"
                         >
                           {pdfLoading === cot.id ? '…' : '⬇'}
+                        </button>
+
+                        <button
+                          type="button"
+                          className="btn-secondary btn-sm cot-action-btn"
+                          disabled={excelLoading === cot.id}
+                          onClick={() => handleExcel(cot.id)}
+                          title="Descargar Excel"
+                        >
+                          {excelLoading === cot.id ? '…' : '📊'}
                         </button>
 
                         {nextEstado && (

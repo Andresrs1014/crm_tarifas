@@ -46,8 +46,9 @@ import { cotFechaDisplay } from '../lib/htmlV6/cotUtils'
 import { exportRecordsExcel } from '../utils/exportExcel'
 import { usePagination } from '../hooks/usePagination'
 import { DataListPanel } from '../components/ui/DataListPanel'
+import { GerencialPanel } from './DashboardGerencial'
 
-function StatCard({ tone, label, value, sub }: {
+export function StatCard({ tone, label, value, sub }: {
   tone: 'blue' | 'cyan' | 'green' | 'gold' | 'purple' | 'red'
   label: string
   value: number | string
@@ -63,6 +64,7 @@ function StatCard({ tone, label, value, sub }: {
 }
 
 export default function Dashboard() {
+  const [view, setView] = useState<'operativo' | 'gerencial'>('operativo')
   const [filterCom, setFilterCom] = useState('')
   const [filterMes, setFilterMes] = useState('')
   const [filterTipo, setFilterTipo] = useState('')
@@ -145,6 +147,24 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-4">
+      {/* Tabs: Operativo / Gerencial */}
+      <div className="flex bg-surface2 border border-border rounded-lg p-0.5 text-xs w-fit">
+        <button
+          type="button"
+          onClick={() => setView('operativo')}
+          className={`px-3 py-1.5 rounded-md transition-colors ${view === 'operativo' ? 'bg-accent/15 text-accent font-semibold' : 'text-muted hover:text-foreground'}`}
+        >
+          📊 Dashboard Operativo
+        </button>
+        <button
+          type="button"
+          onClick={() => setView('gerencial')}
+          className={`px-3 py-1.5 rounded-md transition-colors ${view === 'gerencial' ? 'bg-accent/15 text-accent font-semibold' : 'text-muted hover:text-foreground'}`}
+        >
+          📈 Dashboard Gerencial
+        </button>
+      </div>
+
       {/* Filtros — HTML v6 */}
       <div className="filter-bar filter-bar--page">
         <div className="filter-bar-group">
@@ -195,6 +215,9 @@ export default function Dashboard() {
         </div>
       )}
 
+      {view === 'gerencial' && <GerencialPanel recs={recs} />}
+
+      {view === 'operativo' && <>
       {/* KPIs — renderDashboard stats-row */}
       <div className="stats-row">
         <StatCard tone="blue" label="Total Registros" value={stats.total} sub="Empresas en sistema" />
@@ -549,6 +572,7 @@ export default function Dashboard() {
           </tbody>
         </table>
       </DataListPanel>
+      </>}
     </div>
   )
 }

@@ -163,7 +163,7 @@ function PaqueteoTableHead({ entry }: { entry: PaqueteoSchemaEntry }) {
 // ─── Standard row ─────────────────────────────────────────────────────────────
 
 function WizardStandardRow({
-  bibItem, snapItem, headers, extraCols, selected, onToggle,
+  bibItem, snapItem, headers, extraCols, selected, onToggle, onUpdate,
 }: {
   bibItem: BibliotecaItem
   snapItem?: CotSnapshotItem
@@ -171,23 +171,50 @@ function WizardStandardRow({
   extraCols: string[]
   selected: boolean
   onToggle: () => void
+  onUpdate: (patch: Partial<CotSnapshotItem>) => void
 }) {
   const item = snapItem ?? bibItemToSnapshotItem(bibItem, false)
 
   return (
-    <tr
-      className={selected ? 'wizard-row-selected' : ''}
-      onClick={onToggle}
-      style={{ cursor: 'pointer' }}
-    >
-      <td style={{ width: 36, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+    <tr className={selected ? 'wizard-row-selected' : ''}>
+      <td style={{ width: 36, textAlign: 'center' }}>
         <input type="checkbox" checked={selected} onChange={onToggle} className="w-4 h-4 accent-accent" />
       </td>
       <td className="text-sm">{item.nombre}</td>
-      <td className="text-sm font-mono text-accent">{item.tarifa}</td>
-      <td className="text-xs text-muted">{item.obs ?? '—'}</td>
+      <td>
+        {selected ? (
+          <input
+            className="cell-input font-mono text-accent"
+            value={item.tarifa}
+            onChange={(e) => onUpdate({ tarifa: e.target.value })}
+          />
+        ) : (
+          <span className="text-sm font-mono text-accent">{item.tarifa}</span>
+        )}
+      </td>
+      <td>
+        {selected ? (
+          <input
+            className="cell-input"
+            value={item.obs ?? ''}
+            onChange={(e) => onUpdate({ obs: e.target.value })}
+          />
+        ) : (
+          <span className="text-xs text-muted">{item.obs ?? '—'}</span>
+        )}
+      </td>
       {extraCols.map((col) => (
-        <td key={col} className="text-xs text-muted">{item.extraCols?.[col] ?? bibItem.extraCols?.[col] ?? '—'}</td>
+        <td key={col}>
+          {selected ? (
+            <input
+              className="cell-input"
+              value={item.extraCols?.[col] ?? ''}
+              onChange={(e) => onUpdate({ extraCols: { ...item.extraCols, [col]: e.target.value } })}
+            />
+          ) : (
+            <span className="text-xs text-muted">{item.extraCols?.[col] ?? bibItem.extraCols?.[col] ?? '—'}</span>
+          )}
+        </td>
       ))}
     </tr>
   )
@@ -441,19 +468,30 @@ function WizardStandardGrupo({
   const lineSnap = snapshot[lineaNombre]
   const sortedItems = [...grupo.items].sort((a, b) => a.orden - b.orden)
 
-  function toggleItem(bibItem: BibliotecaItem) {
+  function upsertItem(bibItem: BibliotecaItem, patch: Partial<CotSnapshotItem>, sel: boolean) {
     const current = getGrupoSnapshot(lineSnap, grupo) ?? []
     const idx = current.findIndex((i) => i.id === bibItem.id)
-    if (idx >= 0) {
-      const next = current.filter((i) => i.id !== bibItem.id)
-      onChange(setGrupoSnapshot(snapshot, lineaNombre, grupo.id, next))
-    } else {
+    const base = idx >= 0 ? current[idx] : bibItemToSnapshotItem(bibItem, sel)
+    const next = { ...base, ...patch, sel }
+    const items = idx >= 0
+      ? current.map((i, j) => (j === idx ? next : i))
+      : [...current, next]
+    onChange(setGrupoSnapshot(snapshot, lineaNombre, grupo.id, items))
+  }
+
+  function toggleItem(bibItem: BibliotecaItem) {
+    const snap = findSnapshotItem(lineSnap, grupo, bibItem.id)
+    const selected = isItemSelected(snap)
+    if (selected) {
+      const current = getGrupoSnapshot(lineSnap, grupo) ?? []
       onChange(setGrupoSnapshot(
         snapshot,
         lineaNombre,
         grupo.id,
-        [...current, bibItemToSnapshotItem(bibItem, true)],
+        current.map((i) => (i.id === bibItem.id ? { ...i, sel: false } : i)),
       ))
+    } else {
+      upsertItem(bibItem, {}, true)
     }
   }
 
@@ -478,7 +516,7 @@ function WizardStandardGrupo({
             <tbody>
               {sortedItems.map((bibItem) => {
                 const snap = findSnapshotItem(lineSnap, grupo, bibItem.id)
-                const selected = !!snap && isItemSelected(snap)
+                const selected = isItemSelected(snap)
                 return (
                   <WizardStandardRow
                     key={bibItem.id}
@@ -488,6 +526,7 @@ function WizardStandardGrupo({
                     extraCols={extraCols}
                     selected={selected}
                     onToggle={() => toggleItem(bibItem)}
+                    onUpdate={(patch) => upsertItem(bibItem, patch, true)}
                   />
                 )
               })}

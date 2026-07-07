@@ -177,7 +177,7 @@ export async function duplicarCotizacion(id: string) {
     data: {
       numero,
       recordId: original.recordId,
-      empresa: original.empresa,
+      empresa: `${original.empresa} (copia)`,
       nit: original.nit,
       ciudad: original.ciudad,
       contacto: original.contacto,

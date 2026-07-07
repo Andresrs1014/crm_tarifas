@@ -6,7 +6,11 @@ import {
   PIPELINE_LABELS,
   SVC_COLORS,
 } from './constants'
+import { PROSPECTO_LABEL, PROSPECTO_STAGE_COLOR } from './domainConfig'
 import { resolveVigencia } from './cotUtils'
+
+/** Etapas activas del pipeline + facturado — usadas por el panel gerencial */
+const GERENCIAL_ETAPAS = [...ESTADOS_ACTIVOS, 'facturado'] as const
 
 export interface DashFilters {
   comercialId: string
@@ -182,6 +186,122 @@ export function computeCotLineasChart(cots: Cotizacion[]) {
     data: nonZero.map((s) => lineasCount[s]),
     colors: nonZero.map((s) => SVC_COLORS[s] || '#00c2ff'),
   }
+}
+
+function sumFacturacionLineas(r: CRMRecord): number {
+  return Object.values(r.facturacionLineas ?? {}).reduce((a, b) => a + (Number(b) || 0), 0)
+}
+
+export function computeGerencialKpis(recs: CRMRecord[]) {
+  const prospectos = recs.filter((r) => r.tipo === 'prospecto')
+  const clientes = recs.filter((r) => r.tipo === 'cliente')
+  const hoy = new Date()
+
+  const totalProspectos = prospectos.length
+  const convertidos = prospectos.filter((r) => r.estadoProspecto === 'facturado').length
+  const tasaConversion = totalProspectos > 0 ? Math.round((convertidos / totalProspectos) * 100) : 0
+
+  const vencer = prospectos
+    .filter((r) => r.proximoSeguimiento)
+    .map((r) => ({
+      rec: r,
+      dias: Math.ceil((new Date(`${r.proximoSeguimiento}T12:00`).getTime() - hoy.getTime()) / 86_400_000),
+    }))
+    .filter((x) => x.dias <= 7)
+    .sort((a, b) => a.dias - b.dias)
+  const vencidos = vencer.filter((x) => x.dias <= 0).length
+
+  const totalClientes = clientes.length
+  const enRiesgo = clientes.filter((r) => r.estadoCliente === 'en-riesgo').length
+  const inactivos = clientes.filter((r) => r.estadoCliente === 'inactivo').length
+  const activos = totalClientes - enRiesgo - inactivos
+  const pctRiesgo = totalClientes > 0 ? Math.round((enRiesgo / totalClientes) * 100) : 0
+
+  const ingresosEsperados = prospectos
+    .filter((r) => r.estadoProspecto !== 'facturado')
+    .reduce((s, r) => s + (Number(r.ingresosEsperados) || 0), 0)
+  const ingresosRealizados = recs.reduce((s, r) => s + sumFacturacionLineas(r), 0)
+
+  const cierresConFecha = prospectos.filter((r) => r.estadoProspecto === 'facturado' && r.fecha)
+  const diasCierre = cierresConFecha.length > 0
+    ? Math.round(cierresConFecha.reduce((s, r) => {
+        const fechaReg = new Date(`${r.fecha}T12:00`)
+        const ref = r.fechaVisita ? new Date(`${r.fechaVisita}T12:00`) : hoy
+        return s + Math.max(0, Math.ceil((ref.getTime() - fechaReg.getTime()) / 86_400_000))
+      }, 0) / cierresConFecha.length)
+    : 0
+
+  return {
+    tasaConversion, convertidos, totalProspectos,
+    diasCierre, ingresosEsperados, ingresosRealizados,
+    pctRiesgo, enRiesgo, activos, inactivos, totalClientes,
+    vencidos, totalVencer: vencer.length,
+    vencerList: vencer.map((x) => ({ rec: x.rec, dias: x.dias })),
+    totalPortafolio: totalProspectos + totalClientes,
+  }
+}
+
+export function computeTiempoCierreChart(prospectos: CRMRecord[]) {
+  const hoy = new Date()
+  const suma: Record<string, number> = {}
+  const cnt: Record<string, number> = {}
+  GERENCIAL_ETAPAS.forEach((e) => { suma[e] = 0; cnt[e] = 0 })
+
+  prospectos.forEach((r) => {
+    const est = r.estadoProspecto || 'prospecto'
+    if (!(est in suma)) return
+    const fechaReg = r.fecha ? new Date(`${r.fecha}T12:00`) : hoy
+    suma[est] += Math.max(0, Math.ceil((hoy.getTime() - fechaReg.getTime()) / 86_400_000))
+    cnt[est]++
+  })
+
+  return GERENCIAL_ETAPAS.map((e) => ({
+    name: PROSPECTO_LABEL[e] ?? e,
+    dias: cnt[e] > 0 ? Math.round(suma[e] / cnt[e]) : 0,
+  }))
+}
+
+export function computeIngresosComercialChart(recs: CRMRecord[]) {
+  const mapa: Record<string, { esperado: number; realizado: number }> = {}
+  recs.forEach((r) => {
+    const nombre = r.comercial?.nombre || 'Sin asignar'
+    if (!mapa[nombre]) mapa[nombre] = { esperado: 0, realizado: 0 }
+    if (r.tipo === 'prospecto' && r.estadoProspecto !== 'facturado') {
+      mapa[nombre].esperado += Number(r.ingresosEsperados) || 0
+    }
+    mapa[nombre].realizado += sumFacturacionLineas(r)
+  })
+
+  return Object.entries(mapa)
+    .filter(([, v]) => v.esperado > 0 || v.realizado > 0)
+    .sort((a, b) => (b[1].esperado + b[1].realizado) - (a[1].esperado + a[1].realizado))
+    .map(([name, v]) => ({ name, Esperado: Math.round(v.esperado), Realizado: Math.round(v.realizado) }))
+}
+
+export function computeAbandonoFunnel(prospectos: CRMRecord[]) {
+  const conteo: Record<string, number> = {}
+  GERENCIAL_ETAPAS.forEach((e) => { conteo[e] = 0 })
+  prospectos.forEach((r) => {
+    const est = r.estadoProspecto || 'prospecto'
+    if (est in conteo) conteo[est]++
+  })
+
+  const llegaron = GERENCIAL_ETAPAS.map((_, i) => GERENCIAL_ETAPAS.slice(i).reduce((s, k) => s + conteo[k], 0))
+  const maxLlego = llegaron[0] || 1
+
+  return GERENCIAL_ETAPAS.map((etapa, i) => {
+    const n = llegaron[i]
+    const nSig = i < llegaron.length - 1 ? llegaron[i + 1] : n
+    return {
+      key: etapa,
+      label: PROSPECTO_LABEL[etapa] ?? etapa,
+      n,
+      pctBarra: Math.round((n / maxLlego) * 100),
+      abandono: n > 0 ? Math.round(((n - nSig) / n) * 100) : 0,
+      esUltima: i === GERENCIAL_ETAPAS.length - 1,
+      color: PROSPECTO_STAGE_COLOR[etapa] ?? '#8899b4',
+    }
+  })
 }
 
 export function cotEstadoBadge(cot: Cotizacion): { className: string; label: string } {
