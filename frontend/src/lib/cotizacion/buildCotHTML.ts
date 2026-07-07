@@ -1,5 +1,5 @@
-import type { BibliotecaLinea } from '../../types'
-import type { BibSchemaCol, PaqueteoSchemaEntry } from '../htmlV6/constants'
+import type { BibliotecaLinea, TarifaEspecialGrupoMeta } from '../../types'
+import { TRANSP_SCHEMA, PAQUETEO_SCHEMA, type BibSchemaCol, type PaqueteoSchemaEntry } from '../htmlV6/constants'
 import type { BibliotecaItem } from '../../types'
 import {
   type CotItemsSnapshot,
@@ -7,6 +7,8 @@ import {
   formatCampoDisplay,
   getSchemaForGrupo,
   isItemSelected,
+  isPaqueteoLine,
+  isTransporteLine,
   mergeSchemaCampos,
   parseColumnas,
   parseGrupoNombre,
@@ -159,6 +161,33 @@ export interface BuildCotHTMLInput {
   itemsSnapshot: CotItemsSnapshot
   obsHtml: Record<string, string>
   obsLibre?: string
+  tarifaTipoPorLinea?: Record<string, string>
+  tarifaEspecialGrupos?: Record<string, TarifaEspecialGrupoMeta[]>
+}
+
+/** Render de una línea en modo Tarifa Especial — no hay grupo de biblioteca real, se usa la metadata congelada. */
+function renderEspecialLinea(lineaNombre: string, metaList: TarifaEspecialGrupoMeta[], lineSnap: Record<string, CotSnapshotItem[]> | undefined): string {
+  const isTransporte = isTransporteLine(lineaNombre)
+  const isPaqueteo = isPaqueteoLine(lineaNombre)
+  let body = ''
+
+  for (const meta of metaList) {
+    const items = (lineSnap?.[meta.gid] ?? []).filter(isItemSelected)
+    if (!items.length) continue
+
+    body += `<div class="cot-grupo-titulo">${esc(meta.nombre)}</div>`
+
+    if (isTransporte) {
+      const schema = TRANSP_SCHEMA[meta.tipo as keyof typeof TRANSP_SCHEMA] ?? TRANSP_SCHEMA.local
+      body += renderSchemaTable(items, schema.cols, 'cot-tabla-compact')
+    } else if (isPaqueteo) {
+      const entry = PAQUETEO_SCHEMA[meta.tipo]
+      if (entry) body += renderSchemaTable(items, entry.cols, 'cot-tabla-paq', undefined, entry)
+    } else {
+      body += renderStandardTable(items, ['Servicio', 'Tarifa', 'Observación'], [])
+    }
+  }
+  return body
 }
 
 export function buildCotHTML(input: BuildCotHTMLInput, biblioteca: BibliotecaLinea[]): string {
@@ -176,39 +205,42 @@ export function buildCotHTML(input: BuildCotHTMLInput, biblioteca: BibliotecaLin
   let body = ''
 
   for (const lineaNombre of input.lineas) {
-    const linea = biblioteca.find((l) => l.nombre === lineaNombre)
-    if (!linea) continue
-
+    const isEspecial = input.tarifaTipoPorLinea?.[lineaNombre] === 'especial'
     const lineSnap = input.itemsSnapshot[lineaNombre]
-    const grupos = [...linea.grupos].sort((a, b) => a.orden - b.orden)
-    const claimedGrupoKeys = new Set<string>()
-    const hasContent = grupos.some((g) =>
-      resolveGrupoSnapshotItems(lineSnap, g, linea, new Set()).length > 0,
-    ) || (lineSnap && Object.values(lineSnap).some(
-      (v) => Array.isArray(v) && v.some(isItemSelected),
-    ))
-    if (!hasContent) continue
 
-    body += `<div class="cot-seccion-bloque"><div class="cot-seccion-titulo">${esc(lineaNombre)}</div>`
+    let lineaBody = ''
 
-    for (const grupo of grupos) {
-      const items = resolveGrupoSnapshotItems(lineSnap, grupo, linea, claimedGrupoKeys)
-      if (!items.length) continue
+    if (isEspecial) {
+      lineaBody = renderEspecialLinea(lineaNombre, input.tarifaEspecialGrupos?.[lineaNombre] ?? [], lineSnap)
+    } else {
+      const linea = biblioteca.find((l) => l.nombre === lineaNombre)
+      if (linea) {
+        const grupos = [...linea.grupos].sort((a, b) => a.orden - b.orden)
+        const claimedGrupoKeys = new Set<string>()
+        for (const grupo of grupos) {
+          const items = resolveGrupoSnapshotItems(lineSnap, grupo, linea, claimedGrupoKeys)
+          if (!items.length) continue
 
-      const { display } = parseGrupoNombre(grupo.nombre)
-      body += `<div class="cot-grupo-titulo">${esc(display || grupo.nombre)}</div>`
+          const { display } = parseGrupoNombre(grupo.nombre)
+          lineaBody += `<div class="cot-grupo-titulo">${esc(display || grupo.nombre)}</div>`
 
-      const bibItemsById = new Map(grupo.items.map((i) => [i.id, i]))
-      const schema = getSchemaForGrupo(linea, grupo)
-      if (schema?.kind === 'transporte') {
-        body += renderSchemaTable(items, schema.cols, 'cot-tabla-compact', bibItemsById)
-      } else if (schema?.kind === 'paqueteo') {
-        body += renderSchemaTable(items, schema.cols, 'cot-tabla-paq', bibItemsById, schema.entry)
-      } else {
-        const { headers, extra } = parseColumnas((linea.columnas as string[]) ?? [])
-        body += renderStandardTable(items, headers, extra)
+          const bibItemsById = new Map(grupo.items.map((i) => [i.id, i]))
+          const schema = getSchemaForGrupo(linea, grupo)
+          if (schema?.kind === 'transporte') {
+            lineaBody += renderSchemaTable(items, schema.cols, 'cot-tabla-compact', bibItemsById)
+          } else if (schema?.kind === 'paqueteo') {
+            lineaBody += renderSchemaTable(items, schema.cols, 'cot-tabla-paq', bibItemsById, schema.entry)
+          } else {
+            const { headers, extra } = parseColumnas((linea.columnas as string[]) ?? [])
+            lineaBody += renderStandardTable(items, headers, extra)
+          }
+        }
       }
     }
+
+    if (!lineaBody) continue
+
+    body += `<div class="cot-seccion-bloque"><div class="cot-seccion-titulo">${esc(lineaNombre)}</div>${lineaBody}`
 
     const obs = input.obsHtml[lineaNombre]?.trim()
     if (obs) {

@@ -225,6 +225,8 @@ export default function Cotizaciones() {
           itemsSnapshot: flattenSnapshot(cot.itemsSnapshot),
           obsHtml: cot.obsHtml,
           obsLibre: cot.obsLibre,
+          tarifaTipoPorLinea: cot.tarifaTipoPorLinea,
+          tarifaEspecialGrupos: cot.tarifaEspecialGrupos,
         }, biblioteca)
         : (cot.htmlPreview || `<h2>${cot.numero}</h2><p>${cot.empresa}</p>`)
       await exportCotizacionPDF(html, `cotizacion-${numero}.pdf`)

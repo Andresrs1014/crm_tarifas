@@ -60,6 +60,9 @@ export async function createCotizacion(data: {
   comercial: string;
   paqueteadora?: string;
   tarifaTipo?: string;
+  tarifaTipoPorLinea?: Record<string, string>;
+  tarifaEspecialIdPorLinea?: Record<string, string>;
+  tarifaEspecialGrupos?: Record<string, unknown>;
   estado?: string;
   fecha?: string;
   vigencia?: string;
@@ -85,6 +88,9 @@ export async function createCotizacion(data: {
       comercial: data.comercial,
       paqueteadora: data.paqueteadora,
       tarifaTipo: data.tarifaTipo ?? 'biblioteca',
+      tarifaTipoPorLinea: (data.tarifaTipoPorLinea ?? {}) as JsonInput,
+      tarifaEspecialIdPorLinea: (data.tarifaEspecialIdPorLinea ?? {}) as JsonInput,
+      tarifaEspecialGrupos: (data.tarifaEspecialGrupos ?? {}) as JsonInput,
       estado: data.estado ?? 'borrador',
       fecha: data.fecha ? new Date(data.fecha) : new Date(),
       vigencia: data.vigencia ? new Date(data.vigencia) : defaultVigencia(data.fecha ? new Date(data.fecha) : new Date()),
@@ -110,6 +116,9 @@ export async function updateCotizacion(id: string, data: {
   comercial?: string;
   paqueteadora?: string;
   tarifaTipo?: string;
+  tarifaTipoPorLinea?: Record<string, string>;
+  tarifaEspecialIdPorLinea?: Record<string, string>;
+  tarifaEspecialGrupos?: Record<string, unknown>;
   estado?: string;
   fecha?: string;
   vigencia?: string;
@@ -134,6 +143,9 @@ export async function updateCotizacion(id: string, data: {
       ...(data.comercial !== undefined && { comercial: data.comercial }),
       ...(data.paqueteadora !== undefined && { paqueteadora: data.paqueteadora }),
       ...(data.tarifaTipo !== undefined && { tarifaTipo: data.tarifaTipo }),
+      ...(data.tarifaTipoPorLinea !== undefined && { tarifaTipoPorLinea: data.tarifaTipoPorLinea as JsonInput }),
+      ...(data.tarifaEspecialIdPorLinea !== undefined && { tarifaEspecialIdPorLinea: data.tarifaEspecialIdPorLinea as JsonInput }),
+      ...(data.tarifaEspecialGrupos !== undefined && { tarifaEspecialGrupos: data.tarifaEspecialGrupos as JsonInput }),
       ...(data.estado !== undefined && { estado: data.estado }),
       ...(data.fecha !== undefined && { fecha: new Date(data.fecha) }),
       ...(data.vigencia !== undefined && { vigencia: new Date(data.vigencia) }),
@@ -175,6 +187,9 @@ export async function duplicarCotizacion(id: string) {
       comercial: original.comercial,
       paqueteadora: original.paqueteadora,
       tarifaTipo: original.tarifaTipo,
+      tarifaTipoPorLinea: original.tarifaTipoPorLinea as JsonInput,
+      tarifaEspecialIdPorLinea: original.tarifaEspecialIdPorLinea as JsonInput,
+      tarifaEspecialGrupos: original.tarifaEspecialGrupos as JsonInput,
       estado: 'borrador',
       fecha,
       vigencia: defaultVigencia(fecha),
@@ -262,6 +277,9 @@ export async function actualizarTarifas(id: string, incremento: number) {
       comercial: original.comercial,
       paqueteadora: original.paqueteadora,
       tarifaTipo: original.tarifaTipo,
+      tarifaTipoPorLinea: original.tarifaTipoPorLinea as JsonInput,
+      tarifaEspecialIdPorLinea: original.tarifaEspecialIdPorLinea as JsonInput,
+      tarifaEspecialGrupos: original.tarifaEspecialGrupos as JsonInput,
       estado: 'borrador',
       fecha,
       vigencia: defaultVigencia(fecha),

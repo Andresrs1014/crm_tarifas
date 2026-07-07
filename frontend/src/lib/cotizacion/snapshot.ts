@@ -37,6 +37,11 @@ export function isPaqueteoLine(nombre: string) {
   return nombre.toLowerCase().includes('paqueteo')
 }
 
+/** Clave de biblioteca de tarifas especiales — Paqueteo se escopa por paqueteadora, el resto por línea (paridad HTML _espKey). */
+export function espKeyFor(linea: string, paqueteadora: string): string {
+  return isPaqueteoLine(linea) && paqueteadora ? `Paqueteo-${paqueteadora}` : linea
+}
+
 export function parseColumnas(raw: string[]): { headers: [string, string, string]; extra: string[] } {
   const headers: [string, string, string] = [...COL_DEFAULTS] as [string, string, string]
   const extra: string[] = []

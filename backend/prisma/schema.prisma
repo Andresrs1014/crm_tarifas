@@ -189,13 +189,19 @@ model Cotizacion {
   email         String?
   comercial     String
   paqueteadora  String?
-  tarifaTipo    String   @default("biblioteca") @map("tarifa_tipo")
+  tarifaTipo    String   @default("biblioteca") @map("tarifa_tipo") // legado, usar tarifaTipoPorLinea
   estado        String   @default("borrador")
   fecha         DateTime?
   vigencia      DateTime?
   asunto        String?
   lineas        Json     @default("[]")
   itemsSnapshot Json     @default("{}") @map("items_snapshot")
+  // Tarifa Especial (paridad HTML §renderCotLineasStep): toggle y selección por línea de servicio,
+  // no global. tarifaEspecialGrupos guarda la metadata de grupo (gid/nombre/tipo/obsEcommerce) congelada
+  // al momento de aplicar/guardar — los items siguen viviendo en itemsSnapshot[linea][gid], igual que biblioteca.
+  tarifaTipoPorLinea       Json @default("{}") @map("tarifa_tipo_por_linea")
+  tarifaEspecialIdPorLinea Json @default("{}") @map("tarifa_especial_id_por_linea")
+  tarifaEspecialGrupos     Json @default("{}") @map("tarifa_especial_grupos")
   obsHtml       Json     @default("{}") @map("obs_html")
   obsLibre      String?  @map("obs_libre")
   htmlPreview   String?  @map("html_preview")
@@ -203,6 +209,21 @@ model Cotizacion {
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   @@map("cotizaciones")
+}
+
+/// Biblioteca de tarifas especiales guardadas — reutilizable entre cotizaciones,
+/// independiente de la Biblioteca de Tarifas normal (paridad HTML db.tarifasEspeciales).
+model TarifaEspecial {
+  id        String   @id @default(uuid())
+  espKey    String   @map("esp_key") // línea, o "Paqueteo-<PAQUETEADORA>"
+  svc       String   // línea de servicio real (ej. "Paqueteo")
+  nombre    String
+  grupos    Json     @default("[]") // TarifaEspecialGrupo[] — snapshot autocontenido (gid/nombre/tipo/obsEcommerce/items)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([espKey])
+  @@map("tarifas_especiales")
 }
 
 model CotNumeroCounter {

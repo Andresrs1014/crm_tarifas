@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { BibliotecaLinea, BibliotecaGrupo, BibliotecaItem } from '../../types'
+import type { BibliotecaLinea, BibliotecaGrupo, BibliotecaItem, TarifaEspecialGrupoMeta } from '../../types'
 import {
   TRANSP_SCHEMA,
   PAQUETEO_SCHEMA,
@@ -277,6 +277,157 @@ function WizardSchemaGrupo({
   )
 }
 
+// ─── Tarifa Especial: filas totalmente editables (nombre/tarifa/obs, o celdas de schema) ──
+
+function WizardEspecialSchemaRow({
+  item, cols, onUpdate, onToggle,
+}: {
+  item: CotSnapshotItem
+  cols: BibSchemaCol[]
+  onUpdate: (patch: Partial<CotSnapshotItem>) => void
+  onToggle: () => void
+}) {
+  const campos = item.campos ?? {}
+  const tipos = item.tiposCampo ?? {}
+  const selected = isItemSelected(item)
+
+  return (
+    <tr className={selected ? 'wizard-row-selected' : ''}>
+      <td style={{ width: 36, textAlign: 'center' }}>
+        <input type="checkbox" checked={selected} onChange={onToggle} className="w-4 h-4 accent-accent" />
+      </td>
+      {cols.map((col) => (
+        <td key={col.id}>
+          <WizardSchemaCell
+            col={col}
+            value={resolveSchemaFieldValue(campos, col.id)}
+            toggleVal={resolveSchemaToggleValue(tipos, col.id, campos)}
+            onChange={(v) => onUpdate({ campos: { ...campos, [col.id]: v } })}
+            onToggleChange={(v) => onUpdate({ tiposCampo: { ...tipos, [col.id]: v } })}
+          />
+        </td>
+      ))}
+    </tr>
+  )
+}
+
+function WizardEspecialStandardRow({
+  item, onUpdate, onToggle,
+}: {
+  item: CotSnapshotItem
+  onUpdate: (patch: Partial<CotSnapshotItem>) => void
+  onToggle: () => void
+}) {
+  const selected = isItemSelected(item)
+  return (
+    <tr className={selected ? 'wizard-row-selected' : ''}>
+      <td style={{ width: 36, textAlign: 'center' }}>
+        <input type="checkbox" checked={selected} onChange={onToggle} className="w-4 h-4 accent-accent" />
+      </td>
+      <td><input className="cell-input" value={item.nombre} onChange={(e) => onUpdate({ nombre: e.target.value })} /></td>
+      <td><input className="cell-input font-mono text-accent" value={item.tarifa} onChange={(e) => onUpdate({ tarifa: e.target.value })} /></td>
+      <td><input className="cell-input" value={item.obs ?? ''} onChange={(e) => onUpdate({ obs: e.target.value })} /></td>
+    </tr>
+  )
+}
+
+function WizardEspecialGrupo({
+  lineaNombre, meta, isTransporte, isPaqueteo, snapshot, onChange,
+}: {
+  lineaNombre: string
+  meta: TarifaEspecialGrupoMeta
+  isTransporte: boolean
+  isPaqueteo: boolean
+  snapshot: CotItemsSnapshot
+  onChange: (snap: CotItemsSnapshot) => void
+}) {
+  const items = snapshot[lineaNombre]?.[meta.gid] ?? []
+
+  function updateItem(idx: number, patch: Partial<CotSnapshotItem>) {
+    const next = items.map((it, i) => (i === idx ? { ...it, ...patch } : it))
+    onChange({ ...snapshot, [lineaNombre]: { ...snapshot[lineaNombre], [meta.gid]: next } })
+  }
+
+  let cols: BibSchemaCol[] | null = null
+  let entry: PaqueteoSchemaEntry | undefined
+  if (isTransporte) {
+    cols = (TRANSP_SCHEMA[meta.tipo as keyof typeof TRANSP_SCHEMA] ?? TRANSP_SCHEMA.local).cols
+  } else if (isPaqueteo) {
+    entry = PAQUETEO_SCHEMA[meta.tipo]
+    cols = entry?.cols ?? null
+  }
+
+  return (
+    <div className="grupo-card">
+      <div className="grupo-header grupo-header--open">
+        <div className="grupo-title">{meta.nombre}</div>
+        <div className="text-xs text-muted">{items.length} filas</div>
+      </div>
+      <div className="grupo-body">
+        <TableScrollArea>
+          <table className="bib-items-table">
+            {cols ? (
+              entry ? <PaqueteoTableHead entry={entry} /> : (
+                <thead><tr><th style={{ width: 36 }} />{cols.map((c) => <th key={c.id}>{c.nombre}</th>)}</tr></thead>
+              )
+            ) : (
+              <thead><tr><th style={{ width: 36 }} /><th>Servicio</th><th>Tarifa</th><th>Observación</th></tr></thead>
+            )}
+            <tbody>
+              {items.map((item, idx) => (
+                cols ? (
+                  <WizardEspecialSchemaRow
+                    key={item.id}
+                    item={item}
+                    cols={cols}
+                    onUpdate={(patch) => updateItem(idx, patch)}
+                    onToggle={() => updateItem(idx, { sel: !isItemSelected(item) })}
+                  />
+                ) : (
+                  <WizardEspecialStandardRow
+                    key={item.id}
+                    item={item}
+                    onUpdate={(patch) => updateItem(idx, patch)}
+                    onToggle={() => updateItem(idx, { sel: !isItemSelected(item) })}
+                  />
+                )
+              ))}
+            </tbody>
+          </table>
+        </TableScrollArea>
+      </div>
+    </div>
+  )
+}
+
+function GuardarTarifaEspecialBanner({ linea, saving, onSave }: { linea: string; saving: boolean; onSave: (nombre: string) => void }) {
+  const [nombre, setNombre] = useState('')
+  return (
+    <div className="rounded-xl border border-gold/40 bg-gold/5 p-4 flex flex-wrap items-center gap-3">
+      <span className="text-lg flex-shrink-0">⭐</span>
+      <div className="flex-1 min-w-[220px]">
+        <div className="text-xs font-bold uppercase tracking-wider text-gold mb-1">
+          Guardar como Tarifa Especial — {linea}
+        </div>
+        <input
+          className="cell-input w-full"
+          value={nombre}
+          onChange={(e) => setNombre(e.target.value)}
+          placeholder="Nombre de la tarifa especial (ej: Tarifa Cliente VIP)"
+        />
+      </div>
+      <button
+        type="button"
+        className="btn-primary btn-sm flex-shrink-0"
+        disabled={saving}
+        onClick={() => onSave(nombre)}
+      >
+        {saving ? 'Guardando...' : '💾 Guardar tarifa'}
+      </button>
+    </div>
+  )
+}
+
 function WizardStandardGrupo({
   lineaNombre, grupo, headers, extraCols, snapshot, onChange,
 }: {
@@ -356,10 +507,16 @@ export interface WizardPaso3Props {
   snapshot: CotItemsSnapshot
   lineasDisponibles: BibliotecaLinea[]
   onChange: (snap: CotItemsSnapshot) => void
+  tarifaTipoPorLinea: Record<string, 'biblioteca' | 'especial'>
+  tarifaEspecialGrupos: Record<string, TarifaEspecialGrupoMeta[]>
+  tarifaEspecialIdPorLinea: Record<string, string>
+  onGuardarTarifaEspecial: (linea: string, nombre: string) => void
+  guardandoLinea?: string
 }
 
 export function WizardPaso3({
   lineas, paqueteadora, snapshot, lineasDisponibles, onChange,
+  tarifaTipoPorLinea, tarifaEspecialGrupos, tarifaEspecialIdPorLinea, onGuardarTarifaEspecial, guardandoLinea,
 }: WizardPaso3Props) {
   const [activeLinea, setActiveLinea] = useState(lineas[0] ?? '')
 
@@ -372,6 +529,8 @@ export function WizardPaso3({
   const linea = lineasDisponibles.find((l) => l.nombre === activeLinea)
   const isTransporte = linea ? isTransporteLine(linea.nombre) : false
   const isPaqueteo = linea ? isPaqueteoLine(linea.nombre) : false
+  const isEspecial = tarifaTipoPorLinea[activeLinea] === 'especial'
+  const especialGrupos = tarifaEspecialGrupos[activeLinea] ?? []
 
   const grupos = linea
     ? [...linea.grupos]
@@ -408,7 +567,35 @@ export function WizardPaso3({
         </p>
       )}
 
-      {linea ? (
+      {isEspecial && tarifaEspecialIdPorLinea[activeLinea] === 'nueva' && (
+        <GuardarTarifaEspecialBanner
+          linea={activeLinea}
+          saving={guardandoLinea === activeLinea}
+          onSave={(nombre) => onGuardarTarifaEspecial(activeLinea, nombre)}
+        />
+      )}
+
+      {isEspecial ? (
+        especialGrupos.length > 0 ? (
+          <div className="space-y-4">
+            {especialGrupos.map((meta) => (
+              <WizardEspecialGrupo
+                key={meta.gid}
+                lineaNombre={activeLinea}
+                meta={meta}
+                isTransporte={isTransporte}
+                isPaqueteo={isPaqueteo}
+                snapshot={snapshot}
+                onChange={onChange}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted">
+            Esta línea está en modo Tarifa Especial pero no tiene grupos — vuelve al paso 2 y elige o crea una.
+          </p>
+        )
+      ) : linea ? (
         grupos.length > 0 ? (
           <div className="space-y-4">
             {grupos.map((grupo) => {

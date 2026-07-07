@@ -6,14 +6,25 @@ import { getCotizacion, createCotizacion, updateCotizacion } from '../../api/cot
 import { getBiblioteca } from '../../api/biblioteca'
 import { getComercialesApi } from '../../api/comerciales'
 import { getRecords, getRecord } from '../../api/records'
+import {
+  createTarifaEspecial as apiCreateTarifaEspecial,
+  updateTarifaEspecial as apiUpdateTarifaEspecial,
+  deleteTarifaEspecial as apiDeleteTarifaEspecial,
+} from '../../api/tarifasEspeciales'
 import { toast } from '../../store/toastStore'
-import type { BibliotecaLinea, CRMRecord, EstadoCotizacion } from '../../types'
+import type { BibliotecaLinea, CRMRecord, EstadoCotizacion, TarifaEspecial, TarifaEspecialGrupoMeta } from '../../types'
 import { PAQUETEO_PAQUETEADORAS } from '../../lib/htmlV6/constants'
 import { COTIZACION_ESTADO_OPTIONS } from '../../lib/htmlV6/domainConfig'
 import {
   type CotItemsSnapshot,
+  type CotSnapshotItem,
   ensureTransportePaqueteoSnapshot,
   isItemSelected,
+  isPaqueteoLine,
+  paqueteoGrupoMatches,
+  parseGrupoNombre,
+  bibItemToSnapshotItem,
+  espKeyFor,
 } from '../../lib/cotizacion/snapshot'
 import { buildCotHTML, flattenSnapshot } from '../../lib/cotizacion/buildCotHTML'
 import {
@@ -22,6 +33,7 @@ import {
   summarizeSnapshotItem,
   itemDisplayTarifa,
 } from './WizardPaso3'
+import { LineaTarifaEspecialPanel } from './TarifaEspecialPanel'
 
 // ─── Tipos wizard ──────────────────────────────────────────────────────────────
 
@@ -40,10 +52,12 @@ interface WizardData {
   fecha: string
   vigencia: string
   asunto: string
-  // Paso 2: Líneas de servicio
+  // Paso 2: Líneas de servicio + Tarifa Especial (por línea, no global — paridad HTML)
   lineas: string[]
-  tarifaTipo: 'biblioteca' | 'especial'
-  // Paso 3: Items seleccionados por línea (snapshot)
+  tarifaTipoPorLinea: Record<string, 'biblioteca' | 'especial'>
+  tarifaEspecialIdPorLinea: Record<string, string> // teId | 'nueva' | ''
+  tarifaEspecialGrupos: Record<string, TarifaEspecialGrupoMeta[]> // metadata de grupo congelada para líneas en modo especial
+  // Paso 3: Items seleccionados por línea (snapshot) — también usado por especial (itemsSnapshot[linea][gid])
   itemsSnapshot: CotItemsSnapshot
   // Paso 4: Observaciones por línea + libres
   obsHtml: Record<string, string>
@@ -65,7 +79,7 @@ function plusDaysISO(iso: string, days: number): string {
 const EMPTY: WizardData = {
   empresa: '', nit: '', ciudad: '', contacto: '', cargo: '', telefono: '', email: '',
   comercial: '', paqueteadora: '', recordId: '', fecha: '', vigencia: '', asunto: '',
-  lineas: [], tarifaTipo: 'biblioteca',
+  lineas: [], tarifaTipoPorLinea: {}, tarifaEspecialIdPorLinea: {}, tarifaEspecialGrupos: {},
   itemsSnapshot: {}, obsHtml: {}, obsLibre: '',
   estado: 'borrador',
 }
@@ -90,7 +104,11 @@ function buildWizardPayload(data: WizardData, estado: EstadoCotizacion) {
     comercial: data.comercial,
     paqueteadora: data.paqueteadora || undefined,
     recordId: data.recordId || undefined,
-    tarifaTipo: data.tarifaTipo,
+    // Legado (columna singular usada solo para el badge de la lista) — 'especial' si alguna línea la usa.
+    tarifaTipo: data.lineas.some((l) => data.tarifaTipoPorLinea[l] === 'especial') ? 'especial' : 'biblioteca',
+    tarifaTipoPorLinea: data.tarifaTipoPorLinea,
+    tarifaEspecialIdPorLinea: data.tarifaEspecialIdPorLinea,
+    tarifaEspecialGrupos: data.tarifaEspecialGrupos,
     estado,
     fecha: data.fecha || undefined,
     vigencia: data.vigencia || undefined,
@@ -135,6 +153,8 @@ async function persistCotizacion(
     itemsSnapshot: opts.data.itemsSnapshot,
     obsHtml: opts.data.obsHtml,
     obsLibre: opts.data.obsLibre,
+    tarifaTipoPorLinea: opts.data.tarifaTipoPorLinea,
+    tarifaEspecialGrupos: opts.data.tarifaEspecialGrupos,
   }, opts.biblioteca)
 
   if (htmlPreview !== cot.htmlPreview) {
@@ -328,10 +348,16 @@ function Paso1({ data, onChange }: { data: WizardData; onChange: (d: Partial<Wiz
 
 function Paso2({
   data, onChange, lineasDisponibles,
+  onToggleTarifaEspecial, onSelectTarifaEspecial, onEditarTarifaEspecial, onEliminarTarifaEspecial, onNuevaTarifaEspecial,
 }: {
   data: WizardData
   onChange: (d: Partial<WizardData>) => void
   lineasDisponibles: BibliotecaLinea[]
+  onToggleTarifaEspecial: (linea: string) => void
+  onSelectTarifaEspecial: (linea: string, te: TarifaEspecial) => void
+  onEditarTarifaEspecial: (linea: string, te: TarifaEspecial) => void
+  onEliminarTarifaEspecial: (linea: string, te: TarifaEspecial) => void
+  onNuevaTarifaEspecial: (linea: string) => void
 }) {
   function toggleLinea(nombre: string) {
     const next = data.lineas.includes(nombre)
@@ -345,22 +371,6 @@ function Paso2({
 
   return (
     <div className="space-y-6">
-      <div className="form-group">
-        <label>Tipo de tarifa</label>
-        <div className="type-toggle max-w-md">
-          {(['biblioteca', 'especial'] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => onChange({ tarifaTipo: t })}
-              className={`type-btn ${data.tarifaTipo === t ? 'active' : ''}`}
-            >
-              {t === 'biblioteca' ? 'Biblioteca de tarifas' : 'Tarifa especial'}
-            </button>
-          ))}
-        </div>
-      </div>
-
       <div className="form-group">
         <label>
           Líneas de servicio <span className="text-danger">*</span>
@@ -386,6 +396,31 @@ function Paso2({
           <p className="text-sm text-muted">No hay líneas en la biblioteca. Configúralas en Biblioteca de Tarifas.</p>
         )}
       </div>
+
+      {data.lineas.length > 0 && (
+        <div className="rounded-xl border border-gold/30 overflow-hidden">
+          <div className="bg-gold/10 px-4 py-2.5 text-sm font-bold text-gold uppercase tracking-wider">
+            ⭐ Tarifas Especiales
+          </div>
+          <div className="p-3 space-y-2">
+            {data.lineas.map((linea) => (
+              <LineaTarifaEspecialPanel
+                key={linea}
+                linea={linea}
+                espKey={espKeyFor(linea, data.paqueteadora)}
+                active={data.tarifaTipoPorLinea[linea] === 'especial'}
+                selectedId={data.tarifaEspecialIdPorLinea[linea] ?? ''}
+                isNueva={data.tarifaEspecialIdPorLinea[linea] === 'nueva'}
+                onToggle={() => onToggleTarifaEspecial(linea)}
+                onSelect={(te) => onSelectTarifaEspecial(linea, te)}
+                onEdit={(te) => onEditarTarifaEspecial(linea, te)}
+                onDelete={(te) => onEliminarTarifaEspecial(linea, te)}
+                onNueva={() => onNuevaTarifaEspecial(linea)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -497,7 +532,12 @@ function Paso5({
           {data.contacto && <div><span className="text-muted">Contacto:</span> <span className="text-foreground">{data.contacto}{data.cargo ? ` (${data.cargo})` : ''}</span></div>}
           {data.telefono && <div><span className="text-muted">Teléfono:</span> <span className="text-foreground">{data.telefono}</span></div>}
           <div><span className="text-muted">Comercial:</span> <span className="text-foreground">{data.comercial}</span></div>
-          <div><span className="text-muted">Tarifa:</span> <span className="text-foreground capitalize">{data.tarifaTipo}</span></div>
+          <div className="col-span-2">
+            <span className="text-muted">Tarifa:</span>{' '}
+            <span className="text-foreground">
+              {data.lineas.map((l) => `${l}: ${data.tarifaTipoPorLinea[l] === 'especial' ? 'Especial' : 'Biblioteca'}`).join(' · ')}
+            </span>
+          </div>
           {data.fecha && <div><span className="text-muted">Fecha:</span> <span className="text-foreground">{data.fecha}</span></div>}
           {data.vigencia && <div><span className="text-muted">Válida hasta:</span> <span className="text-foreground">{data.vigencia}</span></div>}
           {data.asunto && <div className="col-span-2"><span className="text-muted">Asunto:</span> <span className="text-foreground">{data.asunto}</span></div>}
@@ -613,7 +653,9 @@ export default function WizardLayout() {
         vigencia: cotExistente.vigencia ? cotExistente.vigencia.slice(0, 10) : '',
         asunto: cotExistente.asunto ?? '',
         lineas: cotExistente.lineas,
-        tarifaTipo: cotExistente.tarifaTipo as 'biblioteca' | 'especial',
+        tarifaTipoPorLinea: cotExistente.tarifaTipoPorLinea ?? {},
+        tarifaEspecialIdPorLinea: cotExistente.tarifaEspecialIdPorLinea ?? {},
+        tarifaEspecialGrupos: cotExistente.tarifaEspecialGrupos ?? {},
         itemsSnapshot: flattenSnapshot(cotExistente.itemsSnapshot),
         obsHtml: cotExistente.obsHtml,
         obsLibre: cotExistente.obsLibre ?? '',
@@ -635,6 +677,144 @@ export default function WizardLayout() {
   const handleSnapshotChange = useCallback((snap: CotItemsSnapshot) => {
     onChange({ itemsSnapshot: snap })
   }, [])
+
+  // ── Tarifa Especial (por línea) ────────────────────────────────────────────
+  // id de la tarifa especial que se está sobrescribiendo al guardar (transitorio, no se persiste en la cotización).
+  const [espEditingId, setEspEditingId] = useState<Record<string, string>>({})
+
+  /** Carga los grupos/items de una tarifa especial guardada al estado del wizard (paridad _cargarItemsDesdeEspecial). */
+  function applyTarifaEspecial(te: TarifaEspecial): { grupos: typeof data.tarifaEspecialGrupos[string]; snapshot: Record<string, CotSnapshotItem[]> } {
+    const grupos = te.grupos.map((g) => ({ gid: g.gid, nombre: g.nombre, tipo: g.tipo, obsEcommerce: g.obsEcommerce }))
+    const snapshot: Record<string, CotSnapshotItem[]> = {}
+    for (const g of te.grupos) {
+      snapshot[g.gid] = (g.items as CotSnapshotItem[]).map((i) => ({ ...i, sel: true }))
+    }
+    return { grupos, snapshot }
+  }
+
+  /** Semilla una tarifa especial "nueva" a partir de la Biblioteca actual para esa línea (paridad abrirNuevaTarifaEspecial). */
+  function seedEspecialFromBiblioteca(linea: string): { grupos: typeof data.tarifaEspecialGrupos[string]; snapshot: Record<string, CotSnapshotItem[]> } {
+    const lineaBib = biblioteca.find((l) => l.nombre === linea)
+    if (!lineaBib) return { grupos: [], snapshot: {} }
+    const grupos = [...lineaBib.grupos]
+      .sort((a, b) => a.orden - b.orden)
+      .filter((g) => paqueteoGrupoMatches(lineaBib, g, data.paqueteadora))
+
+    const metaList: typeof data.tarifaEspecialGrupos[string] = []
+    const snapshot: Record<string, CotSnapshotItem[]> = {}
+    for (const g of grupos) {
+      const { tipo, display } = parseGrupoNombre(g.nombre)
+      const gid = `esp_${g.id}`
+      metaList.push({ gid, nombre: display || g.nombre, tipo, obsEcommerce: g.obsEcommerce ?? '' })
+      snapshot[gid] = [...g.items].sort((a, b) => a.orden - b.orden).map((i) => bibItemToSnapshotItem(i, true))
+    }
+    return { grupos: metaList, snapshot }
+  }
+
+  function handleToggleTarifaEspecial(linea: string) {
+    const active = data.tarifaTipoPorLinea[linea] === 'especial'
+    if (active) {
+      // Al desactivar se limpia la selección biblioteca de esa línea (paridad toggleTarifaEspecial)
+      onChange({
+        tarifaTipoPorLinea: { ...data.tarifaTipoPorLinea, [linea]: 'biblioteca' },
+        itemsSnapshot: { ...data.itemsSnapshot, [linea]: {} },
+      })
+    } else {
+      onChange({ tarifaTipoPorLinea: { ...data.tarifaTipoPorLinea, [linea]: 'especial' } })
+    }
+  }
+
+  function handleSelectTarifaEspecial(linea: string, te: TarifaEspecial) {
+    const { grupos, snapshot } = applyTarifaEspecial(te)
+    onChange({
+      tarifaEspecialIdPorLinea: { ...data.tarifaEspecialIdPorLinea, [linea]: te.id },
+      tarifaEspecialGrupos: { ...data.tarifaEspecialGrupos, [linea]: grupos },
+      itemsSnapshot: { ...data.itemsSnapshot, [linea]: snapshot },
+    })
+  }
+
+  function handleEditarTarifaEspecial(linea: string, te: TarifaEspecial) {
+    const { grupos, snapshot } = applyTarifaEspecial(te)
+    setEspEditingId((prev) => ({ ...prev, [linea]: te.id }))
+    onChange({
+      tarifaTipoPorLinea: { ...data.tarifaTipoPorLinea, [linea]: 'especial' },
+      tarifaEspecialIdPorLinea: { ...data.tarifaEspecialIdPorLinea, [linea]: 'nueva' },
+      tarifaEspecialGrupos: { ...data.tarifaEspecialGrupos, [linea]: grupos },
+      itemsSnapshot: { ...data.itemsSnapshot, [linea]: snapshot },
+    })
+    setStep(2)
+  }
+
+  function handleNuevaTarifaEspecial(linea: string) {
+    setEspEditingId((prev) => {
+      const next = { ...prev }
+      delete next[linea]
+      return next
+    })
+    // Si ya hay una edición "nueva" en curso con contenido, solo continuar en el paso 3.
+    if (data.tarifaEspecialIdPorLinea[linea] === 'nueva' && data.tarifaEspecialGrupos[linea]?.length) {
+      setStep(2)
+      return
+    }
+    const { grupos, snapshot } = seedEspecialFromBiblioteca(linea)
+    onChange({
+      tarifaTipoPorLinea: { ...data.tarifaTipoPorLinea, [linea]: 'especial' },
+      tarifaEspecialIdPorLinea: { ...data.tarifaEspecialIdPorLinea, [linea]: 'nueva' },
+      tarifaEspecialGrupos: { ...data.tarifaEspecialGrupos, [linea]: grupos },
+      itemsSnapshot: { ...data.itemsSnapshot, [linea]: snapshot },
+    })
+    setStep(2)
+  }
+
+  const deleteTarifaEspecialMut = useAppMutation({
+    mutationFn: ({ te }: { linea: string; te: TarifaEspecial }) => apiDeleteTarifaEspecial(te.id),
+    onSuccess: (_r, { linea, te }) => {
+      if (data.tarifaEspecialIdPorLinea[linea] === te.id) {
+        onChange({ tarifaEspecialIdPorLinea: { ...data.tarifaEspecialIdPorLinea, [linea]: '' } })
+      }
+      qc.invalidateQueries({ queryKey: ['tarifas-especiales', espKeyFor(linea, data.paqueteadora)] })
+      toast.success('Tarifa especial eliminada')
+    },
+    onError: () => toast.error('Error al eliminar la tarifa especial'),
+  })
+
+  function handleEliminarTarifaEspecial(linea: string, te: TarifaEspecial) {
+    if (!confirm(`¿Eliminar la tarifa especial "${te.nombre}"?`)) return
+    deleteTarifaEspecialMut.mutate({ linea, te })
+  }
+
+  const guardarTarifaEspecialMut = useAppMutation({
+    mutationFn: async ({ linea, nombre }: { linea: string; nombre: string }) => {
+      const metaList = data.tarifaEspecialGrupos[linea] ?? []
+      const grupos = metaList
+        .map((meta) => ({ ...meta, items: (data.itemsSnapshot[linea]?.[meta.gid] ?? []).filter(isItemSelected) }))
+        .filter((g) => g.items.length > 0)
+      if (!nombre.trim()) throw new Error('Escribe un nombre para la tarifa especial.')
+      if (grupos.length === 0) throw new Error('Selecciona al menos un grupo con ítems para guardar.')
+
+      const key = espKeyFor(linea, data.paqueteadora)
+      const editingId = espEditingId[linea]
+      return editingId
+        ? apiUpdateTarifaEspecial(editingId, { nombre, grupos })
+        : apiCreateTarifaEspecial({ espKey: key, svc: linea, nombre, grupos })
+    },
+    onSuccess: (te, { linea }) => {
+      const { grupos, snapshot } = applyTarifaEspecial(te)
+      onChange({
+        tarifaEspecialIdPorLinea: { ...data.tarifaEspecialIdPorLinea, [linea]: te.id },
+        tarifaEspecialGrupos: { ...data.tarifaEspecialGrupos, [linea]: grupos },
+        itemsSnapshot: { ...data.itemsSnapshot, [linea]: snapshot },
+      })
+      setEspEditingId((prev) => {
+        const next = { ...prev }
+        delete next[linea]
+        return next
+      })
+      qc.invalidateQueries({ queryKey: ['tarifas-especiales', espKeyFor(linea, data.paqueteadora)] })
+      toast.success(`⭐ Tarifa "${te.nombre}" guardada`)
+    },
+    onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Error al guardar la tarifa especial'),
+  })
 
   function advanceStep() {
     if (step === 1 && biblioteca.length) {
@@ -714,7 +894,17 @@ export default function WizardLayout() {
 
   const stepComponents = [
     <Paso1 key={0} data={data} onChange={onChange} />,
-    <Paso2 key={1} data={data} onChange={onChange} lineasDisponibles={biblioteca} />,
+    <Paso2
+      key={1}
+      data={data}
+      onChange={onChange}
+      lineasDisponibles={biblioteca}
+      onToggleTarifaEspecial={handleToggleTarifaEspecial}
+      onSelectTarifaEspecial={handleSelectTarifaEspecial}
+      onEditarTarifaEspecial={handleEditarTarifaEspecial}
+      onEliminarTarifaEspecial={handleEliminarTarifaEspecial}
+      onNuevaTarifaEspecial={handleNuevaTarifaEspecial}
+    />,
     <WizardPaso3
       key={2}
       lineas={data.lineas}
@@ -722,6 +912,11 @@ export default function WizardLayout() {
       snapshot={data.itemsSnapshot}
       lineasDisponibles={biblioteca}
       onChange={handleSnapshotChange}
+      tarifaTipoPorLinea={data.tarifaTipoPorLinea}
+      tarifaEspecialGrupos={data.tarifaEspecialGrupos}
+      tarifaEspecialIdPorLinea={data.tarifaEspecialIdPorLinea}
+      onGuardarTarifaEspecial={(linea, nombre) => guardarTarifaEspecialMut.mutate({ linea, nombre })}
+      guardandoLinea={guardarTarifaEspecialMut.isPending ? guardarTarifaEspecialMut.variables?.linea : undefined}
     />,
     <Paso4 key={3} data={data} onChange={onChange} lineasDisponibles={biblioteca} />,
     <Paso5 key={4} data={data} onChange={onChange} />,

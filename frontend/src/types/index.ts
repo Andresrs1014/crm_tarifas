@@ -234,6 +234,25 @@ export interface BibliotecaLinea {
 // ─── Cotizaciones ─────────────────────────────────────────────────────────────
 export type EstadoCotizacion = 'borrador' | 'enviada' | 'negociacion' | 'aprobada' | 'rechazada'
 
+/** Metadata de un grupo de tarifa especial congelada en la cotización — items siguen viviendo en itemsSnapshot[linea][gid]. */
+export interface TarifaEspecialGrupoMeta {
+  gid: string
+  nombre: string
+  tipo: string
+  obsEcommerce?: string
+}
+
+/** Entrada de la biblioteca reutilizable de tarifas especiales (independiente de una cotización puntual). */
+export interface TarifaEspecial {
+  id: string
+  espKey: string
+  svc: string
+  nombre: string
+  grupos: (TarifaEspecialGrupoMeta & { items: unknown[] })[]
+  createdAt: string
+  updatedAt: string
+}
+
 export interface Cotizacion {
   id: string
   numero: string
@@ -248,6 +267,9 @@ export interface Cotizacion {
   comercial: string
   paqueteadora?: string
   tarifaTipo: 'biblioteca' | 'especial'
+  tarifaTipoPorLinea: Record<string, 'biblioteca' | 'especial'>
+  tarifaEspecialIdPorLinea: Record<string, string>
+  tarifaEspecialGrupos: Record<string, TarifaEspecialGrupoMeta[]>
   estado: EstadoCotizacion
   fecha?: string
   vigencia?: string
@@ -273,6 +295,9 @@ export interface CotizacionCreate {
   comercial: string
   paqueteadora?: string
   tarifaTipo: string
+  tarifaTipoPorLinea?: Record<string, 'biblioteca' | 'especial'>
+  tarifaEspecialIdPorLinea?: Record<string, string>
+  tarifaEspecialGrupos?: Record<string, TarifaEspecialGrupoMeta[]>
   estado: EstadoCotizacion
   fecha?: string
   vigencia?: string
