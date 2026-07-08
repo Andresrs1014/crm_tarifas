@@ -52,6 +52,14 @@
     gap: clamp(12px, 1.5vw, 18px) !important;
   }
 
+  .chart-wrap {
+    height: clamp(200px, 26vh, 240px) !important;
+  }
+
+  .chart-wrap--pipeline {
+    height: clamp(220px, 30vh, 280px) !important;
+  }
+
   .html-charts-grid {
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)) !important;
   }

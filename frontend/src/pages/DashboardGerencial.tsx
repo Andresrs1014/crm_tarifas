@@ -86,7 +86,7 @@ export function GerencialPanel({ recs }: { recs: CRMRecord[] }) {
 
         <div className="chart-card">
           <div className="chart-title">% Clientes por Estado de Relación</div>
-          <div className="h-[220px]">
+          <div className="chart-wrap">
             {riesgoData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>

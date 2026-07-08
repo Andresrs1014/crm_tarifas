@@ -363,7 +363,7 @@ export default function Dashboard() {
           </div>
           <div>
             <div className="text-[11px] uppercase tracking-[1.5px] text-muted mb-3.5">Distribución %</div>
-            <div className="h-[200px]">
+            <div className="chart-wrap">
               {HTML_SERVICES.some((s) => billing.totals[s] > 0) ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -402,7 +402,7 @@ export default function Dashboard() {
         <div className="charts-grid mb-5" style={{ gridTemplateColumns: '1fr 1fr' }}>
           <div className="chart-card">
             <div className="chart-title">📄 Pipeline de Cotizaciones</div>
-            <div className="h-[200px]">
+            <div className="chart-wrap">
               {cotStats.total > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -431,7 +431,7 @@ export default function Dashboard() {
           </div>
           <div className="chart-card">
             <div className="chart-title">📊 Líneas más Cotizadas</div>
-            <div className="h-[200px]">
+            <div className="chart-wrap">
               {cotLineas.labels.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={cotLineas.labels.map((l, i) => ({ name: l, count: cotLineas.data[i] }))}>
