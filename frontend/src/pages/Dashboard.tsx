@@ -240,7 +240,7 @@ export default function Dashboard() {
                   nameKey="name"
                   activeShape={PieActiveShape}
                   data={tipoChart.labels.map((l, i) => ({ name: l, value: tipoChart.data[i] }))}
-                  cx="50%" cy="50%" innerRadius={55} outerRadius={85}
+                  cx="50%" cy="50%" innerRadius="45%" outerRadius="70%"
                   stroke={CHART_DONUT_TIPO.prospecto.stroke} strokeWidth={2}
                 >
                   <Cell fill={CHART_DONUT_TIPO.prospecto.fill} />
