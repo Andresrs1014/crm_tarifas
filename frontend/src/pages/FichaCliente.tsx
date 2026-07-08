@@ -1,10 +1,15 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { getFichas, getAnalistas } from '../api/fichas'
+import { getFichas, getAnalistas, getFichaByRecord } from '../api/fichas'
 import { getComercialesApi } from '../api/comerciales'
+import { getRecord } from '../api/records'
 import { usePagination } from '../hooks/usePagination'
 import { DataListPanel } from '../components/ui/DataListPanel'
+import { buildFichaHTML } from '../lib/ficha/buildFichaHTML'
+import { EMPTY_DATA, type FichaData } from './FichaDetalle'
+import { exportCotizacionPDF } from '../utils/exportPDF'
+import { toast } from '../store/toastStore'
 
 const ESTADO_BADGE: Record<string, string> = {
   pendiente: 'badge-gray',
@@ -21,6 +26,24 @@ export default function FichaCliente() {
   const [filtEstado, setFiltEstado] = useState('')
   const [filtComercial, setFiltComercial] = useState('')
   const [search, setSearch] = useState('')
+  const [pdfLoadingId, setPdfLoadingId] = useState('')
+
+  const { data: analistasAll = [] } = useQuery({ queryKey: ['analistas'], queryFn: getAnalistas })
+
+  async function handlePDF(recordId: string) {
+    setPdfLoadingId(recordId)
+    try {
+      const [ficha, record] = await Promise.all([getFichaByRecord(recordId), getRecord(recordId)])
+      const fichaData: FichaData = { ...EMPTY_DATA, ...(ficha.data as Partial<FichaData>) }
+      const analistaNombre = analistasAll.find((a) => a.id === fichaData.analistaId)?.nombre ?? ''
+      const html = buildFichaHTML(record, fichaData, analistaNombre)
+      await exportCotizacionPDF(html, `ficha-${record.empresa}.pdf`)
+    } catch {
+      toast.error('Error generando PDF')
+    } finally {
+      setPdfLoadingId('')
+    }
+  }
 
   const { data: fichas = [], isLoading } = useQuery({
     queryKey: ['fichas', filtEstado, filtComercial],
@@ -36,9 +59,6 @@ export default function FichaCliente() {
   })
 
   const { data: comerciales = [] } = useQuery({ queryKey: ['comerciales'], queryFn: getComercialesApi })
-
-  // getAnalistas is imported but used only to pre-warm the cache
-  useQuery({ queryKey: ['analistas'], queryFn: getAnalistas })
 
   const filtered = fichas.filter((f) => {
     if (!search) return true
@@ -147,9 +167,20 @@ export default function FichaCliente() {
                   </td>
                   <td className="text-xs text-muted">{f.updatedAt ? new Date(f.updatedAt).toLocaleDateString('es-CO') : '—'}</td>
                   <td>
-                    <Link to={`/fichas/${f.record.id}`} className="btn-primary btn-sm text-xs px-3 py-1">
-                      Abrir
-                    </Link>
+                    <div className="flex items-center gap-1.5">
+                      <Link to={`/fichas/${f.record.id}`} className="btn-primary btn-sm text-xs px-3 py-1">
+                        Abrir
+                      </Link>
+                      <button
+                        type="button"
+                        className="btn-secondary btn-sm text-xs px-2 py-1"
+                        disabled={f.estado !== 'completada' || pdfLoadingId === f.recordId}
+                        title={f.estado !== 'completada' ? 'Solo disponible para fichas completadas' : 'Descargar PDF'}
+                        onClick={() => handlePDF(f.recordId)}
+                      >
+                        {pdfLoadingId === f.recordId ? '…' : '📄'}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

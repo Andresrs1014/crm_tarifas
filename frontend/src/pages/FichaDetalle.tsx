@@ -3,24 +3,26 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAppMutation } from '../hooks/useAppMutation'
 import { getFichaByRecord, updateFicha, getAnalistas, createAnalista, deleteAnalista } from '../api/fichas'
-import { getRecord } from '../api/records'
+import { getRecord, getRecords } from '../api/records'
 import { getCotizaciones } from '../api/cotizaciones'
 import { toast } from '../store/toastStore'
 import { usePagination } from '../hooks/usePagination'
 import { DataListPanel, TableScrollArea } from '../components/ui/DataListPanel'
+import { buildFichaHTML } from '../lib/ficha/buildFichaHTML'
+import { exportCotizacionPDF } from '../utils/exportPDF'
 
 // Types
 type TabId = 'info' | 'contactos' | 'facturacion' | 'operacion' | 'kickoff'
 
-interface FichaContacto {
+export interface FichaContacto {
   cargo: string; tipo: string; nombre: string; email: string; tel: string; cel: string; aviso: boolean
 }
-interface KickoffAsistente {
+export interface KickoffAsistente {
   cargo: string; contacto: string
 }
 
 // Default empty data
-const EMPTY_DATA = {
+export const EMPTY_DATA = {
   // Info General
   tipoCliente: '', manejo: [] as string[], sector: '', canal: '',
   propuesta: '', enlace: '', propuestasIds: [] as string[],
@@ -48,7 +50,7 @@ const EMPTY_DATA = {
   asistentes: [] as KickoffAsistente[], obsKickoff: '',
 }
 
-type FichaData = typeof EMPTY_DATA
+export type FichaData = typeof EMPTY_DATA
 
 /** Paridad exacta HTML v6 fichaCalcPct(): 14 campos puntuales + fc-propuesta (legado oculto,
  *  el HTML nunca lo asigna desde ninguna UI visible — se replica igual, tope real ~93% salvo
@@ -90,6 +92,7 @@ export default function FichaDetalle() {
   const [fichaId, setFichaId] = useState('')
   const [showAnalistaForm, setShowAnalistaForm] = useState(false)
   const [newAnalista, setNewAnalista] = useState({ nombre: '', email: '', tel: '' })
+  const [pdfLoading, setPdfLoading] = useState(false)
 
   const { data: ficha, isLoading } = useQuery({
     queryKey: ['ficha', recordId],
@@ -112,6 +115,13 @@ export default function FichaDetalle() {
     queryKey: ['cotizaciones-all-ficha'],
     queryFn: () => getCotizaciones(),
   })
+
+  const { data: recordsAll = [] } = useQuery({
+    queryKey: ['records-all-ficha'],
+    queryFn: () => getRecords(),
+  })
+
+  const [showRefDropdown, setShowRefDropdown] = useState(false)
 
   useEffect(() => {
     if (ficha) {
@@ -209,6 +219,44 @@ export default function FichaDetalle() {
     navigator.clipboard.writeText(url).then(() => toast.success('Link copiado'))
   }
 
+  async function handlePDF() {
+    if (estado !== 'completada') {
+      toast.error('Solo se puede descargar PDF de fichas completadas')
+      return
+    }
+    if (!record) return
+    setPdfLoading(true)
+    try {
+      const analistaNombre = analistas.find((a) => a.id === data.analistaId)?.nombre ?? ''
+      const html = buildFichaHTML(record, data, analistaNombre)
+      await exportCotizacionPDF(html, `ficha-${record.empresa}.pdf`)
+    } catch {
+      toast.error('Error generando PDF')
+    } finally {
+      setPdfLoading(false)
+    }
+  }
+
+  function seleccionarIntermediario(recId: string) {
+    const rec = recordsAll.find((r) => r.id === recId)
+    if (!rec) return
+    setData((d) => ({
+      ...d,
+      refEmpresa: rec.empresa ?? '',
+      refNit: rec.nit ?? '',
+      refDir: rec.direccion ?? '',
+      refTel: rec.contactos?.[0]?.telefono ?? '',
+    }))
+    setShowRefDropdown(false)
+  }
+
+  const intermediariosMatches = data.refEmpresa.trim().length >= 2
+    ? recordsAll
+        .filter((r) => r.tipo === 'cliente' || r.estadoProspecto === 'facturado')
+        .filter((r) => r.empresa.toLowerCase().includes(data.refEmpresa.toLowerCase()))
+        .slice(0, 8)
+    : []
+
   const analistaActual = analistas.find((a) => a.id === data.analistaId)
   const empresaNombre = (record?.empresa ?? '').toLowerCase()
   const cotizacionesCliente = empresaNombre
@@ -258,9 +306,19 @@ export default function FichaDetalle() {
             <div className="text-xs text-muted mt-0.5">{record?.ciudad ?? ''}</div>
           </div>
         </div>
-        <button className="btn-primary btn-sm" disabled={saveMut.isPending} onClick={() => saveMut.mutate()}>
-          {saveMut.isPending ? 'Guardando...' : '💾 Guardar Ficha'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            className="btn-secondary btn-sm"
+            disabled={estado !== 'completada' || pdfLoading}
+            title={estado !== 'completada' ? 'Solo se puede descargar PDF de fichas completadas' : undefined}
+            onClick={handlePDF}
+          >
+            {pdfLoading ? 'Generando...' : '📄 PDF'}
+          </button>
+          <button className="btn-primary btn-sm" disabled={saveMut.isPending} onClick={() => saveMut.mutate()}>
+            {saveMut.isPending ? 'Guardando...' : '💾 Guardar Ficha'}
+          </button>
+        </div>
       </div>
 
       {/* Progress bar */}
@@ -516,15 +574,43 @@ export default function FichaDetalle() {
             {(data.tipoCliente === 'Intermediario' || data.tipoCliente === 'Referido') && (
               <div className="card p-5 space-y-4">
                 <h3 className="text-sm font-bold text-foreground">Cliente que refiere</h3>
-                <div className="space-y-1"><label className="text-xs text-muted uppercase tracking-widest">Empresa Intermediaria</label>
-                  <input className="input w-full" placeholder="Nombre de la empresa..." value={data.refEmpresa} onChange={(e) => upd('refEmpresa', e.target.value)} /></div>
+                <div className="space-y-1 relative">
+                  <label className="text-xs text-muted uppercase tracking-widest">Empresa Intermediaria</label>
+                  <input
+                    className="input w-full"
+                    placeholder="Escribe el nombre de la empresa..."
+                    value={data.refEmpresa}
+                    autoComplete="off"
+                    onChange={(e) => { upd('refEmpresa', e.target.value); setShowRefDropdown(true) }}
+                    onFocus={() => setShowRefDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowRefDropdown(false), 150)}
+                  />
+                  {showRefDropdown && intermediariosMatches.length > 0 && (
+                    <div className="cot-empresa-dropdown">
+                      {intermediariosMatches.map((r) => (
+                        <button
+                          key={r.id}
+                          type="button"
+                          className="cot-empresa-option"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => seleccionarIntermediario(r.id)}
+                        >
+                          <span className="font-semibold">{r.empresa}</span>
+                          <span className="text-xs text-muted">
+                            {r.nit ? `NIT: ${r.nit} · ` : ''}{r.ciudad ?? ''}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-1"><label className="text-xs text-muted uppercase tracking-widest">NIT</label>
-                    <input className="input w-full" value={data.refNit} onChange={(e) => upd('refNit', e.target.value)} /></div>
+                    <input className="input w-full bg-surface2" readOnly value={data.refNit} placeholder="NIT..." /></div>
                   <div className="space-y-1"><label className="text-xs text-muted uppercase tracking-widest">Dirección</label>
-                    <input className="input w-full" value={data.refDir} onChange={(e) => upd('refDir', e.target.value)} /></div>
+                    <input className="input w-full bg-surface2" readOnly value={data.refDir} placeholder="Dirección..." /></div>
                   <div className="space-y-1"><label className="text-xs text-muted uppercase tracking-widest">Teléfono</label>
-                    <input className="input w-full" value={data.refTel} onChange={(e) => upd('refTel', e.target.value)} /></div>
+                    <input className="input w-full bg-surface2" readOnly value={data.refTel} placeholder="Teléfono..." /></div>
                 </div>
               </div>
             )}
