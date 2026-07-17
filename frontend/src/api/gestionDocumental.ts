@@ -43,6 +43,13 @@ export interface GDRow {
   estadoDocs: 'completo' | 'incompleto' | 'pendiente'
 }
 
+export interface HistorialCiclo {
+  ano: number
+  docs: Record<string, DocEstado>
+  fechaActualizacion: string | null
+  archivedAt: string
+}
+
 export interface GDDoc {
   id: string
   nombre: string
@@ -88,6 +95,14 @@ export const uploadGDArchivos = (recordId: string, docId: string, files: File[])
     { headers: { 'Content-Type': 'multipart/form-data' } }
   ).then(r => r.data)
 }
+
+export const getGDHistorial = (recordId: string) =>
+  client.get<Record<string, HistorialCiclo>>(`/api/gestion-documental/${recordId}/historial`).then(r => r.data)
+
+export const iniciarCicloGD = (recordId: string) =>
+  client.post<{ id: string; docs: Record<string, DocEstado>; cicloActual: number }>(
+    `/api/gestion-documental/${recordId}/iniciar-ciclo`
+  ).then(r => r.data)
 
 export const deleteGDArchivo = (recordId: string, docId: string, archivoId: string) =>
   client.delete<{ id: string; docs: Record<string, DocEstado>; cicloActual: number }>(

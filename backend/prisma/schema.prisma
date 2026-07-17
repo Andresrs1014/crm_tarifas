@@ -239,6 +239,7 @@ model GestionDocumental {
   record      Record   @relation(fields: [recordId], references: [id], onDelete: Cascade)
   docs        Json     @default("{}") @map("docs") // { docId: { estado, obs, fecha } }
   cicloActual Int      @default(2025) @map("ciclo_actual")
+  historial   Json     @default("{}") @map("historial") // { [ano]: { ano, docs, fechaActualizacion, archivedAt } } — ciclos archivados
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("gestion_documental")

@@ -219,6 +219,48 @@ export async function findArchivo(recordId: string, docId: string, archivoId: st
   return archivos.find(a => a.id === archivoId) ?? null;
 }
 
+export interface HistorialCiclo {
+  ano: number;
+  docs: Record<string, DocEstado>;
+  fechaActualizacion: string | null;
+  archivedAt: string;
+}
+
+/** Archiva el ciclo actual en `historial` y reinicia todos los docs a "pendiente" (paridad gdIniciarCiclo). */
+export async function iniciarCiclo(recordId: string) {
+  const gd = await getOrCreateGD(recordId);
+  const anoNuevo = new Date().getFullYear();
+  const cicloAnterior = gd.cicloActual;
+  if (cicloAnterior >= anoNuevo) {
+    throw Object.assign(new Error(`El ciclo ${anoNuevo} ya está activo`), { statusCode: 400 });
+  }
+
+  const historial = { ...(gd.historial as unknown as Record<string, HistorialCiclo>) };
+  historial[cicloAnterior] = {
+    ano: cicloAnterior,
+    docs: gd.docs as Record<string, DocEstado>,
+    fechaActualizacion: gd.updatedAt.toISOString(),
+    archivedAt: new Date().toISOString(),
+  };
+
+  const docsPendientes: Record<string, DocEstado> = {};
+  for (const d of GD_DOCS) docsPendientes[d.id] = { estado: 'pendiente', obs: '', fecha: '', archivos: [] };
+
+  return prisma.gestionDocumental.update({
+    where: { recordId },
+    data: {
+      docs: docsPendientes as JsonInput,
+      cicloActual: anoNuevo,
+      historial: historial as JsonInput,
+    },
+  });
+}
+
+export async function getHistorial(recordId: string): Promise<Record<string, HistorialCiclo>> {
+  const gd = await getOrCreateGD(recordId);
+  return (gd.historial as unknown as Record<string, HistorialCiclo>) ?? {};
+}
+
 /** Quita la metadata del archivo; retorna el registro actualizado y el archivo eliminado (para poder borrarlo de disco). */
 export async function removeArchivo(recordId: string, docId: string, archivoId: string) {
   const gd = await getOrCreateGD(recordId);

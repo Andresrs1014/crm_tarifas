@@ -1,11 +1,11 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAppMutation } from '../hooks/useAppMutation'
-import { FolderOpen, X, ChevronRight, RefreshCw, AlertTriangle, Clock, CheckCircle, Circle, Download, Paperclip, Eye, Trash2, type LucideIcon } from 'lucide-react'
+import { FolderOpen, X, ChevronRight, RefreshCw, AlertTriangle, Clock, CheckCircle, Circle, Download, Paperclip, Eye, Trash2, History, RotateCcw, Archive, type LucideIcon } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import {
-  listGD, upsertGD, GD_DOCS, GDRow, DocEstado, GDArchivo,
-  uploadGDArchivos, deleteGDArchivo, fetchGDArchivoBlob,
+  listGD, upsertGD, GD_DOCS, GDRow, DocEstado, GDArchivo, HistorialCiclo,
+  uploadGDArchivos, deleteGDArchivo, fetchGDArchivoBlob, getGDHistorial, iniciarCicloGD,
 } from '../api/gestionDocumental'
 import { useToastStore } from '../store/toastStore'
 import { usePagination } from '../hooks/usePagination'
@@ -159,6 +159,115 @@ function exportExcel(rows: GDRow[]) {
   XLSX.writeFile(wb, `GestionDocumental_ZYMO_${fecha}.xlsx`)
 }
 
+// ─── Historial de ciclos ────────────────────────────────────────────────────────
+function HistorialCicloCard({ h, esReferido }: { h: HistorialCiclo; esReferido: boolean }) {
+  const docs = GD_DOCS.filter(d => esReferido ? d.aplica === 'todos' : true)
+  let completos = 0, incompletos = 0, pendientes = 0
+  for (const d of docs) {
+    const est = h.docs[d.id]?.estado
+    if (est === 'completo') completos++
+    else if (est === 'incompleto') incompletos++
+    else pendientes++
+  }
+  const pct = Math.round((completos / docs.length) * 100)
+
+  return (
+    <details className="rounded-xl border border-border bg-surface2 overflow-hidden group" open>
+      <summary className="list-none cursor-pointer bg-surface3 border-b border-border px-5 py-3.5 flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-baseline gap-3">
+          <span className="font-display text-xl font-extrabold text-accent">Ciclo {h.ano}</span>
+          <span className="text-[11px] text-muted">Archivado el {fmtDate(h.archivedAt)}</span>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg" style={{ background: 'rgba(52,211,153,0.1)', color: '#34d399', border: '1px solid rgba(52,211,153,0.35)' }}>Completos: {completos}</span>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg" style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.35)' }}>Incompletos: {incompletos}</span>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg" style={{ background: 'rgba(248,113,113,0.1)', color: '#f87171', border: '1px solid rgba(248,113,113,0.35)' }}>Pendientes: {pendientes}</span>
+          <span className="text-sm font-display font-bold ml-1" style={{ color: pctColor(pct) }}>{pct}%</span>
+        </div>
+      </summary>
+      <div className="px-5 py-3 flex flex-col gap-1">
+        {docs.map(doc => {
+          const d = h.docs[doc.id] ?? {}
+          const style = d.estado ? ESTADO_STYLE[d.estado] : null
+          const nA = (d.archivos ?? []).length
+          return (
+            <div key={doc.id} className="flex items-center gap-2.5 py-1">
+              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: style?.text ?? '#64748b' }} />
+              <span className="text-xs text-foreground flex-1 min-w-0">{doc.nombre}</span>
+              {d.fecha && <span className="text-[10px] text-muted flex-shrink-0">{d.fecha}</span>}
+              {nA > 0 && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-md flex-shrink-0" style={{ background: 'rgba(56,189,248,0.1)', color: 'var(--accent)', border: '1px solid rgba(56,189,248,0.2)' }}>
+                  Archivos: {nA}
+                </span>
+              )}
+              <span
+                className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0"
+                style={style ? { background: style.bg, color: style.text, border: `1px solid ${style.border}` } : { color: 'var(--text2)' }}
+              >
+                {style?.label ?? 'Sin gestionar'}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </details>
+  )
+}
+
+function HistorialModal({ row, onClose }: { row: GDRow; onClose: () => void }) {
+  const { data: historial, isLoading } = useQuery({
+    queryKey: ['gestion-documental-historial', row.id],
+    queryFn: () => getGDHistorial(row.id),
+  })
+  const anos = Object.values(historial ?? {}).sort((a, b) => b.ano - a.ano)
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/75 backdrop-blur-sm flex items-start justify-center overflow-y-auto p-4 sm:p-8 animate-fade-in" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="historial-title"
+        className="card-glass w-full max-w-3xl rounded-2xl border-2 border-accent/30 overflow-hidden animate-slide-up"
+        style={{ boxShadow: '0 20px 60px rgba(0,194,255,0.15)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="border-b border-border px-6 py-5 flex items-center justify-between bg-gradient-to-r from-accent/10 to-transparent">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-accent/15 border border-accent/30 flex items-center justify-center flex-shrink-0">
+              <History size={18} className="text-accent" />
+            </div>
+            <div>
+              <h2 id="historial-title" className="font-display text-lg font-bold text-foreground leading-tight">Historial Documental por Ciclo</h2>
+              <p className="text-xs text-muted">{row.empresa}</p>
+            </div>
+          </div>
+          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-lg hover:bg-white/10 text-muted transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+          {isLoading ? (
+            <div className="text-sm text-muted py-8 text-center">Cargando historial...</div>
+          ) : anos.length === 0 ? (
+            <div className="text-center py-12 px-5 text-sm text-muted">
+              <Archive size={28} className="mx-auto mb-3 opacity-40" />
+              Sin ciclos archivados. El historial se crea al iniciar un nuevo ciclo anual.
+            </div>
+          ) : (
+            anos.map(h => <HistorialCicloCard key={h.ano} h={h} esReferido={row.tipoCliente === 'referido'} />)
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Doc Modal ────────────────────────────────────────────────────────────────
 function DocModal({ row, onClose }: { row: GDRow; onClose: () => void }) {
   const qc = useQueryClient()
@@ -170,6 +279,7 @@ function DocModal({ row, onClose }: { row: GDRow; onClose: () => void }) {
   const [draft, setDraft] = useState<Record<string, DocEstado>>(() => ({ ...row.gd.docs }))
   const [ciclo, setCiclo] = useState(row.gd.cicloActual)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [showHistorial, setShowHistorial] = useState(false)
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -190,6 +300,21 @@ function DocModal({ row, onClose }: { row: GDRow; onClose: () => void }) {
       onClose()
     },
     onError: () => push('Error al guardar', 'error'),
+  })
+
+  const iniciarCicloMut = useAppMutation({
+    mutationFn: () => iniciarCicloGD(row.id),
+    onSuccess: (data) => {
+      setDraft(data.docs as Record<string, DocEstado>)
+      setCiclo(data.cicloActual)
+      qc.invalidateQueries({ queryKey: ['gestion-documental'] })
+      qc.invalidateQueries({ queryKey: ['gestion-documental-historial', row.id] })
+      push(`Ciclo ${data.cicloActual} activo — documentos anteriores archivados`, 'success')
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+      push(msg || 'Error al iniciar el ciclo', 'error')
+    },
   })
 
   const uploadMut = useAppMutation({
@@ -232,14 +357,6 @@ function DocModal({ row, onClose }: { row: GDRow; onClose: () => void }) {
       [docId]: { ...prev[docId], [field]: value },
     }))
   }, [])
-
-  // Mass actions
-  const allIds = docs.map(d => d.id)
-  const allChecked = allIds.every(id => selected.has(id))
-
-  function toggleAll(checked: boolean) {
-    setSelected(checked ? new Set(allIds) : new Set())
-  }
 
   function applyMassEstado(estado: 'completo' | 'incompleto' | 'pendiente') {
     if (selected.size === 0) return
@@ -308,7 +425,7 @@ function DocModal({ row, onClose }: { row: GDRow; onClose: () => void }) {
           </div>
 
           {/* Cycle */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <span className="text-xs text-muted uppercase tracking-wider font-semibold">Ciclo documental:</span>
             <select
               value={ciclo}
@@ -322,20 +439,33 @@ function DocModal({ row, onClose }: { row: GDRow; onClose: () => void }) {
             {desactualizado && (
               <span className="text-xs text-red-400 font-semibold">Ciclo desactualizado</span>
             )}
+            <div className="flex items-center gap-2 ml-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  if (row.gd.cicloActual >= anoActual) { push(`El ciclo ${anoActual} ya está activo`, 'info'); return }
+                  if (!confirm(`¿Iniciar ciclo ${anoActual}?\n\nLos documentos del ciclo ${row.gd.cicloActual} quedarán archivados y todos los estados pasarán a Pendiente.`)) return
+                  iniciarCicloMut.mutate()
+                }}
+                disabled={iniciarCicloMut.isPending}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent/10 text-accent border border-accent/30 hover:bg-accent/20 transition-colors disabled:opacity-40"
+              >
+                <RotateCcw size={13} />
+                {iniciarCicloMut.isPending ? 'Iniciando...' : 'Iniciar ciclo'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowHistorial(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface2 border border-border text-muted hover:text-foreground hover:bg-surface3 transition-colors"
+              >
+                <History size={13} />
+                Ver historial
+              </button>
+            </div>
           </div>
 
           {/* Mass action bar */}
           <div className="rounded-xl border border-border bg-surface p-3 flex flex-wrap gap-3 items-center">
-            <label className="flex items-center gap-2 text-xs font-semibold text-foreground cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={allChecked}
-                onChange={e => toggleAll(e.target.checked)}
-                className="w-3.5 h-3.5 accent-accent cursor-pointer"
-              />
-              Seleccionar todos
-            </label>
-            <div className="w-px h-5 bg-border" />
             <span className="text-xs text-muted">Cambiar estado de seleccionados:</span>
             <button
               onClick={() => applyMassEstado('completo')}
@@ -493,6 +623,7 @@ function DocModal({ row, onClose }: { row: GDRow; onClose: () => void }) {
           </button>
         </div>
       </div>
+      {showHistorial && <HistorialModal row={row} onClose={() => setShowHistorial(false)} />}
     </div>
   )
 }

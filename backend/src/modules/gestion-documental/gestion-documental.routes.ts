@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { authenticate, param } from '../../middleware/auth';
-import { listGD, getOrCreateGD, upsertGD, addArchivos, findArchivo, removeArchivo, GD_DOCS } from './gestion-documental.service';
+import { listGD, getOrCreateGD, upsertGD, addArchivos, findArchivo, removeArchivo, iniciarCiclo, getHistorial, GD_DOCS } from './gestion-documental.service';
 import { upload, archivoFilePath, docDir, matchesMagicBytes } from './gestion-documental.upload';
 
 const router = Router();
@@ -59,6 +59,26 @@ router.get('/:recordId', async (req: Request, res: Response, next: NextFunction)
 router.put('/:recordId', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await upsertGD(String(req.params.recordId), req.body);
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/gestion-documental/:recordId/historial
+router.get('/:recordId/historial', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = await getHistorial(param(req.params.recordId));
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/gestion-documental/:recordId/iniciar-ciclo
+router.post('/:recordId/iniciar-ciclo', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = await iniciarCiclo(param(req.params.recordId));
     res.json(data);
   } catch (err) {
     next(err);
