@@ -1495,6 +1495,20 @@
 .grupo-body {
   padding: 12px 14px 14px;
 }
+.grupo-card-handle {
+  flex-shrink: 0;
+  width: 20px;
+  border: none;
+  background: transparent;
+  color: var(--text2);
+  cursor: grab;
+  font-size: 15px;
+  line-height: 1;
+  padding: 2px 0;
+}
+.grupo-card-handle:active {
+  cursor: grabbing;
+}
 
 .wizard-row-selected td {
   background: rgba(0, 194, 255, 0.06);

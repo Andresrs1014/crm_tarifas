@@ -26,6 +26,17 @@ import {
   setGrupoSnapshot,
   getSchemaForGrupo,
 } from '../../lib/cotizacion/snapshot'
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DraggableAttributes,
+  type DraggableSyntheticListeners,
+} from '@dnd-kit/core'
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 // ─── Schema cell (editable en wizard, no persiste en biblioteca) ───────────────
 
@@ -359,7 +370,7 @@ function WizardEspecialStandardRow({
 }
 
 function WizardEspecialGrupo({
-  lineaNombre, meta, isTransporte, isPaqueteo, snapshot, onChange,
+  lineaNombre, meta, isTransporte, isPaqueteo, snapshot, onChange, dragHandle,
 }: {
   lineaNombre: string
   meta: TarifaEspecialGrupoMeta
@@ -367,6 +378,7 @@ function WizardEspecialGrupo({
   isPaqueteo: boolean
   snapshot: CotItemsSnapshot
   onChange: (snap: CotItemsSnapshot) => void
+  dragHandle?: { attributes: DraggableAttributes; listeners: DraggableSyntheticListeners }
 }) {
   const items = snapshot[lineaNombre]?.[meta.gid] ?? []
 
@@ -387,8 +399,21 @@ function WizardEspecialGrupo({
   return (
     <div className="grupo-card">
       <div className="grupo-header grupo-header--open">
-        <div className="grupo-title">{meta.nombre}</div>
-        <div className="text-xs text-muted">{items.length} filas</div>
+        <div className="flex items-center gap-2 min-w-0">
+          {dragHandle && (
+            <button
+              type="button"
+              className="grupo-card-handle"
+              aria-label={`Arrastrar para reordenar el grupo ${meta.nombre}`}
+              {...dragHandle.attributes}
+              {...dragHandle.listeners}
+            >
+              ⠿
+            </button>
+          )}
+          <div className="grupo-title truncate">{meta.nombre}</div>
+        </div>
+        <div className="text-xs text-muted flex-shrink-0">{items.length} filas</div>
       </div>
       <div className="grupo-body">
         <TableScrollArea>
@@ -423,6 +448,24 @@ function WizardEspecialGrupo({
           </table>
         </TableScrollArea>
       </div>
+    </div>
+  )
+}
+
+/** Envuelve WizardEspecialGrupo con drag-and-drop (paridad "Grupos Flotantes" del HTML v6). */
+function SortableEspecialGrupo(props: {
+  lineaNombre: string
+  meta: TarifaEspecialGrupoMeta
+  isTransporte: boolean
+  isPaqueteo: boolean
+  snapshot: CotItemsSnapshot
+  onChange: (snap: CotItemsSnapshot) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: props.meta.gid })
+  const style = { transform: CSS.Transform.toString(transform), transition }
+  return (
+    <div ref={setNodeRef} style={style} className={isDragging ? 'opacity-40' : undefined}>
+      <WizardEspecialGrupo {...props} dragHandle={{ attributes, listeners }} />
     </div>
   )
 }
@@ -551,13 +594,18 @@ export interface WizardPaso3Props {
   tarifaEspecialIdPorLinea: Record<string, string>
   onGuardarTarifaEspecial: (linea: string, nombre: string) => void
   guardandoLinea?: string
+  onAddGrupoEspecial: (linea: string, bibGrupo: BibliotecaGrupo) => void
+  onReorderGruposEspecial: (linea: string, grupos: TarifaEspecialGrupoMeta[]) => void
 }
 
 export function WizardPaso3({
   lineas, paqueteadora, snapshot, lineasDisponibles, onChange,
   tarifaTipoPorLinea, tarifaEspecialGrupos, tarifaEspecialIdPorLinea, onGuardarTarifaEspecial, guardandoLinea,
+  onAddGrupoEspecial, onReorderGruposEspecial,
 }: WizardPaso3Props) {
   const [activeLinea, setActiveLinea] = useState(lineas[0] ?? '')
+  const [grupoAAgregar, setGrupoAAgregar] = useState('')
+  const dragSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
   useEffect(() => {
     if (lineas.length && !lineas.includes(activeLinea)) {
@@ -570,6 +618,21 @@ export function WizardPaso3({
   const isPaqueteo = linea ? isPaqueteoLine(linea.nombre) : false
   const isEspecial = tarifaTipoPorLinea[activeLinea] === 'especial'
   const especialGrupos = tarifaEspecialGrupos[activeLinea] ?? []
+  const especialGidsActuales = new Set(especialGrupos.map((g) => g.gid))
+  const gruposDisponiblesParaAgregar = linea
+    ? linea.grupos.filter((g) => !especialGidsActuales.has(`esp_${g.id}`))
+    : []
+
+  useEffect(() => { setGrupoAAgregar('') }, [activeLinea])
+
+  function handleDragEndGrupos(e: DragEndEvent) {
+    const { active, over } = e
+    if (!over || active.id === over.id) return
+    const oldIndex = especialGrupos.findIndex((g) => g.gid === active.id)
+    const newIndex = especialGrupos.findIndex((g) => g.gid === over.id)
+    if (oldIndex === -1 || newIndex === -1) return
+    onReorderGruposEspecial(activeLinea, arrayMove(especialGrupos, oldIndex, newIndex))
+  }
 
   const grupos = linea
     ? [...linea.grupos]
@@ -615,25 +678,58 @@ export function WizardPaso3({
       )}
 
       {isEspecial ? (
-        especialGrupos.length > 0 ? (
-          <div className="space-y-4">
-            {especialGrupos.map((meta) => (
-              <WizardEspecialGrupo
-                key={meta.gid}
-                lineaNombre={activeLinea}
-                meta={meta}
-                isTransporte={isTransporte}
-                isPaqueteo={isPaqueteo}
-                snapshot={snapshot}
-                onChange={onChange}
-              />
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-muted">
-            Esta línea está en modo Tarifa Especial pero no tiene grupos — vuelve al paso 2 y elige o crea una.
-          </p>
-        )
+        <div className="space-y-4">
+          {especialGrupos.length > 0 ? (
+            <DndContext sensors={dragSensors} onDragEnd={handleDragEndGrupos}>
+              <SortableContext items={especialGrupos.map((g) => g.gid)} strategy={verticalListSortingStrategy}>
+                <div className="space-y-4">
+                  {especialGrupos.map((meta) => (
+                    <SortableEspecialGrupo
+                      key={meta.gid}
+                      lineaNombre={activeLinea}
+                      meta={meta}
+                      isTransporte={isTransporte}
+                      isPaqueteo={isPaqueteo}
+                      snapshot={snapshot}
+                      onChange={onChange}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          ) : (
+            <p className="text-sm text-muted">
+              Esta línea está en modo Tarifa Especial pero no tiene grupos — vuelve al paso 2 y elige o crea una.
+            </p>
+          )}
+
+          {gruposDisponiblesParaAgregar.length > 0 && (
+            <div className="flex items-center gap-2 pt-1">
+              <select
+                value={grupoAAgregar}
+                onChange={(e) => setGrupoAAgregar(e.target.value)}
+                className="filter-input flex-1"
+                aria-label="Grupo de biblioteca a agregar"
+              >
+                <option value="">+ Agregar grupo de Biblioteca...</option>
+                {gruposDisponiblesParaAgregar.map((g) => (
+                  <option key={g.id} value={g.id}>{parseGrupoNombre(g.nombre).display || g.nombre}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="btn-secondary btn-sm"
+                disabled={!grupoAAgregar}
+                onClick={() => {
+                  const bibGrupo = gruposDisponiblesParaAgregar.find((g) => g.id === grupoAAgregar)
+                  if (bibGrupo) { onAddGrupoEspecial(activeLinea, bibGrupo); setGrupoAAgregar('') }
+                }}
+              >
+                Agregar grupo
+              </button>
+            </div>
+          )}
+        </div>
       ) : linea ? (
         grupos.length > 0 ? (
           <div className="space-y-4">

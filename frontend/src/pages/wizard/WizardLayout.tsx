@@ -12,7 +12,7 @@ import {
   deleteTarifaEspecial as apiDeleteTarifaEspecial,
 } from '../../api/tarifasEspeciales'
 import { toast } from '../../store/toastStore'
-import type { BibliotecaLinea, Contacto, CRMRecord, EstadoCotizacion, TarifaEspecial, TarifaEspecialGrupoMeta } from '../../types'
+import type { BibliotecaGrupo, BibliotecaLinea, Contacto, CRMRecord, EstadoCotizacion, TarifaEspecial, TarifaEspecialGrupoMeta } from '../../types'
 import { PAQUETEO_PAQUETEADORAS } from '../../lib/htmlV6/constants'
 import { COTIZACION_ESTADO_OPTIONS } from '../../lib/htmlV6/domainConfig'
 import {
@@ -802,6 +802,29 @@ export default function WizardLayout() {
     return { grupos: metaList, snapshot }
   }
 
+  /** Agrega un grupo más de Biblioteca a una tarifa especial ya en edición (paridad addCotEsp*Grupo). */
+  function handleAddGrupoEspecial(linea: string, bibGrupo: BibliotecaGrupo) {
+    const { tipo, display } = parseGrupoNombre(bibGrupo.nombre)
+    const gid = `esp_${bibGrupo.id}`
+    const meta: TarifaEspecialGrupoMeta = { gid, nombre: display || bibGrupo.nombre, tipo, obsEcommerce: bibGrupo.obsEcommerce ?? '' }
+    const items = [...bibGrupo.items].sort((a, b) => a.orden - b.orden).map((i) => bibItemToSnapshotItem(i, true))
+    onChange({
+      tarifaEspecialGrupos: {
+        ...data.tarifaEspecialGrupos,
+        [linea]: [...(data.tarifaEspecialGrupos[linea] ?? []), meta],
+      },
+      itemsSnapshot: {
+        ...data.itemsSnapshot,
+        [linea]: { ...(data.itemsSnapshot[linea] ?? {}), [gid]: items },
+      },
+    })
+  }
+
+  /** Reordena los grupos flotantes de una tarifa especial (drag & drop). */
+  function handleReorderGruposEspecial(linea: string, grupos: TarifaEspecialGrupoMeta[]) {
+    onChange({ tarifaEspecialGrupos: { ...data.tarifaEspecialGrupos, [linea]: grupos } })
+  }
+
   function handleToggleTarifaEspecial(linea: string) {
     const active = data.tarifaTipoPorLinea[linea] === 'especial'
     if (active) {
@@ -1008,6 +1031,8 @@ export default function WizardLayout() {
       tarifaEspecialIdPorLinea={data.tarifaEspecialIdPorLinea}
       onGuardarTarifaEspecial={(linea, nombre) => guardarTarifaEspecialMut.mutate({ linea, nombre })}
       guardandoLinea={guardarTarifaEspecialMut.isPending ? guardarTarifaEspecialMut.variables?.linea : undefined}
+      onAddGrupoEspecial={handleAddGrupoEspecial}
+      onReorderGruposEspecial={handleReorderGruposEspecial}
     />,
     <Paso4 key={3} data={data} onChange={onChange} lineasDisponibles={biblioteca} />,
     <Paso5 key={4} data={data} biblioteca={biblioteca} numero={cotExistente?.numero ?? ''} />,
