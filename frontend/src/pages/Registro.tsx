@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAppMutation } from '../hooks/useAppMutation'
 import { createRecord, getRecords } from '../api/records'
@@ -33,7 +32,6 @@ function billingTotal(billing: Record<string, string>): number {
 }
 
 export default function Registro() {
-  const navigate = useNavigate()
   const qc = useQueryClient()
   const [tipo, setTipoState] = useState<TipoRecord>('prospecto')
   const [contactos, setContactos] = useState<ContactoForm[]>([emptyContacto()])
@@ -84,7 +82,7 @@ export default function Registro() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['records'] })
       toast.success('Registro guardado exitosamente')
-      setTimeout(() => navigate('/dashboard'), 1200)
+      clearForm()
     },
     onError: () => toast.error('Error al crear el registro'),
   })
