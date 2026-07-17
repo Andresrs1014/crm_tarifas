@@ -200,6 +200,22 @@ const ROOT = path.join(__dirname, '..');
 app.use(express.static(ROOT));
 app.get('/', (_req, res) => res.sendFile(path.join(ROOT, 'index.html')));
 
+// ---------- Bootstrap: crea el primer admin si la tabla users está vacía ----------
+// Solo corre en el primer arranque contra una BD nueva — si ya hay usuarios, no hace nada.
+(function bootstrapAdmin() {
+  const count = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
+  if (count > 0) return;
+  const { BOOTSTRAP_ADMIN_USERNAME, BOOTSTRAP_ADMIN_PASSWORD, BOOTSTRAP_ADMIN_NOMBRE } = process.env;
+  if (!BOOTSTRAP_ADMIN_USERNAME || !BOOTSTRAP_ADMIN_PASSWORD) {
+    console.warn('No hay usuarios en la BD y no hay BOOTSTRAP_ADMIN_USERNAME/PASSWORD en el entorno — nadie va a poder iniciar sesión. Define esas variables o crea uno con create-user.js.');
+    return;
+  }
+  const { hash, salt } = hashPassword(BOOTSTRAP_ADMIN_PASSWORD);
+  db.prepare('INSERT INTO users (id, username, password_hash, salt, nombre, role) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(crypto.randomUUID(), BOOTSTRAP_ADMIN_USERNAME, hash, salt, BOOTSTRAP_ADMIN_NOMBRE || BOOTSTRAP_ADMIN_USERNAME, 'admin');
+  console.log(`✅ Admin inicial creado: ${BOOTSTRAP_ADMIN_USERNAME}`);
+})();
+
 app.listen(PORT, () => {
   console.log(`Servidor en http://localhost:${PORT}`);
 });
