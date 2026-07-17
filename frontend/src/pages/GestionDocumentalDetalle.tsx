@@ -9,6 +9,7 @@ import {
 } from '../api/gestionDocumental'
 import { useToastStore } from '../store/toastStore'
 import { ESTADO_STYLE, pctColor, fmtDate, fmtSize } from '../lib/gestionDocumental/shared'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select'
 
 const ARCHIVOS_ACCEPT = '.pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx'
 
@@ -339,15 +340,14 @@ export default function GestionDocumentalDetalle() {
         {/* Cycle */}
         <div className="flex items-center gap-3 flex-wrap">
           <span className="text-xs text-muted uppercase tracking-wider font-semibold">Ciclo documental:</span>
-          <select
-            value={ciclo}
-            onChange={e => setCiclo(Number(e.target.value))}
-            className="filter-select"
-          >
-            {[anoActual - 1, anoActual, anoActual + 1].map(y => (
-              <option key={y} value={y}>{y}{y === anoActual ? ' (actual)' : ''}</option>
-            ))}
-          </select>
+          <Select value={String(ciclo)} onValueChange={v => setCiclo(Number(v))}>
+            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {[anoActual - 1, anoActual, anoActual + 1].map(y => (
+                <SelectItem key={y} value={String(y)}>{y}{y === anoActual ? ' (actual)' : ''}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {desactualizado && (
             <span className="text-xs text-red-400 font-semibold">Ciclo desactualizado</span>
           )}
@@ -446,16 +446,15 @@ export default function GestionDocumentalDetalle() {
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-2" onClick={e => e.stopPropagation()}>
-                  <select
-                    value={d.estado ?? ''}
-                    onChange={e => setDoc(doc.id, 'estado', e.target.value)}
-                    className="cell-input"
-                  >
-                    <option value="">Sin estado</option>
-                    <option value="completo">Completo</option>
-                    <option value="incompleto">Incompleto</option>
-                    <option value="pendiente">Pendiente</option>
-                  </select>
+                  <Select value={d.estado || '__sin_estado__'} onValueChange={v => setDoc(doc.id, 'estado', v === '__sin_estado__' ? '' : v)}>
+                    <SelectTrigger className="!py-1.5 !text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__sin_estado__">Sin estado</SelectItem>
+                      <SelectItem value="completo">Completo</SelectItem>
+                      <SelectItem value="incompleto">Incompleto</SelectItem>
+                      <SelectItem value="pendiente">Pendiente</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <input
                     type="date"
                     value={d.fecha ?? ''}
