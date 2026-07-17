@@ -8,7 +8,7 @@ import {
   actualizarTarifas,
 } from '../api/cotizaciones'
 import { getBiblioteca } from '../api/biblioteca'
-import { buildCotHTML, flattenSnapshot } from '../lib/cotizacion/buildCotHTML'
+import { buildCotHTMLFromCotizacion, flattenSnapshot } from '../lib/cotizacion/buildCotHTML'
 import { isMonedaCampo } from '../lib/cotizacion/snapshot'
 import { toast } from '../store/toastStore'
 import type { EstadoCotizacion } from '../types'
@@ -152,7 +152,14 @@ export default function Cotizaciones() {
   })
 
   const duplicarMut = useAppMutation({
-    mutationFn: duplicarCotizacion,
+    mutationFn: async (id: string) => {
+      const cot = await duplicarCotizacion(id)
+      const biblioteca = await getBiblioteca()
+      if (biblioteca.length) {
+        await updateCotizacion(cot.id, { htmlPreview: buildCotHTMLFromCotizacion(cot, biblioteca) })
+      }
+      return cot
+    },
     onSuccess: (cot) => {
       qc.invalidateQueries({ queryKey: ['cotizaciones'] })
       toast.success(`Cotización duplicada: ${cot.numero}`)
@@ -194,7 +201,16 @@ export default function Cotizaciones() {
   }, [cotActualizar, pct])
 
   const actualizarMut = useAppMutation({
-    mutationFn: ({ id, inc }: { id: string; inc: number }) => actualizarTarifas(id, inc),
+    mutationFn: async ({ id, inc }: { id: string; inc: number }) => {
+      const result = await actualizarTarifas(id, inc)
+      const biblioteca = await getBiblioteca()
+      if (biblioteca.length) {
+        await updateCotizacion(result.cotizacion.id, {
+          htmlPreview: buildCotHTMLFromCotizacion(result.cotizacion, biblioteca),
+        })
+      }
+      return result
+    },
     onSuccess: ({ cotizacion, itemsActualizados }) => {
       qc.invalidateQueries({ queryKey: ['cotizaciones'] })
       toast.success(`Nueva cotización ${cotizacion.numero} creada · ${itemsActualizados} ítems actualizados`)
@@ -209,27 +225,7 @@ export default function Cotizaciones() {
     try {
       const [cot, biblioteca] = await Promise.all([getCotizacion(cotId), getBiblioteca()])
       const html = biblioteca.length
-        ? buildCotHTML({
-          numero: cot.numero,
-          fecha: cot.fecha ?? cot.createdAt,
-          vigencia: cot.vigencia,
-          asunto: cot.asunto,
-          empresa: cot.empresa,
-          nit: cot.nit,
-          ciudad: cot.ciudad,
-          contacto: cot.contacto,
-          cargo: cot.cargo,
-          telefono: cot.telefono,
-          email: cot.email,
-          comercial: cot.comercial,
-          paqueteadora: cot.paqueteadora,
-          lineas: cot.lineas,
-          itemsSnapshot: flattenSnapshot(cot.itemsSnapshot),
-          obsHtml: cot.obsHtml,
-          obsLibre: cot.obsLibre,
-          tarifaTipoPorLinea: cot.tarifaTipoPorLinea,
-          tarifaEspecialGrupos: cot.tarifaEspecialGrupos,
-        }, biblioteca)
+        ? buildCotHTMLFromCotizacion(cot, biblioteca)
         : (cot.htmlPreview || `<h2>${cot.numero}</h2><p>${cot.empresa}</p>`)
       await exportCotizacionPDF(html, `cotizacion-${numero}.pdf`)
     } catch {

@@ -1,4 +1,4 @@
-import type { BibliotecaLinea, TarifaEspecialGrupoMeta } from '../../types'
+import type { BibliotecaLinea, Cotizacion, TarifaEspecialGrupoMeta } from '../../types'
 import { TRANSP_SCHEMA, PAQUETEO_SCHEMA, type BibSchemaCol, type PaqueteoSchemaEntry } from '../htmlV6/constants'
 import type { BibliotecaItem } from '../../types'
 import {
@@ -311,6 +311,31 @@ export function buildCotHTML(input: BuildCotHTMLInput, biblioteca: BibliotecaLin
     <span>Ref. ${esc(input.numero)}</span>
   </div>
 </div>`
+}
+
+/** Arma el HTML a partir de una Cotizacion tal como la devuelve la API (getCotizacion/duplicar/actualizarTarifas). */
+export function buildCotHTMLFromCotizacion(cot: Cotizacion, biblioteca: BibliotecaLinea[]): string {
+  return buildCotHTML({
+    numero: cot.numero,
+    fecha: cot.fecha ?? cot.createdAt,
+    vigencia: cot.vigencia,
+    asunto: cot.asunto,
+    empresa: cot.empresa,
+    nit: cot.nit,
+    ciudad: cot.ciudad,
+    contacto: cot.contacto,
+    cargo: cot.cargo,
+    telefono: cot.telefono,
+    email: cot.email,
+    comercial: cot.comercial,
+    paqueteadora: cot.paqueteadora,
+    lineas: cot.lineas,
+    itemsSnapshot: flattenSnapshot(cot.itemsSnapshot),
+    obsHtml: cot.obsHtml,
+    obsLibre: cot.obsLibre,
+    tarifaTipoPorLinea: cot.tarifaTipoPorLinea,
+    tarifaEspecialGrupos: cot.tarifaEspecialGrupos,
+  }, biblioteca)
 }
 
 /** Compatibilidad con snapshots legacy (grupoId anidado con sel/items). */

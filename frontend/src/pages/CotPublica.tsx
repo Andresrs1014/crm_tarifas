@@ -14,14 +14,18 @@ export default function CotPublica() {
     enabled: !!numero,
   })
 
+  // Biblioteca exige JWT y esta ruta es pública (sin login) — solo se intenta como
+  // respaldo si la cotización quedó sin htmlPreview persistido (casos antiguos).
   const { data: biblioteca = [] } = useQuery({
     queryKey: ['biblioteca'],
     queryFn: getBiblioteca,
-    enabled: !!data,
+    enabled: !!data && !data.htmlPreview,
+    retry: false,
   })
 
   const htmlPreview = useMemo(() => {
     if (!data) return ''
+    if (data.htmlPreview) return data.htmlPreview
     if (biblioteca.length) {
       return buildCotHTML({
         numero: data.numero,
@@ -39,7 +43,7 @@ export default function CotPublica() {
         obsLibre: data.obsLibre,
       }, biblioteca)
     }
-    return data.htmlPreview || `<h1>${data.numero}</h1><p>${data.empresa}</p>`
+    return `<h1>${data.numero}</h1><p>${data.empresa}</p>`
   }, [data, biblioteca])
 
   if (isLoading) {
