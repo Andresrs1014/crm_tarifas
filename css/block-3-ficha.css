@@ -1,0 +1,13 @@
+.ficha-field { display:flex; flex-direction:column; gap:4px; }
+.ficha-label { font-size:11px; font-weight:700; color:var(--text2); text-transform:uppercase; letter-spacing:0.8px; }
+.ficha-input { background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:7px; padding:8px 10px; font-size:13px; font-family:inherit; width:100%; box-sizing:border-box; transition:border-color 0.2s; }
+.ficha-input:focus { outline:none; border-color:var(--accent); }
+.ficha-tab-btn { transition:color 0.2s; }
+.ficha-tab-btn:hover { color:var(--text) !important; }
+.ficha-card-row { transition:box-shadow 0.15s, border-color 0.15s; }
+#ficha-horiz-wrap::-webkit-scrollbar { height: 6px; }
+#ficha-horiz-wrap::-webkit-scrollbar-track { background: var(--surface); }
+#ficha-horiz-wrap::-webkit-scrollbar-thumb { background: var(--text2); border-radius: 3px; }
+#ficha-horiz-wrap::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+.ficha-card-row:hover { box-shadow:0 4px 20px rgba(0,0,0,0.3); border-color:var(--accent) !important; }
+#page-ficha-cliente .page-inner { padding:20px 24px; }
