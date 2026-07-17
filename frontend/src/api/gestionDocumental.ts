@@ -82,6 +82,9 @@ export const GD_DOCS: GDDoc[] = [
 export const listGD = (params?: { search?: string; vencimiento?: string; estadoDocs?: string }) =>
   client.get<GDRow[]>('/api/gestion-documental', { params }).then(r => r.data)
 
+export const getGDRow = (recordId: string) =>
+  client.get<GDRow>(`/api/gestion-documental/${recordId}/detalle`).then(r => r.data)
+
 export const upsertGD = (recordId: string, data: { docs?: Record<string, DocEstado>; cicloActual?: number }) =>
   client.put<{ id: string; docs: Record<string, DocEstado>; cicloActual: number }>(
     `/api/gestion-documental/${recordId}`, data

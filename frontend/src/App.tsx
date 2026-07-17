@@ -23,6 +23,7 @@ import ImportWizard from './pages/ImportWizard'
 import WizardLayout from './pages/wizard/WizardLayout'
 import MatrizRiesgos from './pages/MatrizRiesgos'
 import GestionDocumental from './pages/GestionDocumental'
+import GestionDocumentalDetalle from './pages/GestionDocumentalDetalle'
 import Preliquidador from './pages/Preliquidador'
 import CalendarioVisitas from './pages/CalendarioVisitas'
 import CotizadorPaqueteo from './pages/CotizadorPaqueteo'
@@ -94,6 +95,7 @@ export default function App() {
             <Route path="sac" element={<SAC />} />
             <Route path="matriz-riesgos" element={<MatrizRiesgos />} />
             <Route path="gestion-documental" element={<GestionDocumental />} />
+            <Route path="gestion-documental/:recordId" element={<GestionDocumentalDetalle />} />
             <Route path="preliquidador" element={<Preliquidador />} />
             <Route path="calendario" element={<CalendarioVisitas />} />
             <Route path="cotizador" element={<CotizadorPaqueteo />} />

@@ -162,6 +162,24 @@ export async function listGD(filters: { search?: string; vencimiento?: string; e
   });
 }
 
+/** Fila enriquecida de un solo cliente (para la página de detalle) — mismo shape que listGD, sin traer todos los clientes. */
+export async function getRow(recordId: string) {
+  const cliente = await prisma.record.findUnique({
+    where: { id: recordId },
+    select: {
+      id: true, empresa: true, nit: true, ciudad: true,
+      tipoCliente: true, estadoCliente: true, tipo: true,
+      comercial: { select: { nombre: true } },
+      matrizRiesgo: { select: { companias: true } },
+      gestionDocumental: { select: { id: true, docs: true, cicloActual: true, updatedAt: true } },
+    },
+  });
+  if (!cliente || cliente.tipo !== 'cliente') {
+    throw Object.assign(new Error('Cliente no encontrado'), { statusCode: 404 });
+  }
+  return enrichRow(cliente);
+}
+
 export async function getOrCreateGD(recordId: string) {
   const record = await prisma.record.findUnique({
     where: { id: recordId },

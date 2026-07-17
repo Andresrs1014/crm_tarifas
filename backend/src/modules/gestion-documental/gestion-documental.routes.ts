@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { authenticate, param } from '../../middleware/auth';
-import { listGD, getOrCreateGD, upsertGD, addArchivos, findArchivo, removeArchivo, iniciarCiclo, getHistorial, GD_DOCS } from './gestion-documental.service';
+import { listGD, getRow, getOrCreateGD, upsertGD, addArchivos, findArchivo, removeArchivo, iniciarCiclo, getHistorial, GD_DOCS } from './gestion-documental.service';
 import { upload, archivoFilePath, docDir, matchesMagicBytes } from './gestion-documental.upload';
 
 const router = Router();
@@ -39,6 +39,16 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       vencimiento:typeof vencimiento=== 'string' ? vencimiento: undefined,
       estadoDocs: typeof estadoDocs === 'string' ? estadoDocs : undefined,
     });
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/gestion-documental/:recordId/detalle — fila enriquecida (para la página de detalle)
+router.get('/:recordId/detalle', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = await getRow(param(req.params.recordId));
     res.json(data);
   } catch (err) {
     next(err);
