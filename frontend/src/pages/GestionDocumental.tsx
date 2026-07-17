@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAppMutation } from '../hooks/useAppMutation'
-import { FolderOpen, X, ChevronRight, RefreshCw, AlertTriangle, Clock, CheckCircle, Circle, Download, Paperclip, Eye, Trash2 } from 'lucide-react'
+import { FolderOpen, X, ChevronRight, RefreshCw, AlertTriangle, Clock, CheckCircle, Circle, Download, Paperclip, Eye, Trash2, type LucideIcon } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import {
   listGD, upsertGD, GD_DOCS, GDRow, DocEstado, GDArchivo,
@@ -18,6 +18,9 @@ const ESTADO_STYLE = {
   pendiente:  { label: 'Pendiente',  bg: 'rgba(248,113,113,0.12)', text: '#f87171', border: 'rgba(248,113,113,0.35)' },
 }
 
+/** Pendientes primero, para identificarlos más fácil en la lista (pedido por QA). */
+const ESTADO_ORDEN: Record<'completo' | 'incompleto' | 'pendiente', number> = { pendiente: 0, incompleto: 1, completo: 2 }
+
 const VENC_STYLE = {
   'con-tiempo': { label: 'Al día',      text: '#34d399', icon: CheckCircle },
   'por-vencer': { label: 'Por vencer',  text: '#f59e0b', icon: AlertTriangle },
@@ -30,6 +33,41 @@ function pctColor(pct: number): string {
   if (pct >= 80) return '#34d399'
   if (pct >= 50) return '#f59e0b'
   return '#f87171'
+}
+
+function AlertBanner({ icon: Icon, color, label, rows, onSelect }: {
+  icon: LucideIcon
+  color: 'red' | 'amber'
+  label: string
+  rows: GDRow[]
+  onSelect: (row: GDRow) => void
+}) {
+  const tone = color === 'red'
+    ? { bg: 'bg-red-500/10', border: 'border-red-500/30', text: 'text-red-400' }
+    : { bg: 'bg-amber-500/10', border: 'border-amber-500/30', text: 'text-amber-400' }
+  return (
+    <div className={`rounded-xl border ${tone.bg} ${tone.border} px-4 py-3 space-y-2`}>
+      <div className="flex items-center gap-3 text-sm">
+        <Icon size={15} className={`${tone.text} flex-shrink-0`} />
+        <span className={`${tone.text} font-semibold`}>{label}</span>
+      </div>
+      <div className="flex flex-wrap gap-1.5 pl-[27px]">
+        {rows.map(row => {
+          const dias = row.vencimiento.diasRestantes
+          return (
+            <button
+              key={row.id}
+              type="button"
+              onClick={() => onSelect(row)}
+              className={`text-[11px] font-medium px-2 py-1 rounded-md bg-black/20 border ${tone.border} ${tone.text} hover:bg-black/30 transition-colors`}
+            >
+              {row.empresa}{dias !== null ? ` · ${dias < 0 ? `${Math.abs(dias)}d vencido` : `${dias}d`}` : ''}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 function StatBadge({ label, value, color }: { label: string; value: number; color: string }) {
@@ -136,7 +174,12 @@ function DocModal({ row, onClose }: { row: GDRow; onClose: () => void }) {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = prevOverflow
+    }
   }, [onClose])
 
   const mutate = useAppMutation({
@@ -484,13 +527,35 @@ export default function GestionDocumental() {
       if (filtPct === '0-49'  && r.cumplimiento >= 50) return false
     }
     return true
-  })
+  }).sort((a, b) => ESTADO_ORDEN[a.estadoDocs] - ESTADO_ORDEN[b.estadoDocs])
 
   // KPIs
-  const total     = filteredRows.length
-  const vencidos  = filteredRows.filter(r => r.vencimiento.status === 'vencido').length
-  const porVencer = filteredRows.filter(r => r.vencimiento.status === 'por-vencer').length
+  const total       = filteredRows.length
+  const vencidosRows  = filteredRows.filter(r => r.vencimiento.status === 'vencido')
+  const porVencerRows = filteredRows.filter(r => r.vencimiento.status === 'por-vencer')
+  const vencidos  = vencidosRows.length
+  const porVencer = porVencerRows.length
   const completos = filteredRows.filter(r => r.estadoDocs === 'completo').length
+
+  // Dashboard de cumplimiento — distribución por rango + promedio por compañía
+  const distGestionados = filteredRows.filter(r => r.cumplimiento >= 80).length
+  const distEnProceso   = filteredRows.filter(r => r.cumplimiento >= 50 && r.cumplimiento < 80).length
+  const distCriticos    = filteredRows.filter(r => r.cumplimiento < 50).length
+  const promedioGeneral = total > 0 ? Math.round(filteredRows.reduce((acc, r) => acc + r.cumplimiento, 0) / total) : 0
+
+  const companiasStats = (() => {
+    const acc: Record<string, { suma: number; count: number }> = {}
+    for (const r of filteredRows) {
+      for (const c of r.companias) {
+        acc[c] ??= { suma: 0, count: 0 }
+        acc[c].suma += r.cumplimiento
+        acc[c].count += 1
+      }
+    }
+    return Object.entries(acc)
+      .map(([nombre, { suma, count }]) => ({ nombre, promedio: Math.round(suma / count), count }))
+      .sort((a, b) => b.promedio - a.promedio)
+  })()
 
   const pagination = usePagination(filteredRows, {
     resetDeps: [search, filtVenc, filtEst, filtTipo, filtCia, filtPct],
@@ -523,20 +588,26 @@ export default function GestionDocumental() {
         </div>
       </div>
 
-      {/* Alert banners */}
+      {/* Alert banners — con detalle por cliente, clicable al detalle */}
       {(vencidos > 0 || porVencer > 0) && (
         <div className="space-y-2">
           {vencidos > 0 && (
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-sm">
-              <AlertTriangle size={15} className="text-red-400 flex-shrink-0" />
-              <span className="text-red-400 font-semibold">{vencidos} cliente{vencidos > 1 ? 's' : ''} con documentación VENCIDA</span>
-            </div>
+            <AlertBanner
+              icon={AlertTriangle}
+              color="red"
+              label={`${vencidos} cliente${vencidos > 1 ? 's' : ''} con documentación VENCIDA`}
+              rows={vencidosRows}
+              onSelect={setSelected}
+            />
           )}
           {porVencer > 0 && (
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-sm">
-              <Clock size={15} className="text-amber-400 flex-shrink-0" />
-              <span className="text-amber-400 font-semibold">{porVencer} cliente{porVencer > 1 ? 's' : ''} con documentación próxima a vencer (≤60 días)</span>
-            </div>
+            <AlertBanner
+              icon={Clock}
+              color="amber"
+              label={`${porVencer} cliente${porVencer > 1 ? 's' : ''} con documentación próxima a vencer (≤60 días)`}
+              rows={porVencerRows}
+              onSelect={setSelected}
+            />
           )}
         </div>
       )}
@@ -548,6 +619,48 @@ export default function GestionDocumental() {
         <StatBadge label="Por vencer"      value={porVencer} color="var(--gold)" />
         <StatBadge label="Vencidos"        value={vencidos}  color="var(--red)" />
       </div>
+
+      {/* Dashboard de cumplimiento */}
+      {total > 0 && (
+        <div className="card-glass rounded-xl border border-border p-4 space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <span className="text-xs text-muted uppercase tracking-wider font-semibold">Distribución de cumplimiento</span>
+            <span className="text-sm font-display font-bold" style={{ color: pctColor(promedioGeneral) }}>
+              Promedio general: {promedioGeneral}%
+            </span>
+          </div>
+          <div className="flex h-2.5 rounded-full overflow-hidden bg-surface">
+            {distGestionados > 0 && <div style={{ width: `${(distGestionados / total) * 100}%`, background: '#34d399' }} title={`${distGestionados} gestionados (≥80%)`} />}
+            {distEnProceso   > 0 && <div style={{ width: `${(distEnProceso / total) * 100}%`,   background: '#f59e0b' }} title={`${distEnProceso} en proceso (50–79%)`} />}
+            {distCriticos    > 0 && <div style={{ width: `${(distCriticos / total) * 100}%`,    background: '#f87171' }} title={`${distCriticos} críticos (<50%)`} />}
+          </div>
+          <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-muted">
+            <span><i className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ background: '#34d399' }} />Gestionados (≥80%): <strong className="text-foreground">{distGestionados}</strong></span>
+            <span><i className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ background: '#f59e0b' }} />En proceso (50–79%): <strong className="text-foreground">{distEnProceso}</strong></span>
+            <span><i className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ background: '#f87171' }} />Críticos (&lt;50%): <strong className="text-foreground">{distCriticos}</strong></span>
+          </div>
+
+          {companiasStats.length > 0 && (
+            <div className="pt-3 border-t border-border/50 space-y-2">
+              <span className="text-xs text-muted uppercase tracking-wider font-semibold">Cumplimiento por compañía logística</span>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {companiasStats.map(c => (
+                  <div key={c.nombre} className="rounded-lg border border-border bg-surface2 px-3 py-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-foreground truncate">{c.nombre}</span>
+                      <span className="font-mono font-bold flex-shrink-0" style={{ color: pctColor(c.promedio) }}>{c.promedio}%</span>
+                    </div>
+                    <div className="h-1.5 mt-1.5 rounded-full bg-surface overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${c.promedio}%`, background: pctColor(c.promedio) }} />
+                    </div>
+                    <div className="text-[10px] text-muted mt-1">{c.count} cliente{c.count > 1 ? 's' : ''}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="filter-bar">

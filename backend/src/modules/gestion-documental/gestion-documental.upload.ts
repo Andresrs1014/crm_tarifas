@@ -3,18 +3,6 @@ import path from 'path';
 
 export const UPLOAD_ROOT = path.join(process.cwd(), 'uploads', 'gestion-documental');
 
-/** Extensión → mimetypes aceptados. Mismo set que el HTML de referencia (gdCargarArchivoDoc). */
-const ALLOWED: Record<string, string[]> = {
-  '.pdf':  ['application/pdf'],
-  '.jpg':  ['image/jpeg'],
-  '.jpeg': ['image/jpeg'],
-  '.png':  ['image/png'],
-  '.doc':  ['application/msword'],
-  '.docx': ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
-  '.xls':  ['application/vnd.ms-excel'],
-  '.xlsx': ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
-};
-
 /** Firma de bytes (magic number) real de cada extensión — el nombre/mimetype que manda el cliente no se puede confiar. */
 const MAGIC_CHECKS: Record<string, (buf: Buffer) => boolean> = {
   '.pdf':  buf => buf.subarray(0, 4).toString('latin1') === '%PDF',
@@ -29,10 +17,15 @@ const MAGIC_CHECKS: Record<string, (buf: Buffer) => boolean> = {
   '.xlsx': buf => buf.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04])),
 };
 
-export function isAllowedFile(originalname: string, mime: string): boolean {
+/**
+ * Solo valida la extensión: el mimetype que manda el navegador para Office
+ * (.doc/.docx/.xls/.xlsx) varía según SO/versión y a veces llega como
+ * application/octet-stream o application/zip, rechazando archivos válidos.
+ * El contenido real se verifica aparte con matchesMagicBytes() antes de guardar.
+ */
+export function isAllowedFile(originalname: string): boolean {
   const ext = path.extname(originalname).toLowerCase();
-  const mimes = ALLOWED[ext];
-  return !!mimes && mimes.includes(mime);
+  return ext in MAGIC_CHECKS;
 }
 
 /** Verifica que el contenido real del archivo coincida con la extensión declarada (evita spoofing de nombre/Content-Type). */
@@ -57,7 +50,7 @@ export const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024, files: 10 },
   fileFilter: (_req, file, cb) => {
-    if (!isAllowedFile(file.originalname, file.mimetype)) {
+    if (!isAllowedFile(file.originalname)) {
       cb(new Error('Tipo de archivo no permitido. Usa PDF, JPG, PNG, DOC/DOCX o XLS/XLSX.'));
       return;
     }
