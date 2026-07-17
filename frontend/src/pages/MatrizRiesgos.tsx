@@ -6,12 +6,11 @@ import { listMatriz, upsertMatriz, MatrizRiesgoRow, MatrizRiesgoUpsert } from '.
 import { useToastStore } from '../store/toastStore'
 import { usePagination } from '../hooks/usePagination'
 import { DataListPanel, TableScrollArea } from '../components/ui/DataListPanel'
+import { MR_MERCANCIA_OPCIONES } from '../lib/htmlV6/constants'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const MR_OPCIONES = {
-  mercancia:   ['Industrial','Tecnología','Consumo masivo','Textiles','Farmacéuticos',
-                'Dispositivos Médicos','Repuestos automotrices','Hogar y cocina',
-                'Accesorios','Herramientas','Juguetería','Electrodomésticos','Decoración','Misceláneos'],
+  mercancia:   MR_MERCANCIA_OPCIONES,
   tipoPersona: ['Jurídica','Natural'],
   tiempo:      ['< 1 año','1 - 3 años','> 3 años'],
   capital:     ['< 1 M','1 M - 50M','>50M - 100M','> 100M'],

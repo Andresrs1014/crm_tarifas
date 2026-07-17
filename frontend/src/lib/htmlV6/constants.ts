@@ -11,6 +11,18 @@ export const HTML_SERVICES = [
 
 export type HtmlService = (typeof HTML_SERVICES)[number]
 
+/** Catálogo de tipos de mercancía — usado por Matriz de Riesgos y por "Tipo de producto" en Ficha de Cliente. */
+export const MR_MERCANCIA_OPCIONES: string[] = [
+  'Industrial', 'Tecnología', 'Consumo masivo', 'Textiles', 'Farmacéuticos',
+  'Dispositivos Médicos', 'Repuestos automotrices', 'Hogar y cocina',
+  'Accesorios', 'Herramientas', 'Juguetería', 'Electrodomésticos', 'Decoración', 'Misceláneos',
+]
+
+/** Catálogo estándar de tipos de embalaje logístico (no existía en el HTML original ni en backend). */
+export const EMBALAJE_OPCIONES: string[] = [
+  'Cajas', 'Estibas / Pallets', 'Huacales', 'Bultos', 'Contenedores', 'Sacos', 'Tambores', 'Granel',
+]
+
 export const SVC_COLORS: Record<string, string> = {
   'Zona Franca': '#00c2ff',
   'Depósito Aduanero': '#a855f7',

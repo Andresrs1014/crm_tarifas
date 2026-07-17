@@ -5,11 +5,14 @@ import { useAppMutation } from '../hooks/useAppMutation'
 import { getFichaByRecord, updateFicha, getAnalistas, createAnalista, deleteAnalista } from '../api/fichas'
 import { getRecord, getRecords } from '../api/records'
 import { getCotizaciones } from '../api/cotizaciones'
+import { getMatrizByRecord } from '../api/matrizRiesgos'
 import { toast } from '../store/toastStore'
 import { usePagination } from '../hooks/usePagination'
 import { DataListPanel, TableScrollArea } from '../components/ui/DataListPanel'
 import { buildFichaHTML } from '../lib/ficha/buildFichaHTML'
 import { exportCotizacionPDF } from '../utils/exportPDF'
+import { MR_MERCANCIA_OPCIONES, EMBALAJE_OPCIONES } from '../lib/htmlV6/constants'
+import type { CRMRecord } from '../types'
 
 // Types
 type TabId = 'info' | 'contactos' | 'facturacion' | 'operacion' | 'kickoff'
@@ -67,6 +70,28 @@ function calcPct(d: FichaData, estado: string): number {
   return Math.round((filled / checks.length) * 100)
 }
 
+/** Defaults de facturación/almacenamiento del HTML v6 (loadFicha) — solo se aplican si el campo aún está vacío, nunca pisan lo ya guardado. */
+function applyFacturacionDefaults(d: FichaData, record: CRMRecord): FichaData {
+  return {
+    ...d,
+    formaPago: d.formaPago || 'Contado',
+    facturarA: d.facturarA || record.empresa,
+    buzon: d.buzon || record.contactos?.[0]?.email || '',
+    pallet: d.pallet || 'No aplica',
+    palletIc: d.palletIc || 'No aplica',
+    rotacion: d.rotacion || 'Mensual',
+    almLg: (d.almLg.p1 || d.almLg.p2) ? d.almLg : { p1: 'Ad valorem / Valor CIF de la mercancía', p2: 'Posición Pallet' },
+    almIc: (d.almIc.p1 || d.almIc.p2) ? d.almIc : { p1: 'Posición Pallet', p2: 'Posición Pallet' },
+    almId: (d.almId.p1 || d.almId.p2) ? d.almId : { p1: 'Ad valorem / Valor CIF de la mercancía', p2: 'Posición Pallet' },
+    factLg: d.factLg || 'Anticipada',
+    factIc: d.factIc || 'Anticipada',
+    factId: d.factId || 'Anticipada',
+    formaFactLg: (d.formaFactLg.forma || d.formaFactLg.cantidad) ? d.formaFactLg : { forma: 'Por documento de transporte', cantidad: 'Factura por documento de transporte' },
+    formaFactIc: (d.formaFactIc.forma || d.formaFactIc.cantidad) ? d.formaFactIc : { forma: 'Por documento de transporte', cantidad: 'Factura por ingreso' },
+    formaFactId: (d.formaFactId.forma || d.formaFactId.cantidad) ? d.formaFactId : { forma: 'Por documento de transporte', cantidad: 'Factura por documento de transporte' },
+  }
+}
+
 const MANEJO_OPTIONS = ['Simple','Simple referenciado','Inventario','Paqueteo','Transporte local']
 const SECTOR_OPTIONS = ['Textiles','Farmacéuticos','Tecnología','Dispositivos Médicos','Cosméticos','Juguetería','Electrodomésticos','Repuestos automotrices','Herramientas','Calzado','Industrial','Consumo masivo','Accesorios','Decoración','Hogar y cocina','Misceláneos','Alimentos secos','Bebidas','Papelería','Material POP']
 const ALMACENAMIENTO_OPTIONS = ['','Ad valorem / Valor CIF de la mercancía','Posición Pallet','Metro cuadrado','Metro cúbico','Por contenedor','CIF - ALL IN Contenedor','ALL IN Contenedor']
@@ -121,18 +146,54 @@ export default function FichaDetalle() {
     queryFn: () => getRecords(),
   })
 
+  const { data: matrizRiesgo } = useQuery({
+    queryKey: ['matriz-riesgo', recordId],
+    queryFn: () => getMatrizByRecord(recordId!),
+    enabled: !!recordId,
+  })
+
   const [showRefDropdown, setShowRefDropdown] = useState(false)
 
+  // Carga inicial: ficha guardada + datos derivados del record (líneas de negocio,
+  // contactos) + defaults de facturación cuando la ficha es nueva. Un solo efecto
+  // para evitar que ficha/record se pisen entre sí según cuál resuelva primero.
   useEffect(() => {
-    if (ficha) {
-      qc.invalidateQueries({ queryKey: ['fichas'] })
-      qc.invalidateQueries({ queryKey: ['fichas-all'] })
-      setFichaId(ficha.id)
-      setEstado(ficha.estado)
-      const merged = { ...EMPTY_DATA, ...(ficha.data as Partial<FichaData>) }
-      setData(merged)
+    if (!ficha) return
+    qc.invalidateQueries({ queryKey: ['fichas'] })
+    qc.invalidateQueries({ queryKey: ['fichas-all'] })
+    setFichaId(ficha.id)
+    setEstado(ficha.estado)
+    let merged = { ...EMPTY_DATA, ...(ficha.data as Partial<FichaData>) }
+
+    if (record) {
+      const svcs = record.servicios ?? []
+      merged = {
+        ...merged,
+        lineasNegocio: {
+          deposito: svcs.includes('Depósito Aduanero'),
+          zf: svcs.includes('Zona Franca'),
+          tlocal: svcs.includes('Transporte') || svcs.includes('Paqueteo'),
+          cedi: svcs.includes('CEDI'),
+        },
+      }
+      if (merged.contactos.length === 0 && record.contactos?.length) {
+        merged.contactos = record.contactos.map((c) => ({
+          cargo: c.cargo ?? '', tipo: '', nombre: c.nombre, email: c.email ?? '',
+          tel: c.telefono ?? '', cel: '', aviso: false,
+        }))
+      }
+      merged = applyFacturacionDefaults(merged, record)
     }
-  }, [ficha])
+
+    setData(merged)
+  }, [ficha, record])
+
+  // Precarga "Tipo de producto" con la mercancía ya clasificada de este cliente en la Matriz de Riesgos.
+  useEffect(() => {
+    if (matrizRiesgo?.mercancia) {
+      setData((d) => d.tipoProducto ? d : { ...d, tipoProducto: matrizRiesgo.mercancia! })
+    }
+  }, [matrizRiesgo])
 
   const pct = calcPct(data, estado)
 
@@ -270,6 +331,11 @@ export default function FichaDetalle() {
     const bActiva = data.propuestasIds.includes(b.id) ? 0 : 1
     return aActiva - bActiva
   })
+  const facturaOpciones = [
+    record?.empresa,
+    (data.tipoCliente === 'Intermediario' || data.tipoCliente === 'Referido') ? data.refEmpresa : '',
+  ].filter((v): v is string => !!v?.trim())
+
   const lineasActivas = [
     data.lineasNegocio.deposito && '📦 Depósito Aduanero',
     data.lineasNegocio.zf && '🏛 Zona Franca',
@@ -461,26 +527,17 @@ export default function FichaDetalle() {
             </Field>
 
             <Field label="Líneas de negocio" className="md:col-span-2">
-              <div className="flex gap-3 flex-wrap mt-1">
+              <p className="text-2xs text-muted italic -mt-1 mb-1.5">Definidas en la creación del cliente — no editable aquí.</p>
+              <div className="flex gap-3 flex-wrap">
                 {[
                   { key: 'deposito', label: '📦 Depósito Aduanero' },
                   { key: 'zf',       label: '🏛 Zona Franca' },
                   { key: 'tlocal',   label: '🚚 Transporte Local' },
                   { key: 'cedi',     label: '🏭 CEDI IMC' },
-                ].map(({ key, label }) => (
-                  <label key={key} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border cursor-pointer text-sm font-semibold transition-all ${
-                    data.lineasNegocio[key as keyof typeof data.lineasNegocio]
-                      ? 'border-accent bg-accent/10 text-accent'
-                      : 'border-border text-muted'
-                  }`}>
-                    <input
-                      type="checkbox"
-                      className="hidden"
-                      checked={data.lineasNegocio[key as keyof typeof data.lineasNegocio]}
-                      onChange={(e) => upd('lineasNegocio', { ...data.lineasNegocio, [key]: e.target.checked })}
-                    />
+                ].filter(({ key }) => data.lineasNegocio[key as keyof typeof data.lineasNegocio]).map(({ key, label }) => (
+                  <span key={key} className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-accent bg-accent/10 text-accent text-sm font-semibold">
                     {label}
-                  </label>
+                  </span>
                 ))}
                 {lineasActivas.length === 0 && <span className="text-xs text-muted italic">Sin líneas de negocio registradas</span>}
               </div>
@@ -631,13 +688,38 @@ export default function FichaDetalle() {
                 <input className="input w-full" placeholder="Ej: Último día del mes..." value={data.fechaCierre} onChange={(e) => upd('fechaCierre', e.target.value)} />
               </Field>
               <Field label="Facturar a">
-                <input className="input w-full" placeholder="Razón social..." value={data.facturarA} onChange={(e) => upd('facturarA', e.target.value)} />
+                <select
+                  className="input w-full"
+                  value={facturaOpciones.includes(data.facturarA) ? data.facturarA : '__otro__'}
+                  onChange={(e) => upd('facturarA', e.target.value === '__otro__' ? '' : e.target.value)}
+                >
+                  <option value="__otro__">— Otro (escribir abajo) —</option>
+                  {facturaOpciones.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+                {!facturaOpciones.includes(data.facturarA) && (
+                  <input className="input w-full mt-2" placeholder="Razón social..." value={data.facturarA} onChange={(e) => upd('facturarA', e.target.value)} />
+                )}
               </Field>
               <Field label="Buzón para facturación electrónica">
                 <input type="email" className="input w-full" placeholder="email@empresa.com" value={data.buzon} onChange={(e) => upd('buzon', e.target.value)} />
               </Field>
               <Field label="Pago realizado por">
-                <input className="input w-full" placeholder="Nombre empresa..." value={data.pagoPor} onChange={(e) => upd('pagoPor', e.target.value)} />
+                <select
+                  className="input w-full"
+                  value={facturaOpciones.includes(data.pagoPor) ? data.pagoPor : '__otro__'}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    upd('pagoPor', v === '__otro__' ? '' : v)
+                    if (v === record?.empresa) upd('telContacto', record?.contactos?.[0]?.telefono ?? data.telContacto)
+                    else if (v === data.refEmpresa) upd('telContacto', data.refTel || data.telContacto)
+                  }}
+                >
+                  <option value="__otro__">— Otro (escribir abajo) —</option>
+                  {facturaOpciones.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+                {!facturaOpciones.includes(data.pagoPor) && (
+                  <input className="input w-full mt-2" placeholder="Nombre empresa..." value={data.pagoPor} onChange={(e) => upd('pagoPor', e.target.value)} />
+                )}
               </Field>
               <Field label="Teléfono Contacto">
                 <input className="input w-full" value={data.telContacto} onChange={(e) => upd('telContacto', e.target.value)} />
@@ -757,7 +839,11 @@ export default function FichaDetalle() {
         {tab === 'operacion' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-4xl">
             <Field label="Tipo de producto" className="md:col-span-2">
-              <input className="input w-full" placeholder="Descripción del producto..." value={data.tipoProducto} onChange={(e) => upd('tipoProducto', e.target.value)} />
+              <select className="input w-full" value={data.tipoProducto} onChange={(e) => upd('tipoProducto', e.target.value)}>
+                <option value="">— Seleccionar —</option>
+                {MR_MERCANCIA_OPCIONES.map((o) => <option key={o}>{o}</option>)}
+              </select>
+              <p className="text-2xs text-muted italic mt-1">Precargado desde la Matriz de Riesgos de este cliente, si ya está clasificado.</p>
             </Field>
             <Field label="Aplica para producto textil">
               <select className="input w-full" value={data.textil} onChange={(e) => upd('textil', e.target.value)}>
@@ -770,7 +856,10 @@ export default function FichaDetalle() {
               </select>
             </Field>
             <Field label="Embalaje de mercancía" className="md:col-span-2">
-              <input className="input w-full" placeholder="Cajas, Huacales, bultos..." value={data.embalaje} onChange={(e) => upd('embalaje', e.target.value)} />
+              <select className="input w-full" value={data.embalaje} onChange={(e) => upd('embalaje', e.target.value)}>
+                <option value="">— Seleccionar —</option>
+                {EMBALAJE_OPCIONES.map((o) => <option key={o}>{o}</option>)}
+              </select>
             </Field>
             <Field label="Control de inventario" className="md:col-span-2">
               <input className="input w-full" placeholder="Caja master, unidades, fecha vencimiento..." value={data.controlInv} onChange={(e) => upd('controlInv', e.target.value)} />
