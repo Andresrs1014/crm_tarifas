@@ -1066,7 +1066,7 @@ export default function WizardLayout() {
 
       <div className="flex flex-wrap justify-between gap-3 cot-wizard-nav">
         <button
-          className="btn-secondary btn-sm"
+          className="btn-secondary-emphasis btn-sm"
           onClick={() => step === 0 ? navigate('/cotizaciones') : setStep((s) => s - 1)}
         >
           {step === 0 ? 'Cancelar' : '← Anterior'}
@@ -1075,7 +1075,7 @@ export default function WizardLayout() {
         <div className="flex flex-wrap gap-2 justify-end">
           <button
             type="button"
-            className="btn-secondary btn-sm"
+            className="btn-secondary-emphasis btn-sm"
             disabled={!saveDraftEnabled || draftMut.isPending || saveMut.isPending}
             onClick={() => draftMut.mutate()}
             title={saveDraftEnabled ? undefined : 'Completa empresa y comercial para guardar borrador'}

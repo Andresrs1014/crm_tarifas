@@ -356,11 +356,19 @@ export function resolveSchemaToggleValue(
   return legacy || undefined
 }
 
+/** Formatea un monto con separador de miles es-CO ("$150.000"). Si no es numérico, devuelve el valor tal cual con el prefijo "$". */
+export function formatMoneyPunctuated(value: string): string {
+  const cleaned = value.replace(/^\$/, '').trim()
+  const num = Number(cleaned.replace(/\./g, '').replace(/,/g, '.'))
+  if (Number.isNaN(num)) return value.startsWith('$') ? value : `$${value}`
+  return `$${Math.round(num).toLocaleString('es-CO')}`
+}
+
 export function formatCampoDisplay(value: string, colTipo: string, toggle?: string): string {
   if (!value?.trim()) return '—'
   const t = toggle ?? (colTipo === 'porcentaje' ? 'porcentaje' : colTipo === 'moneda' || colTipo === 'tarifa' ? 'moneda' : 'texto')
   if (t === 'porcentaje') return value.includes('%') ? value : `${value}%`
-  if (t === 'moneda' || t === 'tarifa') return value.startsWith('$') ? value : `$${value}`
+  if (t === 'moneda' || t === 'tarifa') return formatMoneyPunctuated(value)
   return value
 }
 

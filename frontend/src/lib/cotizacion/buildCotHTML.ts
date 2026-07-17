@@ -5,6 +5,7 @@ import {
   type CotItemsSnapshot,
   type CotSnapshotItem,
   formatCampoDisplay,
+  formatMoneyPunctuated,
   getSchemaForGrupo,
   isItemSelected,
   isPaqueteoLine,
@@ -130,7 +131,7 @@ function renderStandardTable(
   const rows = items.map((item) => {
     const tarifaCell = item.tipoTarifa === 'porcentaje'
       ? esc(item.tarifa.includes('%') ? item.tarifa : `${item.tarifa}%`)
-      : esc(item.tarifa.startsWith('$') ? item.tarifa : `$${item.tarifa}`)
+      : esc(formatMoneyPunctuated(item.tarifa))
     const extras = extraCols.map((col) => `<td>${esc(item.extraCols?.[col] ?? '—')}</td>`).join('')
     return `<tr>
       <td>${esc(item.nombre)}</td>

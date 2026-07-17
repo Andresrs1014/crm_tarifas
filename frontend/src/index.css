@@ -97,6 +97,17 @@
     background-color: var(--surface3);
   }
 
+  /* Variante de btn-secondary para acciones que no deben leerse como "tenues" (ej. navegación de wizard) */
+  .btn-secondary-emphasis {
+    @apply btn text-foreground;
+    background-color: var(--surface2);
+    border-color: rgba(56, 189, 248, 0.3);
+  }
+  .btn-secondary-emphasis:hover {
+    border-color: rgba(56, 189, 248, 0.6);
+    background-color: var(--surface3);
+  }
+
   .btn-danger {
     @apply btn bg-danger/10 text-danger border-danger/30
            hover:bg-danger/20 hover:border-danger/50;

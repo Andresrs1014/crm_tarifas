@@ -66,7 +66,7 @@ export function LineaTarifaEspecialPanel({
                       className="flex-1 min-w-0 flex items-center gap-2 text-left"
                     >
                       <span className={isSel ? 'text-gold' : 'text-muted'}>{isSel ? '⭐' : '☆'}</span>
-                      <span className={`text-xs truncate ${isSel ? 'text-gold font-bold' : 'text-foreground'}`}>{te.nombre}</span>
+                      <span className={`text-xs break-words ${isSel ? 'text-gold font-bold' : 'text-foreground'}`} title={te.nombre}>{te.nombre}</span>
                       <span className="text-2xs text-muted flex-shrink-0 ml-auto">
                         {itemCount(te)} ítems · {fmtFecha(te.createdAt)}
                       </span>
