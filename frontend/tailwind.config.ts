@@ -17,8 +17,8 @@ export default {
         success:    '#34d399',
         danger:     '#f87171',
         purple:     '#a78bfa',
-        muted:      '#64748b',
-        border:     '#1e293b',
+        muted:      '#94a3b8',
+        border:     '#2a3a52',
         foreground: '#e2e8f0',
       },
       fontFamily: {
