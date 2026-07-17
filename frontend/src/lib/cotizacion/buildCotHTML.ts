@@ -18,6 +18,35 @@ import {
   resolveSchemaToggleValue,
 } from './snapshot'
 
+/** Logos de operador por línea de negocio (paridad HTML v6, extraídos de seguimiento-zymo-v6.html). */
+const SVC_LOGOS: Record<string, string> = {
+  'Zona Franca': '/logos-linea/zonafranca.jpg',
+  'Depósito Aduanero': '/logos-linea/deposito.jpg',
+  'CEDI': '/logos-linea/cedi.jpg',
+  'Transporte': '/logos-linea/cedi.jpg',
+  'Paqueteo': '/logos-linea/cedi.jpg',
+  'Aduana': '/logos-linea/aduana.jpg',
+}
+const SVC_LOGO_STYLE: Record<string, string> = {
+  'Zona Franca': 'max-width:190px;height:auto;display:block;object-fit:contain',
+  'Depósito Aduanero': 'max-height:90px;width:auto;display:block;object-fit:contain',
+  'CEDI': 'max-height:90px;width:auto;display:block;object-fit:contain',
+  'Transporte': 'max-height:90px;width:auto;display:block;object-fit:contain',
+  'Paqueteo': 'max-height:90px;width:auto;display:block;object-fit:contain',
+  'Aduana': 'max-width:200px;height:auto;display:block;object-fit:contain',
+}
+
+function buildSvcLogoHtml(lineas: string[]): string {
+  const seen = new Set<string>()
+  return lineas.map((svc) => {
+    const src = SVC_LOGOS[svc]
+    if (!src || seen.has(src)) return ''
+    seen.add(src)
+    const st = SVC_LOGO_STYLE[svc] ?? 'max-width:200px;max-height:90px;width:auto;height:auto;display:block'
+    return `<img src="${src}" alt="${esc(svc)}" style="${st}">`
+  }).filter(Boolean).join('')
+}
+
 function formatCotFecha(raw?: string): string {
   const opts: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'long', year: 'numeric' }
   if (!raw?.trim()) return new Date().toLocaleDateString('es-CO', opts)
@@ -254,16 +283,21 @@ export function buildCotHTML(input: BuildCotHTMLInput, biblioteca: BibliotecaLin
     body += `<div class="cot-obs-box"><div class="cot-obs-titulo">Observaciones generales</div><p>${esc(input.obsLibre).replace(/\n/g, '<br>')}</p></div>`
   }
 
+  const svcLogoHtml = buildSvcLogoHtml(input.lineas)
+
   return `<style>${COT_STYLES}</style>
 <div class="cot-preview">
   <div class="cot-preview-header">
     <div class="cot-preview-logo"><img src="/logo.png" alt="Logo" /></div>
-    <div class="cot-preview-meta">
-      <strong>COTIZACIÓN ${esc(input.numero)}</strong>
-      Fecha: ${esc(fecha)}<br>
-      ${vigencia ? `Válida hasta: ${esc(vigencia)}<br>` : ''}
-      Comercial: ${esc(input.comercial)}
-      ${input.paqueteadora ? `<br>Paqueteadora: ${esc(input.paqueteadora)}` : ''}
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+      ${svcLogoHtml ? `<div style="display:flex;flex-direction:row;align-items:center;justify-content:flex-end;gap:20px;flex-wrap:nowrap">${svcLogoHtml}</div>` : ''}
+      <div class="cot-preview-meta">
+        <strong>COTIZACIÓN ${esc(input.numero)}</strong>
+        Fecha: ${esc(fecha)}<br>
+        ${vigencia ? `Válida hasta: ${esc(vigencia)}<br>` : ''}
+        Comercial: ${esc(input.comercial)}
+        ${input.paqueteadora ? `<br>Paqueteadora: ${esc(input.paqueteadora)}` : ''}
+      </div>
     </div>
   </div>
   <div class="cot-cliente-box">
