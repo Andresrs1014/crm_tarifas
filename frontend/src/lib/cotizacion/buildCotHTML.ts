@@ -224,14 +224,6 @@ export function buildCotHTML(input: BuildCotHTMLInput, biblioteca: BibliotecaLin
   const fecha = formatCotFecha(input.fecha)
   const vigencia = input.vigencia ? formatCotFecha(input.vigencia) : ''
 
-  const clienteParts = [
-    input.nit ? `NIT: ${esc(input.nit)}` : '',
-    input.ciudad ? `Ciudad: ${esc(input.ciudad)}` : '',
-    input.contacto ? `Contacto: ${esc(input.contacto)}${input.cargo ? ` (${esc(input.cargo)})` : ''}` : '',
-    input.telefono ? `Tel: ${esc(input.telefono)}` : '',
-    input.email ? esc(input.email) : '',
-  ].filter(Boolean).join(' · ')
-
   let body = ''
 
   for (const lineaNombre of input.lineas) {
@@ -292,19 +284,17 @@ export function buildCotHTML(input: BuildCotHTMLInput, biblioteca: BibliotecaLin
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
       ${svcLogoHtml ? `<div style="display:flex;flex-direction:row;align-items:center;justify-content:flex-end;gap:20px;flex-wrap:nowrap">${svcLogoHtml}</div>` : ''}
       <div class="cot-preview-meta">
-        <strong>COTIZACIÓN ${esc(input.numero)}</strong>
-        Fecha: ${esc(fecha)}<br>
-        ${vigencia ? `Válida hasta: ${esc(vigencia)}<br>` : ''}
-        Comercial: ${esc(input.comercial)}
-        ${input.paqueteadora ? `<br>Paqueteadora: ${esc(input.paqueteadora)}` : ''}
+        <strong>${esc(input.numero) || 'BORRADOR'}</strong>
+        <span>Fecha: ${esc(fecha)}</span><br>
+        ${vigencia ? `<span>Vigencia: ${esc(vigencia)}</span>` : ''}
       </div>
     </div>
   </div>
   <div class="cot-cliente-box">
-    <strong>${esc(input.empresa)}</strong>
-    ${clienteParts || '—'}
+    <strong>${esc(input.empresa) || '—'}</strong>
+    ${input.contacto ? `<div style="margin-top:4px;font-size:13px;color:#444">${esc(input.contacto)}${input.cargo ? ` (${esc(input.cargo)})` : ''}</div>` : ''}
+    ${input.asunto?.trim() ? `<div style="margin-top:8px;font-weight:600;color:#002366">${esc(input.asunto)}</div>` : ''}
   </div>
-  ${input.asunto?.trim() ? `<p style="font-size:14px;font-weight:700;color:#002366;margin:-16px 0 20px">Asunto: ${esc(input.asunto)}</p>` : ''}
   ${body || '<p style="color:#888;font-size:13px">Sin ítems seleccionados.</p>'}
   <div class="cot-footer-line">
     <span>Propuesta comercial · Grupo ZYMO</span>
