@@ -23,6 +23,8 @@ function section(title: string, rows: string): string {
 const FP_STYLES = `
 .fp-doc{background:#fff;color:#1a1a2e;border-radius:12px;padding:40px;max-width:820px;margin:0 auto;font-family:'Barlow',Arial,sans-serif;line-height:1.5}
 .fp-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #002366}
+.fp-header-logo{line-height:0;margin-bottom:10px}
+.fp-header-logo img{height:56px;max-width:200px;object-fit:contain}
 .fp-header h1{font-family:'Barlow Condensed','Barlow',Arial,sans-serif;font-size:24px;font-weight:800;color:#002366;margin:0 0 4px}
 .fp-header-meta{text-align:right;font-size:12px;color:#555;line-height:1.6}
 .fp-seccion{margin-bottom:20px}
@@ -135,6 +137,7 @@ export function buildFichaHTML(record: CRMRecord, data: FichaData, analistaNombr
 <div class="fp-doc">
   <div class="fp-header">
     <div>
+      <div class="fp-header-logo"><img src="/logo.png" alt="Logo" /></div>
       <h1>Ficha de Cliente</h1>
       <div style="font-size:14px;font-weight:700;color:#002366">${esc(record.empresa)}</div>
       ${record.nit ? `<div style="font-size:12px;color:#555">NIT: ${esc(record.nit)}</div>` : ''}

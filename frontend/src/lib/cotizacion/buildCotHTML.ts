@@ -30,7 +30,7 @@ const COT_STYLES = `
 .cot-preview{background:#fff;color:#1a1a2e;border-radius:12px;padding:48px;max-width:820px;margin:0 auto;box-shadow:0 8px 48px rgba(0,0,0,0.12);font-family:'Barlow',Arial,sans-serif;line-height:1.5}
 .cot-preview-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:20px;border-bottom:3px solid #002366}
 .cot-preview-logo{line-height:0}
-.cot-preview-logo img{height:72px;max-width:220px;object-fit:contain}
+.cot-preview-logo img{height:80px;max-width:230px;object-fit:contain}
 .cot-preview-meta{text-align:right;font-size:13px;color:#555;line-height:1.6}
 .cot-preview-meta strong{display:block;font-family:'Barlow Condensed','Barlow',Arial,sans-serif;font-size:20px;font-weight:800;color:#002366;letter-spacing:1px;margin-bottom:4px}
 .cot-cliente-box{background:#f0f4ff;border-left:4px solid #002366;border-radius:4px;padding:16px 20px;margin-bottom:28px;font-size:13px;color:#333}

@@ -377,13 +377,13 @@ export default function Preliquidador() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
+      <div className="no-print">
         <h2 className="section-title" style={{ marginBottom: 4 }}>Preliquidador</h2>
         <p className="text-xs text-muted">Estimación de costos a partir de una cotización existente</p>
       </div>
 
       {/* Step 1: Select cotizacion + items */}
-      <div className="card p-5 space-y-5">
+      <div className="card p-5 space-y-5 no-print">
         <div className="text-xs font-semibold text-muted uppercase tracking-wider flex items-center gap-2">
           <span className="w-5 h-5 rounded-full bg-accent/20 text-accent flex items-center justify-center text-[10px] font-bold">1</span>
           Seleccionar cotización
@@ -482,7 +482,7 @@ export default function Preliquidador() {
 
       {/* Step 2: Dynamic form */}
       {step >= 2 && checkedItems.length > 0 && (
-        <div className="card p-5 space-y-5">
+        <div className="card p-5 space-y-5 no-print">
           <div className="text-xs font-semibold text-muted uppercase tracking-wider flex items-center gap-2">
             <span className="w-5 h-5 rounded-full bg-accent/20 text-accent flex items-center justify-center text-[10px] font-bold">3</span>
             Datos para el cálculo
@@ -583,6 +583,14 @@ export default function Preliquidador() {
       {/* Step 3: Result */}
       {result && (
         <div className="rounded-xl border border-border overflow-hidden" id="preliq-result">
+          {/* Letterhead — solo visible al imprimir */}
+          <div className="hidden print:flex items-center gap-3 px-6 py-4 border-b-2 border-accent bg-white">
+            <img src="/logo.png" alt="Logo" style={{ height: 48 }} />
+            <div>
+              <div className="text-xs font-bold uppercase tracking-widest" style={{ color: '#002366' }}>Preliquidación estimada</div>
+              <div className="text-[11px]" style={{ color: '#555' }}>{new Date().toLocaleDateString('es-CO')}</div>
+            </div>
+          </div>
           {/* Header */}
           <div className="px-6 py-5 border-b-2 border-accent" style={{ background: 'linear-gradient(135deg,#0d2a4a,#0a1f38)' }}>
             <div className="flex items-start justify-between flex-wrap gap-4">
@@ -643,7 +651,7 @@ export default function Preliquidador() {
               <div className="text-[10px] text-muted uppercase tracking-wider mb-0.5">TOTAL ESTIMADO</div>
               <div className="text-3xl font-display font-bold text-green-400">{fmtCOP(total)} <span className="text-base text-muted font-normal">COP</span></div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 no-print">
               <button onClick={() => { setResult(null); setStep(1); setSelectedItems(new Set()); setSelectedCot(null); setSearch('') }}
                 className="btn-secondary btn-sm">
                 Nueva
@@ -662,7 +670,7 @@ export default function Preliquidador() {
         </div>
       )}
       {/* Historial */}
-      <div className="space-y-4">
+      <div className="space-y-4 no-print">
         <div className="flex items-center gap-2">
           <History size={15} className="text-muted" />
           <span className="text-xs font-semibold text-muted uppercase tracking-wider">Historial de Preliquidaciones</span>
