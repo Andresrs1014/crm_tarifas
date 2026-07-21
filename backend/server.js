@@ -150,6 +150,56 @@ app.delete('/api/users/:id', requireAuth, requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------- Link público de cotización (SIN auth — para clientes externos) ----------
+// Antes de tener BD compartida, este link solo funcionaba en el mismo navegador que
+// creó la cotización (localStorage aislado por usuario) — el propio HTML original lo
+// admitía así ("Este link solo funciona en el dispositivo donde fue creada..."). Ahora
+// que los datos son compartidos, expone SOLO la cotización pedida, nunca el resto de
+// la base — ni las demás cotizaciones, ni la Biblioteca completa, ni otros comerciales.
+function normalizarNumeroCot(raw) {
+  return String(raw || '').replace(/^(COT)(\d+)$/i, 'COT-$2');
+}
+app.get('/api/public/cotizacion/:numero', (req, res) => {
+  const row = db.prepare('SELECT value FROM storage WHERE key = ?').get('zymo-db');
+  if (!row) { res.json({ cotizacion: null }); return; }
+  const zdb = JSON.parse(row.value);
+  const raw = req.params.numero;
+  const normalized = normalizarNumeroCot(raw);
+  const cot = (zdb.cotizaciones || []).find((c) =>
+    String(c.numero || '').replace(/-/g, '').toUpperCase() === String(raw).toUpperCase() ||
+    c.numero === normalized ||
+    c.id === raw);
+  if (!cot) { res.json({ cotizacion: null }); return; }
+
+  const biblioteca = {};
+  for (const linea of cot.lineas || []) {
+    if (zdb.biblioteca?.[linea]) biblioteca[linea] = zdb.biblioteca[linea];
+  }
+
+  const tarifasEspeciales = {};
+  for (const linea of cot.lineas || []) {
+    if (cot.tarifaTipo?.[linea] !== 'especial') continue;
+    const teId = cot.tarifaEspecialId?.[linea];
+    if (!teId) continue;
+    const keys = linea === 'Paqueteo'
+      ? ['Paqueteo-COORDINADORA', 'Paqueteo-TCC', 'Paqueteo-SERVIENTREGA', 'Paqueteo']
+      : [linea];
+    for (const key of keys) {
+      const te = (zdb.tarifasEspeciales?.[key] || []).find((t) => t.id === teId);
+      if (te) { tarifasEspeciales[key] = [te]; break; }
+    }
+  }
+
+  const comercial = (zdb.comerciales || []).find((c) => c.id === cot.comercialId);
+
+  res.json({
+    cotizacion: cot,
+    biblioteca,
+    tarifasEspeciales,
+    comerciales: comercial ? [comercial] : [],
+  });
+});
+
 // Trae TODAS las claves de una — hidratación inicial del bridge de localStorage.
 app.get('/api/storage', requireAuth, (_req, res) => {
   const rows = db.prepare('SELECT key, value, version FROM storage').all();

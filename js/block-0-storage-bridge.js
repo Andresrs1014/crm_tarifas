@@ -22,24 +22,46 @@
     return xhr;
   }
 
-  // 1. Sesión requerida — si no hay, a login.
-  var meXhr = syncRequest('GET', '/api/auth/me');
-  var me = {};
-  try { me = JSON.parse(meXhr.responseText || '{}'); } catch (e) {}
-  if (!me.authenticated) {
-    window.location.replace('/login.html?next=' + encodeURIComponent(window.location.pathname + window.location.search));
-    throw new Error('No autenticado — redirigiendo a login');
-  }
-
-  // 2. Hidratar TODA la caché de una sola vez.
   var cache = Object.create(null); // { key: { value: <string>, version: <number> } }
-  var storeXhr = syncRequest('GET', '/api/storage');
-  if (storeXhr.status === 200) {
-    var all = {};
-    try { all = JSON.parse(storeXhr.responseText || '{}'); } catch (e) {}
-    Object.keys(all).forEach(function (k) {
-      cache[k] = { value: JSON.stringify(all[k].value), version: all[k].version };
-    });
+
+  // 0. Link público de cotización (?ZYMO=COT001 o ?cot=id) — sin login. El propio
+  // HTML original ya asumía este link como de solo-lectura ("solo funciona en el
+  // dispositivo donde fue creada"); acá se resuelve del lado del servidor y se le
+  // entrega al visitante ÚNICAMENTE esa cotización, nunca el resto de la BD.
+  var params = new URLSearchParams(window.location.search);
+  var cotParam = params.get('ZYMO') || params.get('cot');
+  var isPublicView = !!cotParam;
+
+  if (isPublicView) {
+    var pubXhr = syncRequest('GET', '/api/public/cotizacion/' + encodeURIComponent(cotParam));
+    var pub = { cotizacion: null };
+    try { pub = JSON.parse(pubXhr.responseText || '{}'); } catch (e) {}
+    var syntheticDb = {
+      cotizaciones: pub.cotizacion ? [pub.cotizacion] : [],
+      biblioteca: pub.biblioteca || {},
+      tarifasEspeciales: pub.tarifasEspeciales || {},
+      comerciales: pub.comerciales || [],
+    };
+    cache['zymo-db'] = { value: JSON.stringify(syntheticDb), version: null };
+  } else {
+    // 1. Sesión requerida — si no hay, a login.
+    var meXhr = syncRequest('GET', '/api/auth/me');
+    var me = {};
+    try { me = JSON.parse(meXhr.responseText || '{}'); } catch (e) {}
+    if (!me.authenticated) {
+      window.location.replace('/login.html?next=' + encodeURIComponent(window.location.pathname + window.location.search));
+      throw new Error('No autenticado — redirigiendo a login');
+    }
+
+    // 2. Hidratar TODA la caché de una sola vez.
+    var storeXhr = syncRequest('GET', '/api/storage');
+    if (storeXhr.status === 200) {
+      var all = {};
+      try { all = JSON.parse(storeXhr.responseText || '{}'); } catch (e) {}
+      Object.keys(all).forEach(function (k) {
+        cache[k] = { value: JSON.stringify(all[k].value), version: all[k].version };
+      });
+    }
   }
 
   function persist(key, valueStr, expectedVersion) {
@@ -77,10 +99,12 @@
       var valueStr = String(value);
       var expectedVersion = Object.prototype.hasOwnProperty.call(cache, key) ? cache[key].version : null;
       cache[key] = { value: valueStr, version: expectedVersion };
-      persist(key, valueStr, expectedVersion);
+      // Vista pública: solo-lectura, nunca escribe al backend compartido.
+      if (!isPublicView) persist(key, valueStr, expectedVersion);
     },
     removeItem: function (key) {
       delete cache[key];
+      if (isPublicView) return;
       var xhr = new XMLHttpRequest();
       xhr.open('DELETE', '/api/storage/' + encodeURIComponent(key), true);
       xhr.send(null);

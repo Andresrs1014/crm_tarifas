@@ -240,8 +240,9 @@ window.onload = () => {
   if(!new URLSearchParams(window.location.search).get('ZYMO') && !new URLSearchParams(window.location.search).get('cot')){
     document.title = 'CRM Proyectos & Negocios — Grupo ZYMO';
   }
-  // Show sample data prompt if empty
-  if(db.records.length===0){
+  // Show sample data prompt if empty (nunca en vista pública — ahí "vacío" es normal y esperado)
+  const _esVistaPublica = !!(new URLSearchParams(window.location.search).get('ZYMO') || new URLSearchParams(window.location.search).get('cot'));
+  if(db.records.length===0 && !_esVistaPublica){
     setTimeout(()=>{
       document.getElementById('modal-titulo').textContent = '👋 Bienvenido a ZYMO';
       document.getElementById('modal-content').innerHTML = `
