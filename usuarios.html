@@ -48,7 +48,11 @@
   <div id="content" class="wrap" style="display:none">
     <div class="topbar">
       <h1>👥 Usuarios del sistema</h1>
-      <a class="back" href="/">← Volver al CRM</a>
+      <span>
+        <a class="back" href="/">← Volver al CRM</a>
+        &nbsp;·&nbsp;
+        <a class="back" href="#" onclick="fetch('/api/auth/logout',{method:'POST'}).then(()=>location.href='/login.html');return false">Cerrar sesión</a>
+      </span>
     </div>
 
     <div class="card">
