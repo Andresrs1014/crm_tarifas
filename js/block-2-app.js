@@ -283,7 +283,7 @@ function showPage(id){
   document.getElementById('page-'+id).classList.add('active');
   window.scrollTo({top:0, behavior:'instant'});
   const tabs = document.querySelectorAll('.nav-tab');
-  const map = {dashboard:0,registro:1,prospectos:2,clientes:3,equipo:4,cotizaciones:5,crm:6,cotizador:7,preliquidador:8,calendario:9,biblioteca:10,'gestion-documental':11,sac:12,'matriz-riesgos':13,'ficha-cliente':14,'ficha-detalle':14};
+  const map = {dashboard:0,registro:1,prospectos:2,clientes:3,equipo:4,cotizaciones:5,crm:6,cotizador:7,preliquidador:8,calendario:9,'gestion-documental':10,'ficha-cliente':11,'ficha-detalle':11,'matriz-riesgos':12,biblioteca:13,sac:14};
   if(map[id]!==undefined && tabs[map[id]]) tabs[map[id]].classList.add('active');  if(id==='dashboard') renderDashboard();
   if(id==='prospectos') renderProspectos();
   if(id==='crm'){ renderCRM(); setTimeout(initCRMScrollSync,50); }
