@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Usuarios — Grupo ZYMO</title>
+<style>
+  body { margin:0; min-height:100vh; background:#0a0e1a; font-family:'Barlow',Arial,sans-serif; color:#e2e8f0; }
+  .wrap { max-width:760px; margin:0 auto; padding:32px 24px 60px; }
+  .topbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:28px; }
+  h1 { font-size:22px; margin:0; color:#fff; }
+  a.back { color:#00c2ff; text-decoration:none; font-size:13px; }
+  a.back:hover { text-decoration:underline; }
+  .card { background:#111827; border:1px solid #1e293b; border-radius:12px; padding:24px; margin-bottom:24px; }
+  .card h2 { font-size:15px; margin:0 0 16px; color:#fff; text-transform:uppercase; letter-spacing:0.5px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:end; }
+  .field { display:flex; flex-direction:column; gap:6px; flex:1; min-width:150px; }
+  label { font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; }
+  input, select { background:#0a0e1a; border:1px solid #1e293b; color:#e2e8f0; border-radius:7px;
+    padding:9px 11px; font-size:14px; font-family:inherit; }
+  input:focus, select:focus { outline:none; border-color:#00c2ff; }
+  button { background:#00c2ff; color:#001018; border:none; border-radius:7px; padding:10px 18px;
+    font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap; }
+  button:disabled { opacity:0.5; cursor:not-allowed; }
+  button.danger { background:transparent; color:#f87171; border:1px solid rgba(248,113,113,0.4); padding:6px 12px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { text-align:left; color:#94a3b8; font-size:11px; text-transform:uppercase; letter-spacing:0.5px;
+    padding:8px 10px; border-bottom:1px solid #1e293b; }
+  td { padding:10px; border-bottom:1px solid #1e293b; }
+  .role-badge { font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px; }
+  .role-admin { background:rgba(167,139,250,0.15); color:#a78bfa; }
+  .role-comercial { background:rgba(0,194,255,0.12); color:#00c2ff; }
+  .msg { font-size:13px; margin-top:10px; min-height:16px; }
+  .msg.err { color:#f87171; }
+  .msg.ok { color:#34d399; }
+  .empty { color:#64748b; font-size:13px; padding:16px 0; text-align:center; }
+  .gate { display:flex; align-items:center; justify-content:center; min-height:100vh; text-align:center; padding:20px; }
+</style>
+</head>
+<body>
+  <div id="gate" class="gate" style="display:none">
+    <div>
+      <p style="font-size:16px;margin-bottom:14px">🔒 Solo un administrador puede ver esta página.</p>
+      <a class="back" href="/">← Volver al CRM</a>
+    </div>
+  </div>
+
+  <div id="content" class="wrap" style="display:none">
+    <div class="topbar">
+      <h1>👥 Usuarios del sistema</h1>
+      <a class="back" href="/">← Volver al CRM</a>
+    </div>
+
+    <div class="card">
+      <h2>Crear usuario</h2>
+      <div class="row">
+        <div class="field">
+          <label for="f-username">Usuario</label>
+          <input id="f-username" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="f-password">Contraseña</label>
+          <input id="f-password" type="password" autocomplete="new-password">
+        </div>
+        <div class="field">
+          <label for="f-nombre">Nombre completo</label>
+          <input id="f-nombre">
+        </div>
+        <div class="field" style="flex:0 0 150px">
+          <label for="f-role">Rol</label>
+          <select id="f-role">
+            <option value="comercial">Comercial</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <button id="btn-crear" type="button">+ Crear</button>
+      </div>
+      <div class="msg" id="msg-crear"></div>
+    </div>
+
+    <div class="card">
+      <h2>Usuarios existentes</h2>
+      <table>
+        <thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Creado</th><th></th></tr></thead>
+        <tbody id="tbody-usuarios"></tbody>
+      </table>
+      <div id="empty-usuarios" class="empty" style="display:none">Sin usuarios todavía.</div>
+    </div>
+  </div>
+
+  <script>
+    var meActual = null;
+
+    function fmtFecha(iso) {
+      try { return new Date(iso).toLocaleDateString('es-CO', { day:'2-digit', month:'2-digit', year:'numeric' }); }
+      catch (e) { return iso; }
+    }
+
+    function cargarUsuarios() {
+      fetch('/api/users').then(function (r) { return r.json(); }).then(function (users) {
+        var tbody = document.getElementById('tbody-usuarios');
+        var empty = document.getElementById('empty-usuarios');
+        tbody.innerHTML = '';
+        empty.style.display = users.length ? 'none' : 'block';
+        users.forEach(function (u) {
+          var tr = document.createElement('tr');
+          var esYo = u.id === meActual.id;
+          tr.innerHTML =
+            '<td>' + u.username + (esYo ? ' <span style="color:#64748b">(tú)</span>' : '') + '</td>' +
+            '<td>' + u.nombre + '</td>' +
+            '<td><span class="role-badge role-' + u.role + '">' + u.role + '</span></td>' +
+            '<td>' + fmtFecha(u.created_at) + '</td>' +
+            '<td>' + (esYo ? '' : '<button class="danger" data-id="' + u.id + '">Eliminar</button>') + '</td>';
+          tbody.appendChild(tr);
+        });
+        tbody.querySelectorAll('button.danger').forEach(function (btn) {
+          btn.addEventListener('click', function () { eliminarUsuario(btn.getAttribute('data-id')); });
+        });
+      });
+    }
+
+    function eliminarUsuario(id) {
+      if (!confirm('¿Eliminar este usuario? No podrá volver a iniciar sesión.')) return;
+      fetch('/api/users/' + id, { method: 'DELETE' }).then(function () { cargarUsuarios(); });
+    }
+
+    document.getElementById('btn-crear').addEventListener('click', function () {
+      var msg = document.getElementById('msg-crear');
+      var btn = document.getElementById('btn-crear');
+      var body = {
+        username: document.getElementById('f-username').value.trim(),
+        password: document.getElementById('f-password').value,
+        nombre: document.getElementById('f-nombre').value.trim(),
+        role: document.getElementById('f-role').value,
+      };
+      if (!body.username || !body.password || !body.nombre) {
+        msg.textContent = 'Completa usuario, contraseña y nombre.';
+        msg.className = 'msg err';
+        return;
+      }
+      btn.disabled = true;
+      msg.textContent = '';
+      fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).then(function (res) {
+        return res.json().then(function (data) { return { ok: res.ok, data: data }; });
+      }).then(function (r) {
+        btn.disabled = false;
+        if (!r.ok) {
+          msg.textContent = r.data.error || 'Error al crear el usuario.';
+          msg.className = 'msg err';
+          return;
+        }
+        msg.textContent = '✅ Usuario "' + r.data.username + '" creado.';
+        msg.className = 'msg ok';
+        document.getElementById('f-username').value = '';
+        document.getElementById('f-password').value = '';
+        document.getElementById('f-nombre').value = '';
+        document.getElementById('f-role').value = 'comercial';
+        cargarUsuarios();
+      });
+    });
+
+    // Gate: requiere sesión + rol admin.
+    fetch('/api/auth/me').then(function (r) { return r.json(); }).then(function (me) {
+      if (!me.authenticated) {
+        window.location.href = '/login.html?next=' + encodeURIComponent('/usuarios.html');
+        return;
+      }
+      if (me.user.role !== 'admin') {
+        document.getElementById('gate').style.display = 'flex';
+        return;
+      }
+      meActual = me.user;
+      document.getElementById('content').style.display = 'block';
+      cargarUsuarios();
+    });
+  </script>
+</body>
+</html>
