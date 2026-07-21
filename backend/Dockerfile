@@ -9,7 +9,7 @@ RUN cd backend && npm ci --omit=dev
 # Resto del proyecto, mismo layout que en local — server.js sirve los estáticos
 # desde el directorio padre de backend/ (ver ROOT en server.js).
 COPY backend/ ./backend/
-COPY index.html login.html ./
+COPY index.html login.html usuarios.html ./
 COPY css ./css
 COPY js ./js
 COPY ["HTML ULTIMA VERSION", "./HTML ULTIMA VERSION"]
