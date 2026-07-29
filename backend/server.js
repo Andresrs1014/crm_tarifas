@@ -222,6 +222,7 @@ app.put('/api/storage/:key', requireAuth, (req, res) => {
 
   // Chequeo de versión: si alguien más guardó desde que este cliente cargó su copia, rechazar.
   if (current && expectedVersion !== undefined && expectedVersion !== null && current.version !== expectedVersion) {
+    console.warn(`[storage] CONFLICTO_VERSION key=${key} user=${req.user.username} expectedVersion=${expectedVersion} currentVersion=${current.version} at=${new Date().toISOString()}`);
     res.status(409).json({
       error: 'CONFLICTO_VERSION',
       message: 'Alguien más guardó cambios en esta clave. Recarga antes de continuar.',
@@ -237,10 +238,12 @@ app.put('/api/storage/:key', requireAuth, (req, res) => {
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, version = excluded.version, updated_at = excluded.updated_at
   `).run(key, json, newVersion);
 
+  console.log(`[storage] guardado key=${key} user=${req.user.username} version=${newVersion} bytes=${json.length} at=${new Date().toISOString()}`);
   res.json({ ok: true, version: newVersion });
 });
 
 app.delete('/api/storage/:key', requireAuth, (req, res) => {
+  console.warn(`[storage] BORRADO key=${req.params.key} user=${req.user.username} at=${new Date().toISOString()}`);
   db.prepare('DELETE FROM storage WHERE key = ?').run(req.params.key);
   res.json({ ok: true });
 });
