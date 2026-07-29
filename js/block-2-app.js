@@ -38,6 +38,7 @@ if(!localStorage.getItem('zymo-db') && _ZYMO_BACKUP_EMBEBIDO){
 }
 // Ensure all required db keys exist (backwards compat with old localStorage)
 if(!db.cotizaciones) db.cotizaciones = [];
+if(!db.papeleraCotizaciones) db.papeleraCotizaciones = [];
 if(!db.analistas) db.analistas = [
   {id:'a1', nombre:'Ana García',    email:'ana.garcia@zymo.com',    tel:'301 234 5678'},
   {id:'a2', nombre:'Carlos López',  email:'carlos.lopez@zymo.com',  tel:'302 345 6789'},
@@ -2048,7 +2049,6 @@ function fmtTarifa(val, tipo){
 function nextCotNumero(){
   const n = db.cotNumero || 1;
   db.cotNumero = n + 1;
-  save();
   return 'COT-' + String(n).padStart(3,'0');
 }
 
@@ -5517,10 +5517,47 @@ function duplicarCotizacion(id){
 }
 
 function eliminarCotizacion(id){
-  if(!confirm('¿Eliminar esta cotización? Esta acción no se puede deshacer.')) return;
-  db.cotizaciones = db.cotizaciones.filter(c=>c.id!==id);
+  if(!confirm('¿Eliminar esta cotización? Se moverá a la papelera y podrás restaurarla si fue un error.')) return;
+  const idx = db.cotizaciones.findIndex(c=>c.id===id);
+  if(idx<0) return;
+  const cot = db.cotizaciones.splice(idx,1)[0];
+  cot.deletedAt = Date.now();
+  if(!db.papeleraCotizaciones) db.papeleraCotizaciones = [];
+  db.papeleraCotizaciones.push(cot);
   save(); renderCotizaciones();
-  toast('🗑','Cotización eliminada','#ff4444');
+  toast('🗑','Cotización movida a la papelera','#ff4444');
+}
+
+function abrirPapeleraCotizaciones(){
+  const items = (db.papeleraCotizaciones||[]).slice().sort((a,b)=>(b.deletedAt||0)-(a.deletedAt||0));
+  document.getElementById('modal-titulo').textContent = '🗑️ Papelera de Cotizaciones';
+  document.getElementById('modal-content').innerHTML = items.length ? `
+    <div class="modal-section">
+      ${items.map(c=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+          <div>
+            <div style="font-weight:600">${c.numero||'—'} · ${c.empresa||'—'}</div>
+            <div style="font-size:11px;color:var(--text2)">Eliminada: ${new Date(c.deletedAt).toLocaleString('es-CO')}</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="restaurarCotizacion('${c.id}')">♻️ Restaurar</button>
+        </div>`).join('')}
+    </div>` : `<div class="modal-section" style="color:var(--text2);text-align:center;padding:30px">La papelera está vacía.</div>`;
+  document.getElementById('modal-footer').innerHTML = `
+    <div style="display:flex;gap:12px;margin-left:auto">
+      <button class="btn btn-secondary" onclick="closeModal()">Cerrar</button>
+    </div>`;
+  document.getElementById('modal-detalle').classList.add('open');
+}
+
+function restaurarCotizacion(id){
+  const idx = (db.papeleraCotizaciones||[]).findIndex(c=>c.id===id);
+  if(idx<0) return;
+  const cot = db.papeleraCotizaciones.splice(idx,1)[0];
+  delete cot.deletedAt;
+  db.cotizaciones.push(cot);
+  save(); renderCotizaciones();
+  abrirPapeleraCotizaciones();
+  toast('♻️','Cotización restaurada: '+(cot.numero||''),'#00e676');
 }
 
 // ============================================================
