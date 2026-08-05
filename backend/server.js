@@ -220,6 +220,14 @@ app.put('/api/storage/:key', requireAuth, (req, res) => {
 
   const current = db.prepare('SELECT version FROM storage WHERE key = ?').get(key);
 
+  // Si la clave ya existe, exigir expectedVersion siempre — sin esto, un cliente
+  // que por cualquier razón mande null/undefined pisaba la clave a ciegas sin
+  // pasar por el chequeo de conflicto de abajo.
+  if (current && (expectedVersion === undefined || expectedVersion === null)) {
+    res.status(400).json({ error: 'Falta "expectedVersion" — la clave ya existe, no se puede guardar a ciegas.' });
+    return;
+  }
+
   // Chequeo de versión: si alguien más guardó desde que este cliente cargó su copia, rechazar.
   if (current && expectedVersion !== undefined && expectedVersion !== null && current.version !== expectedVersion) {
     console.warn(`[storage] CONFLICTO_VERSION key=${key} user=${req.user.username} expectedVersion=${expectedVersion} currentVersion=${current.version} at=${new Date().toISOString()}`);

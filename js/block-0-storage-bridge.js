@@ -71,7 +71,13 @@
     xhr.onload = function () {
       if (xhr.status === 409) {
         console.error('[storage-bridge] Conflicto guardando "' + key + '": otro usuario guardó cambios más recientes.');
-        alert('Otro usuario guardó cambios en este momento. Recarga la página (F5) antes de seguir para no perder tu trabajo.');
+        // ponytail: sin esto, la versión local nunca se actualiza y CADA acción
+        // siguiente de este usuario vuelve a fallar en silencio hasta que cierra
+        // la pestaña — perdiendo todo lo que hizo desde el último guardado exitoso,
+        // sin dejar rastro. Recargar de inmediato limita la pérdida a solo esta
+        // acción puntual, en vez de a toda la sesión.
+        alert('Otro usuario guardó cambios en este momento. La página se va a recargar para traer la versión más reciente — repite la última acción que hiciste.');
+        window.location.reload();
         return;
       }
       if (xhr.status >= 200 && xhr.status < 300) {
