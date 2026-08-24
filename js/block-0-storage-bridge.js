@@ -188,4 +188,59 @@
   } catch (e) {
     console.error('[storage-bridge] No se pudo reemplazar window.localStorage:', e);
   }
+
+  // ── Sincronización periódica ──────────────────────────────────────────────
+  // La hidratación inicial (arriba) solo pasa una vez, al cargar la página --
+  // si alguien más crea/edita algo después, esta pestaña nunca se entera, se
+  // queda con la foto de cuando cargó. Por eso a un comercial le aparecían
+  // cotizaciones que a otro no: cada quien ve lo que había cuando SU pestaña
+  // cargó, no lo que hay ahora.
+  //
+  // No se recarga sola en silencio -- si alguien está a mitad de llenar un
+  // formulario, una recarga automática le tira el trabajo no guardado (lo
+  // mismo que se acaba de corregir arriba, pero por otra vía). En vez de eso,
+  // revisa el servidor cada 20s y, si hay algo más nuevo que no sea un
+  // guardado propio en vuelo, muestra un aviso -- el usuario decide cuándo
+  // es buen momento para actualizar.
+  if (!isPublicView) {
+    var syncBannerShown = false;
+    function showSyncBanner() {
+      if (syncBannerShown) return;
+      syncBannerShown = true;
+      var bar = document.createElement('div');
+      bar.setAttribute('style',
+        'position:fixed;left:0;right:0;bottom:0;z-index:999999;' +
+        'background:#1d4ed8;color:#fff;font:600 13px/1.4 system-ui,sans-serif;' +
+        'padding:10px 16px;display:flex;align-items:center;justify-content:center;' +
+        'gap:14px;box-shadow:0 -2px 10px rgba(0,0,0,.25)');
+      bar.innerHTML =
+        '<span>Hay cotizaciones o datos nuevos guardados por otro usuario.</span>' +
+        '<button type="button" style="background:#fff;color:#1d4ed8;border:0;' +
+        'border-radius:6px;padding:6px 14px;font:700 13px system-ui,sans-serif;' +
+        'cursor:pointer">Actualizar ahora</button>';
+      bar.querySelector('button').onclick = function () { window.location.reload(); };
+      document.body.appendChild(bar);
+    }
+
+    setInterval(function () {
+      if (syncBannerShown) return; // ya se avisó, no hace falta seguir preguntando
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', '/api/storage', true);
+      xhr.onload = function () {
+        if (xhr.status !== 200) return;
+        var all = {};
+        try { all = JSON.parse(xhr.responseText || '{}'); } catch (e) { return; }
+        var stale = Object.keys(all).some(function (key) {
+          // Si hay un guardado propio pendiente o en vuelo para esta clave, no
+          // cuenta como "atrasado" -- es a este usuario a quien le falta subir
+          // su cambio, no al revés.
+          if (key in pendingSave || saving[key]) return false;
+          var localVersion = cache[key] ? cache[key].version : null;
+          return localVersion != null && all[key].version > localVersion;
+        });
+        if (stale) showSyncBanner();
+      };
+      xhr.send(null);
+    }, 20000);
+  }
 })();
