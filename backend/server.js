@@ -33,7 +33,21 @@ db.exec(`
     role TEXT NOT NULL CHECK(role IN ('admin','comercial')),
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+  CREATE TABLE IF NOT EXISTS storage_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key TEXT NOT NULL,
+    value TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    saved_by TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_storage_history_key ON storage_history(key, id);
 `);
+
+// Cuántas versiones viejas se conservan por clave antes de podar las más
+// antiguas -- sin esto storage_history crece sin límite (cada guardado del
+// blob completo pesa unos MB) y se come el disco con el tiempo.
+const HISTORY_KEEP = Number(process.env.STORAGE_HISTORY_KEEP) || 50;
 
 // ---------- Contraseñas (scrypt nativo — sin dependencias externas) ----------
 function hashPassword(password, salt) {
@@ -91,6 +105,17 @@ function requireAdmin(req, res, next) {
 const app = express();
 app.use(express.json({ limit: '20mb' })); // el blob completo puede pesar varios MB
 app.use(cookieParser());
+
+// Marca de versión del build (escrita por el Dockerfile en cada rebuild real).
+// Sin auth a propósito -- el bridge del cliente la revisa antes de saber si
+// hay sesión, y de todas formas no expone nada sensible, solo un timestamp.
+let BUILD_VERSION = 'dev';
+try {
+  BUILD_VERSION = require('node:fs').readFileSync(path.join(__dirname, 'BUILD_VERSION'), 'utf8').trim();
+} catch (e) {
+  console.warn('BUILD_VERSION no encontrado (normal en desarrollo local, fuera de Docker).');
+}
+app.get('/api/app-version', (_req, res) => res.json({ version: BUILD_VERSION }));
 
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body || {};
@@ -218,7 +243,7 @@ app.put('/api/storage/:key', requireAuth, (req, res) => {
     return;
   }
 
-  const current = db.prepare('SELECT version FROM storage WHERE key = ?').get(key);
+  const current = db.prepare('SELECT value, version FROM storage WHERE key = ?').get(key);
 
   // Si la clave ya existe, exigir expectedVersion siempre — sin esto, un cliente
   // que por cualquier razón mande null/undefined pisaba la clave a ciegas sin
@@ -241,6 +266,23 @@ app.put('/api/storage/:key', requireAuth, (req, res) => {
 
   const newVersion = (current?.version ?? 0) + 1;
   const json = JSON.stringify(value);
+
+  // Respaldo: antes de pisar la versión anterior, la guarda en storage_history
+  // -- "en vez de borrar las cosas, respaldarlas" (nada se pierde de verdad,
+  // incluso si dos usuarios se pisan el blob completo entre sí). Solo hay algo
+  // que respaldar si ya existía una versión previa (current) -- una clave
+  // nueva no reemplaza nada.
+  if (current) {
+    db.prepare('INSERT INTO storage_history (key, value, version, saved_by) VALUES (?, ?, ?, ?)')
+      .run(key, current.value, current.version, req.user.username);
+    // Poda lo más viejo -- sin esto storage_history crece sin límite.
+    db.prepare(`
+      DELETE FROM storage_history WHERE key = ? AND id NOT IN (
+        SELECT id FROM storage_history WHERE key = ? ORDER BY id DESC LIMIT ?
+      )
+    `).run(key, key, HISTORY_KEEP);
+  }
+
   db.prepare(`
     INSERT INTO storage (key, value, version, updated_at) VALUES (?, ?, ?, datetime('now'))
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, version = excluded.version, updated_at = excluded.updated_at
@@ -251,9 +293,56 @@ app.put('/api/storage/:key', requireAuth, (req, res) => {
 });
 
 app.delete('/api/storage/:key', requireAuth, (req, res) => {
-  console.warn(`[storage] BORRADO key=${req.params.key} user=${req.user.username} at=${new Date().toISOString()}`);
-  db.prepare('DELETE FROM storage WHERE key = ?').run(req.params.key);
+  const { key } = req.params;
+  console.warn(`[storage] BORRADO key=${key} user=${req.user.username} at=${new Date().toISOString()}`);
+  // Mismo criterio que el guardado: respaldar antes de borrar, no perderlo.
+  const current = db.prepare('SELECT value, version FROM storage WHERE key = ?').get(key);
+  if (current) {
+    db.prepare('INSERT INTO storage_history (key, value, version, saved_by) VALUES (?, ?, ?, ?)')
+      .run(key, current.value, current.version, req.user.username);
+  }
+  db.prepare('DELETE FROM storage WHERE key = ?').run(key);
   res.json({ ok: true });
+});
+
+// ---------- Historial de versiones + restauración (solo admin) ----------
+// Lista liviana: NO trae el value completo (puede pesar varios MB por fila),
+// solo lo necesario para elegir cuál restaurar.
+app.get('/api/storage/:key/history', requireAuth, requireAdmin, (req, res) => {
+  const rows = db.prepare(
+    'SELECT id, version, saved_by, created_at, length(value) AS bytes FROM storage_history WHERE key = ? ORDER BY id DESC'
+  ).all(req.params.key);
+  res.json(rows);
+});
+
+app.post('/api/storage/:key/restore/:historyId', requireAuth, requireAdmin, (req, res) => {
+  const { key, historyId } = req.params;
+  const snapshot = db.prepare('SELECT value, version FROM storage_history WHERE id = ? AND key = ?').get(historyId, key);
+  if (!snapshot) {
+    res.status(404).json({ error: 'Esa versión del historial no existe.' });
+    return;
+  }
+  // Restaurar es en sí mismo un guardado más -- pasa por el mismo camino de
+  // respaldo de arriba (lo que había justo antes de restaurar también queda
+  // en el historial, por si la restauración fue un error).
+  const current = db.prepare('SELECT value, version FROM storage WHERE key = ?').get(key);
+  if (current) {
+    db.prepare('INSERT INTO storage_history (key, value, version, saved_by) VALUES (?, ?, ?, ?)')
+      .run(key, current.value, current.version, req.user.username);
+    db.prepare(`
+      DELETE FROM storage_history WHERE key = ? AND id NOT IN (
+        SELECT id FROM storage_history WHERE key = ? ORDER BY id DESC LIMIT ?
+      )
+    `).run(key, key, HISTORY_KEEP);
+  }
+  const newVersion = (current?.version ?? 0) + 1;
+  db.prepare(`
+    INSERT INTO storage (key, value, version, updated_at) VALUES (?, ?, ?, datetime('now'))
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, version = excluded.version, updated_at = excluded.updated_at
+  `).run(key, snapshot.value, newVersion);
+
+  console.warn(`[storage] RESTAURADO key=${key} desde historyId=${historyId} (version original ${snapshot.version}) user=${req.user.username} -> nueva version=${newVersion} at=${new Date().toISOString()}`);
+  res.json({ ok: true, version: newVersion });
 });
 
 // ---------- Estáticos: sirve index.html + css/ + js/ desde la raíz del proyecto ----------

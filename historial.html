@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Historial de versiones — Grupo ZYMO</title>
+<style>
+  body { margin:0; min-height:100vh; background:#0a0e1a; font-family:'Barlow',Arial,sans-serif; color:#e2e8f0; }
+  .wrap { max-width:900px; margin:0 auto; padding:32px 24px 60px; }
+  .topbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:10px; }
+  h1 { font-size:22px; margin:0; color:#fff; }
+  a.back { color:#00c2ff; text-decoration:none; font-size:13px; }
+  a.back:hover { text-decoration:underline; }
+  .intro { font-size:13px; color:#94a3b8; margin:0 0 24px; line-height:1.5; }
+  .card { background:#111827; border:1px solid #1e293b; border-radius:12px; padding:24px; margin-bottom:24px; }
+  .card h2 { font-size:15px; margin:0 0 16px; color:#fff; text-transform:uppercase; letter-spacing:0.5px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:end; margin-bottom:4px; }
+  .field { display:flex; flex-direction:column; gap:6px; }
+  label { font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; }
+  select { background:#0a0e1a; border:1px solid #1e293b; color:#e2e8f0; border-radius:7px;
+    padding:9px 11px; font-size:14px; font-family:inherit; min-width:220px; }
+  select:focus { outline:none; border-color:#00c2ff; }
+  button { background:#00c2ff; color:#001018; border:none; border-radius:7px; padding:8px 14px;
+    font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; }
+  button:disabled { opacity:0.5; cursor:not-allowed; }
+  button.ghost { background:transparent; color:#00c2ff; border:1px solid rgba(0,194,255,0.4); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { text-align:left; color:#94a3b8; font-size:11px; text-transform:uppercase; letter-spacing:0.5px;
+    padding:8px 10px; border-bottom:1px solid #1e293b; }
+  td { padding:10px; border-bottom:1px solid #1e293b; }
+  .badge { font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px; background:rgba(52,211,153,0.12); color:#34d399; }
+  .msg { font-size:13px; margin-top:10px; min-height:16px; }
+  .msg.err { color:#f87171; }
+  .msg.ok { color:#34d399; }
+  .empty { color:#64748b; font-size:13px; padding:16px 0; text-align:center; }
+  .gate { display:flex; align-items:center; justify-content:center; min-height:100vh; text-align:center; padding:20px; }
+</style>
+</head>
+<body>
+  <div id="gate" class="gate" style="display:none">
+    <div>
+      <p style="font-size:16px;margin-bottom:14px">🔒 Solo un administrador puede ver esta página.</p>
+      <a class="back" href="/">← Volver al CRM</a>
+    </div>
+  </div>
+
+  <div id="content" class="wrap" style="display:none">
+    <div class="topbar">
+      <h1>🗄️ Historial de versiones</h1>
+      <span>
+        <a class="back" href="/">← Volver al CRM</a>
+        &nbsp;·&nbsp;
+        <a class="back" href="#" onclick="fetch('/api/auth/logout',{method:'POST'}).then(()=>location.href='/login.html');return false">Cerrar sesión</a>
+      </span>
+    </div>
+    <p class="intro">Cada vez que se guarda o se borra una clave, la versión anterior queda respaldada acá antes de reemplazarse — nada se pierde de verdad, aunque dos usuarios se pisen al guardar casi al mismo tiempo. Restaurar una versión vieja también queda guardado como una versión nueva (no se pierde lo que había antes de restaurar).</p>
+
+    <div class="card">
+      <div class="row">
+        <div class="field">
+          <label for="f-key">Clave</label>
+          <select id="f-key"></select>
+        </div>
+        <button id="btn-refrescar" class="ghost" type="button">↻ Refrescar</button>
+      </div>
+      <div class="msg" id="msg-key"></div>
+    </div>
+
+    <div class="card">
+      <h2>Versiones guardadas</h2>
+      <table>
+        <thead><tr><th>Versión</th><th>Guardó</th><th>Fecha</th><th>Tamaño</th><th></th></tr></thead>
+        <tbody id="tbody-historial"></tbody>
+      </table>
+      <div id="empty-historial" class="empty" style="display:none">Sin historial todavía para esta clave — se llena a partir del próximo guardado.</div>
+    </div>
+  </div>
+
+  <script>
+    function fmtFecha(iso) {
+      try { return new Date(iso + 'Z').toLocaleString('es-CO', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }); }
+      catch (e) { return iso; }
+    }
+    function fmtBytes(n) {
+      if (n > 1024 * 1024) return (n / (1024 * 1024)).toFixed(1) + ' MB';
+      if (n > 1024) return (n / 1024).toFixed(0) + ' KB';
+      return n + ' B';
+    }
+
+    function cargarClaves() {
+      fetch('/api/storage').then(function (r) { return r.json(); }).then(function (all) {
+        var sel = document.getElementById('f-key');
+        var prev = sel.value;
+        sel.innerHTML = '';
+        Object.keys(all).sort().forEach(function (k) {
+          var opt = document.createElement('option');
+          opt.value = k;
+          opt.textContent = k + ' (versión actual: ' + all[k].version + ')';
+          sel.appendChild(opt);
+        });
+        if (prev && all[prev]) sel.value = prev;
+        cargarHistorial();
+      });
+    }
+
+    function cargarHistorial() {
+      var key = document.getElementById('f-key').value;
+      if (!key) return;
+      fetch('/api/storage/' + encodeURIComponent(key) + '/history').then(function (r) { return r.json(); }).then(function (rows) {
+        var tbody = document.getElementById('tbody-historial');
+        var empty = document.getElementById('empty-historial');
+        tbody.innerHTML = '';
+        empty.style.display = rows.length ? 'none' : 'block';
+        rows.forEach(function (row) {
+          var tr = document.createElement('tr');
+          tr.innerHTML =
+            '<td>v' + row.version + '</td>' +
+            '<td>' + (row.saved_by || '—') + '</td>' +
+            '<td>' + fmtFecha(row.created_at) + '</td>' +
+            '<td>' + fmtBytes(row.bytes) + '</td>' +
+            '<td><button data-id="' + row.id + '">♻️ Restaurar</button></td>';
+          tbody.appendChild(tr);
+        });
+        tbody.querySelectorAll('button').forEach(function (btn) {
+          btn.addEventListener('click', function () { restaurar(key, btn.getAttribute('data-id'), btn); });
+        });
+      });
+    }
+
+    function restaurar(key, historyId, btn) {
+      if (!confirm('¿Restaurar esta versión de "' + key + '"? Quedará como la versión activa ahora mismo (lo que hay actualmente también se respalda, por si acaso).')) return;
+      btn.disabled = true;
+      fetch('/api/storage/' + encodeURIComponent(key) + '/restore/' + historyId, { method: 'POST' })
+        .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+        .then(function (r) {
+          var msg = document.getElementById('msg-key');
+          if (!r.ok) {
+            msg.textContent = r.data.error || 'No se pudo restaurar.';
+            msg.className = 'msg err';
+            btn.disabled = false;
+            return;
+          }
+          msg.textContent = '✅ Restaurado — "' + key + '" quedó en la versión ' + r.data.version + '. Los usuarios con esa clave abierta van a ver el aviso de sincronización.';
+          msg.className = 'msg ok';
+          cargarClaves();
+        });
+    }
+
+    document.getElementById('f-key').addEventListener('change', cargarHistorial);
+    document.getElementById('btn-refrescar').addEventListener('click', cargarClaves);
+
+    // Gate: requiere sesión + rol admin.
+    fetch('/api/auth/me').then(function (r) { return r.json(); }).then(function (me) {
+      if (!me.authenticated) {
+        window.location.href = '/login.html?next=' + encodeURIComponent('/historial.html');
+        return;
+      }
+      if (me.user.role !== 'admin') {
+        document.getElementById('gate').style.display = 'flex';
+        return;
+      }
+      document.getElementById('content').style.display = 'block';
+      cargarClaves();
+    });
+  </script>
+</body>
+</html>

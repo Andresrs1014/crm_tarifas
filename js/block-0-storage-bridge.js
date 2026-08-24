@@ -14,6 +14,30 @@
 (function () {
   'use strict';
 
+  // Referencia al localStorage REAL del navegador, tomada ANTES de que más
+  // abajo lo reemplacemos por el shim -- es el respaldo de emergencia: cada
+  // setItem() se escribe acá también, de inmediato, y solo se borra cuando
+  // el servidor CONFIRMA que la guardó. Si la pestaña se recarga o se cierra
+  // a la fuerza antes de esa confirmación (JS viejo, choque de versión
+  // agotado, red caída, lo que sea), el cambio no se pierde: sigue en el
+  // localStorage real, y la próxima vez que se abra el CRM se ofrece
+  // recuperarlo. Puede fallar en modo incógnito estricto de Safari -- si
+  // pasa, el respaldo simplemente no aplica, no rompe nada más.
+  var nativeStorage = null;
+  try { nativeStorage = window.localStorage; } catch (e) {}
+  var BACKUP_PREFIX = '__zymo_backup__';
+
+  function stashLocal(key, valueStr) {
+    if (!nativeStorage) return;
+    try {
+      nativeStorage.setItem(BACKUP_PREFIX + key, JSON.stringify({ valueStr: valueStr, ts: Date.now() }));
+    } catch (e) {} // cuota llena u otro error -- el guardado al servidor sigue intentándose igual
+  }
+  function clearStash(key) {
+    if (!nativeStorage) return;
+    try { nativeStorage.removeItem(BACKUP_PREFIX + key); } catch (e) {}
+  }
+
   function syncRequest(method, url, body) {
     var xhr = new XMLHttpRequest();
     xhr.open(method, url, false); // false = síncrono, intencional (ver comentario arriba)
@@ -65,6 +89,12 @@
         cache[k] = { value: JSON.stringify(all[k].value), version: all[k].version };
       });
     }
+
+    // 3. Versión del build que se acaba de cargar -- para detectar más
+    // adelante si el servidor se redespliega mientras esta pestaña sigue
+    // abierta (ver la sección de sincronización periódica, al final).
+    var versionXhr = syncRequest('GET', '/api/app-version');
+    try { window.__zymoLoadedAppVersion = JSON.parse(versionXhr.responseText || '{}').version || null; } catch (e) {}
   }
 
   // Antes, cada setItem() disparaba su propio PUT con la versión que tuviera
@@ -125,6 +155,10 @@
           var res = JSON.parse(xhr.responseText);
           if (cache[key]) cache[key].version = res.version;
         } catch (e) {}
+        // Confirmado por el servidor -- ya no hace falta el respaldo de
+        // emergencia de este valor puntual (si mientras tanto se encoló uno
+        // más nuevo, ese ya se re-respaldó solo al llamar setItem).
+        if (!(key in pendingSave)) clearStash(key);
       } else {
         console.error('[storage-bridge] Error guardando "' + key + '": HTTP ' + xhr.status);
       }
@@ -157,6 +191,10 @@
       }
       // Vista pública: solo-lectura, nunca escribe al backend compartido.
       if (isPublicView) return;
+      // Respaldo de emergencia PRIMERO, antes de intentar nada con el
+      // servidor -- si algo sale mal después (choque agotado, red caída,
+      // la pestaña se cierra), esto ya quedó guardado en el navegador.
+      stashLocal(key, valueStr);
       pendingSave[key] = { valueStr: valueStr, attempt: 0 };
       flushKey(key);
     },
@@ -203,44 +241,134 @@
   // guardado propio en vuelo, muestra un aviso -- el usuario decide cuándo
   // es buen momento para actualizar.
   if (!isPublicView) {
-    var syncBannerShown = false;
-    function showSyncBanner() {
-      if (syncBannerShown) return;
-      syncBannerShown = true;
+    function showBanner(html, color) {
       var bar = document.createElement('div');
       bar.setAttribute('style',
         'position:fixed;left:0;right:0;bottom:0;z-index:999999;' +
-        'background:#1d4ed8;color:#fff;font:600 13px/1.4 system-ui,sans-serif;' +
+        'background:' + color + ';color:#fff;font:600 13px/1.4 system-ui,sans-serif;' +
         'padding:10px 16px;display:flex;align-items:center;justify-content:center;' +
-        'gap:14px;box-shadow:0 -2px 10px rgba(0,0,0,.25)');
-      bar.innerHTML =
-        '<span>Hay cotizaciones o datos nuevos guardados por otro usuario.</span>' +
-        '<button type="button" style="background:#fff;color:#1d4ed8;border:0;' +
-        'border-radius:6px;padding:6px 14px;font:700 13px system-ui,sans-serif;' +
-        'cursor:pointer">Actualizar ahora</button>';
-      bar.querySelector('button').onclick = function () { window.location.reload(); };
+        'gap:14px;box-shadow:0 -2px 10px rgba(0,0,0,.25);flex-wrap:wrap;text-align:center');
+      bar.innerHTML = html;
       document.body.appendChild(bar);
+      return bar;
     }
 
+    // ── Recuperar respaldos de emergencia de una sesión anterior ────────────
+    // Si quedó algo en el localStorage real que nunca se confirmó guardado
+    // (ver stashLocal más arriba), avisar apenas carga -- antes de que se
+    // pueda perder por seguir editando encima.
+    //
+    // Diferido a DOMContentLoaded a propósito: este script corre en <head>,
+    // antes de que exista <body> -- llamar showBanner() (que hace
+    // document.body.appendChild) en ese punto tira TypeError porque body es
+    // null, y como queda dentro de un try/catch se traga el error en
+    // silencio: el aviso simplemente nunca aparecía. Verificado con
+    // agent-browser -- sin este defer, la detección corría bien pero el
+    // aviso nunca se veía en pantalla.
+    document.addEventListener('DOMContentLoaded', function () {
+      if (!nativeStorage) return;
+      try {
+        Object.keys(nativeStorage).filter(function (k) { return k.indexOf(BACKUP_PREFIX) === 0; })
+          .forEach(function (storageKey) {
+            var key = storageKey.slice(BACKUP_PREFIX.length);
+            var stashed;
+            try { stashed = JSON.parse(nativeStorage.getItem(storageKey)); } catch (e) { return; }
+            if (!stashed || !stashed.valueStr) return;
+            // Si es idéntico a lo que ya hay hidratado, no era nada pendiente
+            // de verdad (quedó de un guardado que sí se confirmó pero por lo
+            // que sea no se limpió) -- lo borra en silencio, sin molestar.
+            if (cache[key] && cache[key].value === stashed.valueStr) { clearStash(key); return; }
+            var when = new Date(stashed.ts).toLocaleString('es-CO', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+            var bar = showBanner(
+              '<span>⚠️ Se encontró un cambio de "' + key + '" (' + when + ') que no se confirmó guardado antes de la última recarga.</span>' +
+              '<button type="button" data-a="restore" style="background:#fff;color:#b45309;border:0;border-radius:6px;padding:6px 14px;font:700 13px system-ui,sans-serif;cursor:pointer">Recuperar</button>' +
+              '<button type="button" data-a="discard" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6);border-radius:6px;padding:6px 14px;font:700 13px system-ui,sans-serif;cursor:pointer">Descartar</button>',
+              '#b45309'
+            );
+            bar.querySelector('[data-a="restore"]').onclick = function () {
+              window.localStorage.setItem(key, stashed.valueStr); // pasa por el storageShim real -> flushKey normal
+              bar.remove();
+            };
+            bar.querySelector('[data-a="discard"]').onclick = function () {
+              clearStash(key);
+              bar.remove();
+            };
+          });
+      } catch (e) {}
+    });
+
+    // ── Sincronización periódica ────────────────────────────────────────────
+    // La hidratación inicial (arriba) solo pasa una vez, al cargar la página --
+    // si alguien más crea/edita algo después, esta pestaña nunca se entera, se
+    // queda con la foto de cuando cargó. Por eso a un comercial le aparecían
+    // cotizaciones que a otro no: cada quien ve lo que había cuando SU pestaña
+    // cargó, no lo que hay ahora.
+    //
+    // No se recarga sola en silencio -- si alguien está a mitad de llenar un
+    // formulario, una recarga automática le tira el trabajo no guardado (lo
+    // mismo que se acaba de corregir arriba, pero por otra vía). En vez de eso,
+    // revisa el servidor cada 20s y, si hay algo más nuevo que no sea un
+    // guardado propio en vuelo, muestra un aviso -- el usuario decide cuándo
+    // es buen momento para actualizar.
+    //
+    // También revisa si el SERVIDOR se redesplegó desde que esta pestaña
+    // cargó (comparando /api/app-version contra lo que se guardó al hidratar)
+    // -- si un deploy trae un fix como el de más arriba, una pestaña que ya
+    // estaba abierta sigue corriendo el JS viejo en memoria hasta que alguien
+    // la recarga a mano. Es justo lo que pasó una vez: una pestaña vieja
+    // chocó, hizo alert()+reload() con el código de antes, y se perdió lo que
+    // tenía sin que nadie se enterara a tiempo de avisar que se cerrara.
+    var dataBannerShown = false;
+    var versionBannerShown = false;
     setInterval(function () {
-      if (syncBannerShown) return; // ya se avisó, no hace falta seguir preguntando
-      var xhr = new XMLHttpRequest();
-      xhr.open('GET', '/api/storage', true);
-      xhr.onload = function () {
-        if (xhr.status !== 200) return;
-        var all = {};
-        try { all = JSON.parse(xhr.responseText || '{}'); } catch (e) { return; }
-        var stale = Object.keys(all).some(function (key) {
-          // Si hay un guardado propio pendiente o en vuelo para esta clave, no
-          // cuenta como "atrasado" -- es a este usuario a quien le falta subir
-          // su cambio, no al revés.
-          if (key in pendingSave || saving[key]) return false;
-          var localVersion = cache[key] ? cache[key].version : null;
-          return localVersion != null && all[key].version > localVersion;
-        });
-        if (stale) showSyncBanner();
-      };
-      xhr.send(null);
+      if (!dataBannerShown) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/storage', true);
+        xhr.onload = function () {
+          if (xhr.status !== 200) return;
+          var all = {};
+          try { all = JSON.parse(xhr.responseText || '{}'); } catch (e) { return; }
+          var stale = Object.keys(all).some(function (key) {
+            // Si hay un guardado propio pendiente o en vuelo para esta clave, no
+            // cuenta como "atrasado" -- es a este usuario a quien le falta subir
+            // su cambio, no al revés.
+            if (key in pendingSave || saving[key]) return false;
+            var localVersion = cache[key] ? cache[key].version : null;
+            return localVersion != null && all[key].version > localVersion;
+          });
+          if (stale) {
+            dataBannerShown = true;
+            var bar = showBanner(
+              '<span>Hay cotizaciones o datos nuevos guardados por otro usuario.</span>' +
+              '<button type="button" data-a="reload" style="background:#fff;color:#1d4ed8;border:0;border-radius:6px;padding:6px 14px;font:700 13px system-ui,sans-serif;cursor:pointer">Actualizar ahora</button>',
+              '#1d4ed8'
+            );
+            bar.querySelector('[data-a="reload"]').onclick = function () { window.location.reload(); };
+          }
+        };
+        xhr.send(null);
+      }
+
+      if (!versionBannerShown && window.__zymoLoadedAppVersion) {
+        var vXhr = new XMLHttpRequest();
+        vXhr.open('GET', '/api/app-version', true);
+        vXhr.onload = function () {
+          if (vXhr.status !== 200) return;
+          var v = null;
+          try { v = JSON.parse(vXhr.responseText || '{}').version; } catch (e) { return; }
+          if (v && v !== window.__zymoLoadedAppVersion) {
+            versionBannerShown = true;
+            var bar2 = showBanner(
+              '<span>⚠️ Esta pestaña tiene una versión desactualizada del CRM (hubo una actualización del sistema). ' +
+              'Guarda lo que estés haciendo y actualiza para evitar perder cambios.</span>' +
+              '<button type="button" data-a="reload" style="background:#fff;color:#b91c1c;border:0;border-radius:6px;padding:6px 14px;font:700 13px system-ui,sans-serif;cursor:pointer">Actualizar ahora</button>',
+              '#b91c1c'
+            );
+            bar2.querySelector('[data-a="reload"]').onclick = function () { window.location.reload(); };
+          }
+        };
+        vXhr.send(null);
+      }
     }, 20000);
   }
 })();
