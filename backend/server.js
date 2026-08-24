@@ -6,6 +6,7 @@ const cookieParser = require('cookie-parser');
 const crypto = require('node:crypto');
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
+const { merge3 } = require('./merge');
 
 const PORT = process.env.PORT || 3010;
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
@@ -253,19 +254,49 @@ app.put('/api/storage/:key', requireAuth, (req, res) => {
     return;
   }
 
-  // Chequeo de versión: si alguien más guardó desde que este cliente cargó su copia, rechazar.
+  // Chequeo de versión: si alguien más guardó desde que este cliente cargó su
+  // copia, antes esto rechazaba directo con 409 y el cliente reintentaba con
+  // SU blob completo, pisando lo que el otro usuario hubiera agregado
+  // mientras tanto (aunque fuera algo sin relación, ej. un cliente nuevo vs
+  // una cotización nueva). Ahora, si todavía existe en storage_history la
+  // versión exacta de la que partió este cliente (la "base" común), se
+  // intenta fusionar por id/clave en vez de rechazar -- ver merge.js para el
+  // porqué y el único caso límite real que queda (mismo campo del mismo
+  // registro editado distinto por los dos: gana lo que ya está en vivo, pero
+  // el resto del registro y todo lo demás no se pierde).
+  let valueToSave = value;
+  let mergedFromConflict = false;
   if (current && expectedVersion !== undefined && expectedVersion !== null && current.version !== expectedVersion) {
-    console.warn(`[storage] CONFLICTO_VERSION key=${key} user=${req.user.username} expectedVersion=${expectedVersion} currentVersion=${current.version} at=${new Date().toISOString()}`);
-    res.status(409).json({
-      error: 'CONFLICTO_VERSION',
-      message: 'Alguien más guardó cambios en esta clave. Recarga antes de continuar.',
-      currentVersion: current.version,
-    });
-    return;
+    const baseRow = db.prepare('SELECT value FROM storage_history WHERE key = ? AND version = ?').get(key, expectedVersion);
+    if (!baseRow) {
+      // Sin base común (se podó del historial, o expectedVersion nunca fue
+      // una versión real) no hay con qué fusionar de forma segura -- cae al
+      // rechazo de siempre, el cliente reintenta con la versión fresca.
+      console.warn(`[storage] CONFLICTO_VERSION (sin base para fusionar) key=${key} user=${req.user.username} expectedVersion=${expectedVersion} currentVersion=${current.version} at=${new Date().toISOString()}`);
+      res.status(409).json({
+        error: 'CONFLICTO_VERSION',
+        message: 'Alguien más guardó cambios en esta clave. Recarga antes de continuar.',
+        currentVersion: current.version,
+      });
+      return;
+    }
+    try {
+      valueToSave = merge3(JSON.parse(baseRow.value), value, JSON.parse(current.value));
+      mergedFromConflict = true;
+      console.warn(`[storage] FUSIONADO key=${key} user=${req.user.username} expectedVersion=${expectedVersion} currentVersion=${current.version} at=${new Date().toISOString()}`);
+    } catch (e) {
+      console.error(`[storage] Error fusionando key=${key}, cae a rechazo:`, e);
+      res.status(409).json({
+        error: 'CONFLICTO_VERSION',
+        message: 'Alguien más guardó cambios en esta clave. Recarga antes de continuar.',
+        currentVersion: current.version,
+      });
+      return;
+    }
   }
 
   const newVersion = (current?.version ?? 0) + 1;
-  const json = JSON.stringify(value);
+  const json = JSON.stringify(valueToSave);
 
   // Respaldo: antes de pisar la versión anterior, la guarda en storage_history
   // -- "en vez de borrar las cosas, respaldarlas" (nada se pierde de verdad,
@@ -288,8 +319,18 @@ app.put('/api/storage/:key', requireAuth, (req, res) => {
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, version = excluded.version, updated_at = excluded.updated_at
   `).run(key, json, newVersion);
 
-  console.log(`[storage] guardado key=${key} user=${req.user.username} version=${newVersion} bytes=${json.length} at=${new Date().toISOString()}`);
-  res.json({ ok: true, version: newVersion });
+  console.log(`[storage] guardado key=${key} user=${req.user.username} version=${newVersion} bytes=${json.length}${mergedFromConflict ? ' (fusionado)' : ''} at=${new Date().toISOString()}`);
+  // Si se fusionó, lo que quedó guardado puede tener cosas que este cliente
+  // todavía no tenía en su copia (lo que agregó el otro usuario) -- se lo
+  // manda de vuelta para que el bridge actualice su caché ya mismo, en vez
+  // de que la pestaña se quede "atrasada" hasta el próximo aviso de
+  // sincronización de los 20s.
+  const responseBody = { ok: true, version: newVersion };
+  if (mergedFromConflict) {
+    responseBody.merged = true;
+    responseBody.value = valueToSave;
+  }
+  res.json(responseBody);
 });
 
 app.delete('/api/storage/:key', requireAuth, (req, res) => {

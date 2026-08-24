@@ -154,6 +154,12 @@
         try {
           var res = JSON.parse(xhr.responseText);
           if (cache[key]) cache[key].version = res.version;
+          // El servidor fusionó esto con lo que otro usuario había guardado
+          // mientras tanto (ver merge.js) -- lo que quedó puede tener cosas
+          // que esta pestaña todavía no tenía. Actualizar la caché ya mismo
+          // evita que se quede "atrasada" hasta el próximo aviso de
+          // sincronización de los 20s.
+          if (res.merged && cache[key]) cache[key].value = JSON.stringify(res.value);
         } catch (e) {}
         // Confirmado por el servidor -- ya no hace falta el respaldo de
         // emergencia de este valor puntual (si mientras tanto se encoló uno
