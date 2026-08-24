@@ -23,6 +23,9 @@
   }
 
   var cache = Object.create(null); // { key: { value: <string>, version: <number> } }
+  var pendingSave = Object.create(null); // key -> { valueStr, attempt } -- próxima escritura a mandar
+  var saving = Object.create(null);      // key -> true mientras haya un PUT en vuelo para esa clave
+  var MAX_RETRIES = 3;
 
   // 0. Link público de cotización (?ZYMO=COT001 o ?cot=id) — sin login. El propio
   // HTML original ya asumía este link como de solo-lectura ("solo funciona en el
@@ -64,35 +67,77 @@
     }
   }
 
-  function persist(key, valueStr, expectedVersion) {
+  // Antes, cada setItem() disparaba su propio PUT con la versión que tuviera
+  // cache[key] EN ESE MOMENTO, sin esperar la respuesta del anterior -- si la
+  // app llamaba a save() dos veces seguidas (algo normal: hay 70+ puntos de
+  // guardado y ningún debounce), la segunda mandaba la MISMA expectedVersion
+  // que la primera porque cache[key].version nunca se corregía hasta que
+  // llegaba la respuesta. El servidor aceptaba la primera y rechazaba la
+  // segunda con 409 -- y el manejador de 409 hacía alert()+reload() de una,
+  // descartando ese guardado sin más. Con dos pestañas abiertas (o dos
+  // usuarios) el choque es constante, no la excepción.
+  //
+  // Fix: como mucho un PUT en vuelo por clave. Si llega un setItem mientras
+  // ya hay uno viajando, se encola (la más nueva reemplaza a la que estaba
+  // encolada, no hace falta mandar cada estado intermedio) y se manda apenas
+  // el anterior responda, ya con la versión real que confirmó el servidor.
+  // Y si aun así choca (409 -- otro usuario sí guardó de por medio), el
+  // servidor ya nos dice currentVersion en el propio 409: reintentamos el
+  // guardado de este usuario contra esa versión fresca, hasta MAX_RETRIES
+  // veces, en vez de tirar el cambio a la basura. Solo si sigue chocando
+  // (conflicto real y repetido en la misma clave) cae al aviso + recarga de
+  // antes, como último recurso.
+  function flushKey(key) {
+    if (saving[key] || !(key in pendingSave)) return;
+    var job = pendingSave[key];
+    delete pendingSave[key];
+    saving[key] = true;
+
+    var expectedVersion = cache[key] ? cache[key].version : null;
     var xhr = new XMLHttpRequest();
     xhr.open('PUT', '/api/storage/' + encodeURIComponent(key), true); // async — no bloquea la UI
     xhr.setRequestHeader('Content-Type', 'application/json');
     xhr.onload = function () {
+      saving[key] = false;
+
       if (xhr.status === 409) {
-        console.error('[storage-bridge] Conflicto guardando "' + key + '": otro usuario guardó cambios más recientes.');
-        // ponytail: sin esto, la versión local nunca se actualiza y CADA acción
-        // siguiente de este usuario vuelve a fallar en silencio hasta que cierra
-        // la pestaña — perdiendo todo lo que hizo desde el último guardado exitoso,
-        // sin dejar rastro. Recargar de inmediato limita la pérdida a solo esta
-        // acción puntual, en vez de a toda la sesión.
-        alert('Otro usuario guardó cambios en este momento. La página se va a recargar para traer la versión más reciente — repite la última acción que hiciste.');
-        window.location.reload();
+        var currentVersion = null;
+        try { currentVersion = JSON.parse(xhr.responseText).currentVersion; } catch (e) {}
+        if (currentVersion != null && job.attempt < MAX_RETRIES) {
+          if (cache[key]) cache[key].version = currentVersion;
+          // Si ya se encoló un guardado más nuevo mientras este viajaba, ese
+          // reemplaza al que falló -- no lo pisamos, ya se va a mandar solo
+          // con la versión recién corregida arriba.
+          if (!(key in pendingSave)) {
+            pendingSave[key] = { valueStr: job.valueStr, attempt: job.attempt + 1 };
+          }
+          flushKey(key);
+        } else {
+          console.error('[storage-bridge] Conflicto persistente guardando "' + key + '" tras ' + job.attempt + ' reintento(s).');
+          alert('Otro usuario guardó cambios en este momento y no se pudo resolver automáticamente. La página se va a recargar para traer la versión más reciente — repite la última acción que hiciste.');
+          window.location.reload();
+        }
         return;
       }
+
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           var res = JSON.parse(xhr.responseText);
           if (cache[key]) cache[key].version = res.version;
         } catch (e) {}
+      } else {
+        console.error('[storage-bridge] Error guardando "' + key + '": HTTP ' + xhr.status);
       }
+      flushKey(key); // por si entró un guardado nuevo mientras este viajaba
     };
     xhr.onerror = function () {
+      saving[key] = false;
       console.error('[storage-bridge] No se pudo guardar "' + key + '" — sin conexión con el servidor.');
     };
     try {
-      xhr.send(JSON.stringify({ value: JSON.parse(valueStr), expectedVersion: expectedVersion }));
+      xhr.send(JSON.stringify({ value: JSON.parse(job.valueStr), expectedVersion: expectedVersion }));
     } catch (e) {
+      saving[key] = false;
       console.error('[storage-bridge] Valor no serializable para "' + key + '":', e);
     }
   }
@@ -103,10 +148,17 @@
     },
     setItem: function (key, value) {
       var valueStr = String(value);
-      var expectedVersion = Object.prototype.hasOwnProperty.call(cache, key) ? cache[key].version : null;
-      cache[key] = { value: valueStr, version: expectedVersion };
+      // La versión NUNCA se toca acá -- solo flushKey() la actualiza, y solo
+      // con lo que el servidor confirmó (ver comentario arriba de flushKey).
+      if (Object.prototype.hasOwnProperty.call(cache, key)) {
+        cache[key].value = valueStr;
+      } else {
+        cache[key] = { value: valueStr, version: null };
+      }
       // Vista pública: solo-lectura, nunca escribe al backend compartido.
-      if (!isPublicView) persist(key, valueStr, expectedVersion);
+      if (isPublicView) return;
+      pendingSave[key] = { valueStr: valueStr, attempt: 0 };
+      flushKey(key);
     },
     removeItem: function (key) {
       delete cache[key];
